@@ -1,0 +1,38 @@
+[gd_scene load_steps=6 format=3 uid="uid://chwuaamvff38w"]
+
+[ext_resource type="Script" uid="uid://uvbpbcnaua1h" path="res://control.gd" id="1_0fbet"]
+[ext_resource type="FontFile" uid="uid://dtc16cg0dah4y" path="res://font/QingNiaoHuaGuangJianMeiHei-2.ttf" id="1_62e2m"]
+
+[sub_resource type="Theme" id="Theme_qtu10"]
+default_font = ExtResource("1_62e2m")
+
+[sub_resource type="Theme" id="Theme_62e2m"]
+
+[sub_resource type="Theme" id="Theme_ee4bf"]
+
+[node name="Control" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = SubResource("Theme_qtu10")
+script = ExtResource("1_0fbet")
+
+[node name="Button" type="Button" parent="."]
+layout_mode = 0
+offset_right = 300.0
+offset_bottom = 100.0
+theme = SubResource("Theme_62e2m")
+text = "点击"
+
+[node name="Label" type="Label" parent="."]
+custom_minimum_size = Vector2(200, 100)
+layout_mode = 0
+offset_left = 100.0
+offset_top = 100.0
+offset_right = 300.0
+offset_bottom = 200.0
+theme = SubResource("Theme_ee4bf")
+text = "测试"
