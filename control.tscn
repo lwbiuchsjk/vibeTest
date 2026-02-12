@@ -1,14 +1,10 @@
-[gd_scene load_steps=6 format=3 uid="uid://chwuaamvff38w"]
+[gd_scene load_steps=4 format=3 uid="uid://dub1wk1hjvhbe"]
 
-[ext_resource type="Script" uid="uid://uvbpbcnaua1h" path="res://control.gd" id="1_0fbet"]
-[ext_resource type="FontFile" uid="uid://dtc16cg0dah4y" path="res://font/QingNiaoHuaGuangJianMeiHei-2.ttf" id="1_62e2m"]
+[ext_resource type="Script" uid="uid://uvbpbcnaua1h" path="res://control.gd" id="1_script"]
+[ext_resource type="FontFile" uid="uid://dtc16cg0dah4y" path="res://font/QingNiaoHuaGuangJianMeiHei-2.ttf" id="2_font"]
 
-[sub_resource type="Theme" id="Theme_qtu10"]
-default_font = ExtResource("1_62e2m")
-
-[sub_resource type="Theme" id="Theme_62e2m"]
-
-[sub_resource type="Theme" id="Theme_ee4bf"]
+[sub_resource type="Theme" id="Theme_default"]
+default_font = ExtResource("2_font")
 
 [node name="Control" type="Control"]
 layout_mode = 3
@@ -17,22 +13,90 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme = SubResource("Theme_qtu10")
-script = ExtResource("1_0fbet")
+theme = SubResource("Theme_default")
+script = ExtResource("1_script")
 
-[node name="Button" type="Button" parent="."]
-layout_mode = 0
-offset_right = 300.0
-offset_bottom = 100.0
-theme = SubResource("Theme_62e2m")
-text = "点击"
+[node name="LoginPanel" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -230.0
+offset_top = -150.0
+offset_right = 230.0
+offset_bottom = 110.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 14
 
-[node name="Label" type="Label" parent="."]
-custom_minimum_size = Vector2(200, 100)
-layout_mode = 0
-offset_left = 100.0
-offset_top = 100.0
-offset_right = 300.0
-offset_bottom = 200.0
-theme = SubResource("Theme_ee4bf")
-text = "测试"
+[node name="Title" type="Label" parent="LoginPanel"]
+layout_mode = 2
+text = "Milestone 1 - Login"
+horizontal_alignment = 1
+
+[node name="Hint" type="Label" parent="LoginPanel"]
+layout_mode = 2
+text = "Use existing account or create a new one."
+horizontal_alignment = 1
+
+[node name="AccountInput" type="LineEdit" parent="LoginPanel"]
+layout_mode = 2
+placeholder_text = "Enter account"
+
+[node name="ButtonRow" type="HBoxContainer" parent="LoginPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="LoginButton" type="Button" parent="LoginPanel/ButtonRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Login with Account"
+
+[node name="CreateButton" type="Button" parent="LoginPanel/ButtonRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Create Account"
+
+[node name="StatusLabel" type="Label" parent="LoginPanel"]
+layout_mode = 2
+text = "Ready."
+horizontal_alignment = 1
+
+[node name="GamePanel" type="VBoxContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -230.0
+offset_top = -140.0
+offset_right = 230.0
+offset_bottom = 90.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 14
+
+[node name="GameTitle" type="Label" parent="GamePanel"]
+layout_mode = 2
+text = "Main Flow Page"
+horizontal_alignment = 1
+
+[node name="AccountLabel" type="Label" parent="GamePanel"]
+layout_mode = 2
+text = "Account:"
+horizontal_alignment = 1
+
+[node name="ClearCountLabel" type="Label" parent="GamePanel"]
+layout_mode = 2
+text = "Clear Count: 0"
+horizontal_alignment = 1
+
+[node name="LogoutButton" type="Button" parent="GamePanel"]
+layout_mode = 2
+text = "Back to Login"
+
+[node name="HTTPRequest" type="HTTPRequest" parent="."]
