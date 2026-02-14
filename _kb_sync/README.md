@@ -32,5 +32,9 @@ Configured via `.vscode/tasks.json` + `.vscode/settings.json`.
    - `includeNodeTokens`: which wiki nodes to read and cache
    - `cache.*`: cache settings
      - `cache.lang`: doc language enum `0/1/2` (the Feishu API requires numeric values)
+     - `cache.allNodes`: cache all nodes in the space (default `true`). If `false`, `includeNodeTokens` is used as a whitelist.
 
 If `_kb_sync/kb.local.json` is missing, the script falls back to `kb.binding.json` + default cache settings (cache disabled).
+
+Note: caching is enabled by default now (docx raw_content). You can disable it via `cache.enabled=false` in
+`_kb_sync/kb.local.json` or `_kb_sync/kb.binding.json`.

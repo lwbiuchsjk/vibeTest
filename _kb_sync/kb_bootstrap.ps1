@@ -16,6 +16,31 @@ function LogInfo([string]$msg) {
   if (-not $Quiet) { Write-Host "[kb-sync] $msg" }
 }
 
+function Get-Cfg([string]$name) {
+  # local overrides binding; return empty string if not present
+  $v = $null
+  if ($local -and ($local.PSObject.Properties.Name -contains $name)) { $v = $local.$name }
+  if ((-not $v) -and $binding -and ($binding.PSObject.Properties.Name -contains $name)) { $v = $binding.$name }
+  if ($null -eq $v) { return '' }
+  return [string]$v
+}
+
+function Get-CfgArr([string]$name) {
+  # Returns @() if missing; local overrides binding.
+  if ($local -and ($local.PSObject.Properties.Name -contains $name) -and $local.$name) { return @($local.$name) }
+  if ($binding -and ($binding.PSObject.Properties.Name -contains $name) -and $binding.$name) { return @($binding.$name) }
+  return @()
+}
+
+function Get-CfgCache([string]$name, [object]$defaultValue) {
+  # Returns cache.<name> value; local overrides binding.
+  $v = $null
+  if ($local -and $local.cache -and ($local.cache.PSObject.Properties.Name -contains $name)) { $v = $local.cache.$name }
+  if (($null -eq $v) -and $binding -and $binding.cache -and ($binding.cache.PSObject.Properties.Name -contains $name)) { $v = $binding.cache.$name }
+  if ($null -eq $v) { return $defaultValue }
+  return $v
+}
+
 function Resolve-RelPath([string]$baseDir, [string]$p) {
   if (-not $p) { return '' }
   if ([System.IO.Path]::IsPathRooted($p)) { return $p }
@@ -81,6 +106,42 @@ function Normalize-DocLang([object]$v) {
   }
 }
 
+function Resolve-SpaceIdByName([string]$domain, [hashtable]$headers, [string]$spaceName) {
+  $want = ([string]$spaceName).Trim()
+  if (-not $want) { throw 'spaceName is empty' }
+
+  $matches = @()
+  $pageToken = ''
+  $hasMore = $true
+  while ($hasMore) {
+    $url = "$domain/open-apis/wiki/v2/spaces?page_size=50"
+    if ($pageToken) {
+      $url += "&page_token=$([uri]::EscapeDataString($pageToken))"
+    }
+
+    $resp = Invoke-RestMethod -Method Get -Uri $url -Headers $headers
+    if ($resp.code -ne 0) { throw "spaces list failed: $($resp.msg)" }
+
+    $items = @()
+    if ($resp.data -and $resp.data.items) { $items = @($resp.data.items) }
+    foreach ($s in $items) {
+      $name = ([string]$s.name).Trim()
+      if ([string]::Equals($name, $want, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $matches += $s
+      }
+    }
+
+    $hasMore = [bool]($resp.data.has_more)
+    $pageToken = [string]($resp.data.page_token)
+  }
+
+  if ($matches.Count -eq 1) { return [string]$matches[0].space_id }
+  if ($matches.Count -eq 0) { throw "spaceName not found (no visible wiki space matched): $want" }
+
+  $ids = ($matches | ForEach-Object { [string]$_.space_id }) -join ', '
+  throw "spaceName matched multiple spaces. Please set spaceId explicitly. name=$want ids=$ids"
+}
+
 if (-not (Test-Path $bindingPath)) {
   throw "Binding file not found: $bindingPath"
 }
@@ -97,9 +158,9 @@ if (Test-Path $localPath) {
   }
 }
 
-$spaceId = $binding.spaceId
-if ($local -and $local.spaceId) { $spaceId = $local.spaceId }
-if (-not $spaceId) { throw 'spaceId is required (kb.binding.json or kb.local.json)' }
+$spaceId = Get-Cfg 'spaceId'
+$spaceToken = Get-Cfg 'spaceToken'
+$spaceName = Get-Cfg 'spaceName'
 
 $appConfigRel = $binding.appConfigPath
 if ($local -and $local.appConfigPath) { $appConfigRel = $local.appConfigPath }
@@ -131,24 +192,82 @@ if (-not $tokenInfo.ok) {
 $userToken = $tokenInfo.userAccessToken
 $headers = @{ Authorization = "Bearer $userToken" }
 
-$spaceResp = Invoke-RestMethod -Method Get -Uri "$domain/open-apis/wiki/v2/spaces/$spaceId" -Headers $headers
-if ($spaceResp.code -ne 0) { throw "space query failed: $($spaceResp.msg)" }
-
-$allNodes = @()
-$pageToken = ''
-$hasMore = $true
-while ($hasMore) {
-  $url = "$domain/open-apis/wiki/v2/spaces/$spaceId/nodes?page_size=50"
-  if ($pageToken) {
-    $url += "&page_token=$([uri]::EscapeDataString($pageToken))"
+$effectiveSpaceId = $spaceId
+if (-not $effectiveSpaceId) {
+  # spaceToken is a human-friendly identifier in kb.binding.json.
+  # Current implementation treats it as:
+  # - numeric => spaceId
+  # - otherwise => spaceName (resolved via spaces list API)
+  if ($spaceToken) {
+    if ($spaceToken -match '^\d+$') {
+      $effectiveSpaceId = $spaceToken
+    } else {
+      $spaceName = $spaceToken
+    }
   }
 
-  $nodeResp = Invoke-RestMethod -Method Get -Uri $url -Headers $headers
-  if ($nodeResp.code -ne 0) { throw "nodes query failed: $($nodeResp.msg)" }
+  if (-not $effectiveSpaceId) {
+    if ($spaceName) {
+      LogInfo "Resolving spaceId by spaceName: $spaceName"
+      $effectiveSpaceId = Resolve-SpaceIdByName $domain $headers $spaceName
+    } else {
+      throw 'spaceId is required, or provide spaceToken/spaceName (kb.binding.json or kb.local.json)'
+    }
+  }
+}
 
-  if ($nodeResp.data.items) { $allNodes += $nodeResp.data.items }
-  $hasMore = [bool]$nodeResp.data.has_more
-  $pageToken = [string]$nodeResp.data.page_token
+$spaceResp = Invoke-RestMethod -Method Get -Uri "$domain/open-apis/wiki/v2/spaces/$effectiveSpaceId" -Headers $headers
+if ($spaceResp.code -ne 0) { throw "space query failed: $($spaceResp.msg)" }
+
+function Fetch-NodesPage([string]$spaceId, [string]$parentNodeToken) {
+  $items = @()
+  $pageToken = ''
+  $hasMore = $true
+  while ($hasMore) {
+    $url = "$domain/open-apis/wiki/v2/spaces/$spaceId/nodes?page_size=50"
+    if ($parentNodeToken) {
+      $url += "&parent_node_token=$([uri]::EscapeDataString($parentNodeToken))"
+    }
+    if ($pageToken) {
+      $url += "&page_token=$([uri]::EscapeDataString($pageToken))"
+    }
+
+    $nodeResp = Invoke-RestMethod -Method Get -Uri $url -Headers $headers
+    if ($nodeResp.code -ne 0) { throw "nodes query failed: $($nodeResp.msg)" }
+
+    if ($nodeResp.data.items) { $items += @($nodeResp.data.items) }
+    $hasMore = [bool]$nodeResp.data.has_more
+    $pageToken = [string]$nodeResp.data.page_token
+  }
+  return ,$items
+}
+
+# Recursively traverse all nodes in the space (tree walk via parent_node_token).
+$allNodes = @()
+$nodeByToken = @{}
+$seenParents = @{}
+$q = New-Object 'System.Collections.Generic.Queue[string]'
+$q.Enqueue('')
+
+while ($q.Count -gt 0) {
+  $parent = [string]$q.Dequeue()
+  if ($seenParents.ContainsKey($parent)) { continue }
+  $seenParents[$parent] = $true
+
+  $nodes = Fetch-NodesPage $effectiveSpaceId $parent
+  foreach ($n in $nodes) {
+    $nt = [string]$n.node_token
+    if (-not $nt) { continue }
+
+    if (-not $nodeByToken.ContainsKey($nt)) {
+      $nodeByToken[$nt] = $n
+      $allNodes += $n
+    }
+
+    if ([bool]$n.has_child) {
+      $q.Enqueue($nt)
+    }
+  }
 }
 
 $space = $spaceResp.data.space
@@ -191,37 +310,54 @@ $jsonOut | ConvertTo-Json -Depth 8 | Set-Content -Path $cacheJsonPath -Encoding 
 LogInfo "KB synced: $($space.name) / nodes=$($allNodes.Count)"
 
 # Optional: cache docx raw_content locally so agents can read without hitting network each time.
-$cacheEnabled = $false
+# Default to enabled (can disable via kb.local.json / kb.binding.json: { "cache": { "enabled": false } })
+$cacheEnabled = $true
 $cacheDir = Join-Path $scriptDir 'cache'
 $bundlePath = Join-Path $scriptDir 'KB_CACHE.md'
 $indexPath = Join-Path $scriptDir 'cache_index.json'
 $cacheLang = 0
 $cacheTtlHours = 24
 $includeNodeTokens = @()
+$cacheAllNodes = $true
 
-if ($local) {
-  if ($null -ne $local.cache.enabled) { $cacheEnabled = [bool]$local.cache.enabled }
-  if ($local.cache.dir) { $cacheDir = Resolve-RelPath $scriptDir ([string]$local.cache.dir) }
-  if ($local.cache.bundlePath) { $bundlePath = Resolve-RelPath $scriptDir ([string]$local.cache.bundlePath) }
-  if ($local.cache.indexPath) { $indexPath = Resolve-RelPath $scriptDir ([string]$local.cache.indexPath) }
-  if ($null -ne $local.cache.lang) { $cacheLang = Normalize-DocLang $local.cache.lang }
-  if ($local.cache.ttlHours) { $cacheTtlHours = [int]$local.cache.ttlHours }
-  if ($local.includeNodeTokens) { $includeNodeTokens = @($local.includeNodeTokens) }
-}
+$cacheEnabled = [bool](Get-CfgCache 'enabled' $cacheEnabled)
+$cacheDir = Resolve-RelPath $scriptDir ([string](Get-CfgCache 'dir' $cacheDir))
+$bundlePath = Resolve-RelPath $scriptDir ([string](Get-CfgCache 'bundlePath' $bundlePath))
+$indexPath = Resolve-RelPath $scriptDir ([string](Get-CfgCache 'indexPath' $indexPath))
+$cacheLang = Normalize-DocLang (Get-CfgCache 'lang' $cacheLang)
+$cacheTtlHours = [int](Get-CfgCache 'ttlHours' $cacheTtlHours)
+$includeNodeTokens = @(Get-CfgArr 'includeNodeTokens')
+$cacheAllNodes = [bool](Get-CfgCache 'allNodes' $cacheAllNodes)
 
 if ($cacheEnabled) {
   LogInfo "Caching enabled. dir=$cacheDir ttlHours=$cacheTtlHours"
   New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
 
-  $selected = $allNodes | Where-Object { $_.obj_type -eq 'docx' }
-  if ($includeNodeTokens.Count -gt 0) {
-    $tokenSet = @{}
+  $tokenSet = @{}
+  if ((-not $cacheAllNodes) -and ($includeNodeTokens.Count -gt 0)) {
     foreach ($t in $includeNodeTokens) { if ($t) { $tokenSet[[string]$t] = $true } }
-    $selected = $selected | Where-Object { $tokenSet.ContainsKey([string]$_.node_token) }
   }
 
   $cacheIndex = @()
-  foreach ($n in $selected) {
+  foreach ($n in $allNodes) {
+    if ((-not $cacheAllNodes) -and ($includeNodeTokens.Count -gt 0) -and (-not $tokenSet.ContainsKey([string]$n.node_token))) {
+      continue
+    }
+
+    # Cache everything we can. Currently only docx raw_content is fetched and stored as text.
+    $isDocx = ([string]$n.obj_type) -eq 'docx'
+    if (-not $isDocx) {
+      $cacheIndex += [ordered]@{
+        node_token = [string]$n.node_token
+        obj_type = [string]$n.obj_type
+        obj_token = [string]$n.obj_token
+        title = [string]$n.title
+        cached = $false
+        reason = 'unsupported obj_type (only docx raw_content is cached)'
+      }
+      continue
+    }
+
     $docId = [string]$n.obj_token
     if (-not $docId) { continue }
 
@@ -256,6 +392,7 @@ if ($cacheEnabled) {
       cache_file = [string]$cacheFile
       cached_at = $fi.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')
       bytes = [int]$fi.Length
+      cached = $true
     }
   }
 
@@ -267,10 +404,12 @@ if ($cacheEnabled) {
   $bundle += "- GeneratedAt: $generated"
   $bundle += "- SpaceId: $($space.space_id)"
   $bundle += "- SpaceName: $($space.name)"
-  $bundle += "- DocsCached: $($cacheIndex.Count)"
+  $bundle += "- ItemsIndexed: $($cacheIndex.Count)"
+  $bundle += "- DocsCached: $((@($cacheIndex | Where-Object { $_.cached -eq $true })).Count)"
   $bundle += ''
 
   foreach ($e in $cacheIndex) {
+    if (-not $e.cached) { continue }
     $bundle += "## [docx] $($e.title)"
     $bundle += ''
     $bundle += "- node_token: $($e.node_token)"
