@@ -1,0 +1,13 @@
+﻿{
+  "servers": {
+    "feishu": {
+      "type": "stdio",
+      "command": "lark-mcp",
+      "args": [
+        "mcp",
+        "--config",
+        "${workspaceFolder}\\lark-mcp.config.json"
+      ]
+    }
+  }
+}
