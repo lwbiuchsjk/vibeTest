@@ -79,6 +79,41 @@ function Resolve-LarkRoot {
   return ''
 }
 
+function Ensure-UserToken(
+  [string]$nodeExe,
+  [string]$readTokenScript,
+  [string]$larkRoot,
+  [string]$appId,
+  [string]$appSecret,
+  [string]$domain
+) {
+  $tokenRaw = & $nodeExe $readTokenScript --larkRoot $larkRoot --appId $appId
+  $tokenInfo = $tokenRaw | ConvertFrom-Json
+  if ($tokenInfo.ok) { return $tokenInfo }
+
+  $err = [string]$tokenInfo.error
+  if ($err -notlike 'no user token*') { return $tokenInfo }
+
+  LogInfo "No user token found for appId=$appId. Attempting lark-mcp login..."
+  $larkCmd = Get-Command lark-mcp -ErrorAction SilentlyContinue
+  if (-not $larkCmd) {
+    throw "Failed to read user token: $err. lark-mcp CLI not found in PATH."
+  }
+
+  if (-not $appSecret) {
+    throw "Failed to read user token: $err. appSecret is required to auto-login."
+  }
+
+  & $larkCmd.Source login --app-id $appId --app-secret $appSecret --domain $domain
+  if ($LASTEXITCODE -ne 0) {
+    throw "Failed to read user token: $err. lark-mcp login failed with exit code $LASTEXITCODE."
+  }
+
+  $tokenRaw = & $nodeExe $readTokenScript --larkRoot $larkRoot --appId $appId
+  $tokenInfo = $tokenRaw | ConvertFrom-Json
+  return $tokenInfo
+}
+
 function Normalize-DocLang([object]$v) {
   if ($null -eq $v) { return 0 }
 
@@ -170,6 +205,7 @@ $config = Get-Content -Raw $appConfigPath | ConvertFrom-Json
 
 $appId = $config.appId
 if (-not $appId) { throw "appId missing in $appConfigPath" }
+$appSecret = [string]$config.appSecret
 
 $domain = $config.domain
 if (-not $domain) { $domain = 'https://open.feishu.cn' }
@@ -183,8 +219,7 @@ if (-not $larkRoot) { throw 'Cannot locate @larksuiteoapi/lark-mcp installation.
 
 LogInfo "Using lark-mcp root: $larkRoot"
 
-$tokenRaw = & $nodeExe $readTokenScript --larkRoot $larkRoot --appId $appId
-$tokenInfo = $tokenRaw | ConvertFrom-Json
+$tokenInfo = Ensure-UserToken $nodeExe $readTokenScript $larkRoot $appId $appSecret $domain
 if (-not $tokenInfo.ok) {
   throw "Failed to read user token: $($tokenInfo.error)"
 }
