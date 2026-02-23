@@ -85,16 +85,29 @@ function Ensure-UserToken(
   [string]$larkRoot,
   [string]$appId,
   [string]$appSecret,
-  [string]$domain
+  [string]$domain,
+  [switch]$ForceRefresh
 ) {
+  $nowEpoch = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+  $refreshSkewSeconds = 120
+
   $tokenRaw = & $nodeExe $readTokenScript --larkRoot $larkRoot --appId $appId
   $tokenInfo = $tokenRaw | ConvertFrom-Json
-  if ($tokenInfo.ok) { return $tokenInfo }
+  if ($tokenInfo.ok -and (-not $ForceRefresh)) {
+    $exp = 0.0
+    [void][double]::TryParse([string]$tokenInfo.expiresAt, [ref]$exp)
+    if (($exp -gt 0) -and ($exp -gt ($nowEpoch + $refreshSkewSeconds))) {
+      return $tokenInfo
+    }
+    LogInfo "User token expired or expiring soon. Attempting lark-mcp login..."
+  }
 
   $err = [string]$tokenInfo.error
-  if ($err -notlike 'no user token*') { return $tokenInfo }
+  if (($tokenInfo.ok -ne $true) -and ($err -notlike 'no user token*') -and (-not $ForceRefresh)) { return $tokenInfo }
 
-  LogInfo "No user token found for appId=$appId. Attempting lark-mcp login..."
+  if (($tokenInfo.ok -ne $true) -and ($err -like 'no user token*')) {
+    LogInfo "No user token found for appId=$appId. Attempting lark-mcp login..."
+  }
   $larkCmd = Get-Command lark-mcp -ErrorAction SilentlyContinue
   if (-not $larkCmd) {
     throw "Failed to read user token: $err. lark-mcp CLI not found in PATH."
@@ -112,6 +125,44 @@ function Ensure-UserToken(
   $tokenRaw = & $nodeExe $readTokenScript --larkRoot $larkRoot --appId $appId
   $tokenInfo = $tokenRaw | ConvertFrom-Json
   return $tokenInfo
+}
+
+function Invoke-FeishuGet([string]$url) {
+  $maxRetry = 1
+  for ($attempt = 0; $attempt -le $maxRetry; $attempt++) {
+    try {
+      $resp = Invoke-RestMethod -Method Get -Uri $url -Headers $script:headers
+      if (($resp -and ($resp.code -eq 99991677)) -and ($attempt -lt $maxRetry)) {
+        LogInfo "Feishu token expired (code=99991677). Refreshing token and retrying..."
+        $script:tokenInfo = Ensure-UserToken $script:nodeExe $script:readTokenScript $script:larkRoot $script:appId $script:appSecret $script:domain -ForceRefresh
+        if (-not $script:tokenInfo.ok) {
+          throw "Failed to refresh user token: $($script:tokenInfo.error)"
+        }
+        $script:userToken = $script:tokenInfo.userAccessToken
+        $script:headers = @{ Authorization = "Bearer $($script:userToken)" }
+        continue
+      }
+      return $resp
+    } catch {
+      $errMsg = [string]$_.Exception.Message
+      $detailMsg = ''
+      if ($_.ErrorDetails) { $detailMsg = [string]$_.ErrorDetails.Message }
+      $isExpired = ($errMsg -like '*99991677*') -or ($detailMsg -like '*99991677*') -or ($errMsg -like '*Authentication token expired*') -or ($detailMsg -like '*Authentication token expired*')
+      if ($isExpired -and ($attempt -lt $maxRetry)) {
+        LogInfo "Feishu token expired in HTTP error. Refreshing token and retrying..."
+        $script:tokenInfo = Ensure-UserToken $script:nodeExe $script:readTokenScript $script:larkRoot $script:appId $script:appSecret $script:domain -ForceRefresh
+        if (-not $script:tokenInfo.ok) {
+          throw "Failed to refresh user token: $($script:tokenInfo.error)"
+        }
+        $script:userToken = $script:tokenInfo.userAccessToken
+        $script:headers = @{ Authorization = "Bearer $($script:userToken)" }
+        continue
+      }
+      throw
+    }
+  }
+
+  throw "Feishu GET retry exhausted: $url"
 }
 
 function Normalize-DocLang([object]$v) {
@@ -154,7 +205,7 @@ function Resolve-SpaceIdByName([string]$domain, [hashtable]$headers, [string]$sp
       $url += "&page_token=$([uri]::EscapeDataString($pageToken))"
     }
 
-    $resp = Invoke-RestMethod -Method Get -Uri $url -Headers $headers
+    $resp = Invoke-FeishuGet $url
     if ($resp.code -ne 0) { throw "spaces list failed: $($resp.msg)" }
 
     $items = @()
@@ -251,7 +302,7 @@ if (-not $effectiveSpaceId) {
   }
 }
 
-$spaceResp = Invoke-RestMethod -Method Get -Uri "$domain/open-apis/wiki/v2/spaces/$effectiveSpaceId" -Headers $headers
+$spaceResp = Invoke-FeishuGet "$domain/open-apis/wiki/v2/spaces/$effectiveSpaceId"
 if ($spaceResp.code -ne 0) { throw "space query failed: $($spaceResp.msg)" }
 
 function Fetch-NodesPage([string]$spaceId, [string]$parentNodeToken) {
@@ -267,7 +318,7 @@ function Fetch-NodesPage([string]$spaceId, [string]$parentNodeToken) {
       $url += "&page_token=$([uri]::EscapeDataString($pageToken))"
     }
 
-    $nodeResp = Invoke-RestMethod -Method Get -Uri $url -Headers $headers
+    $nodeResp = Invoke-FeishuGet $url
     if ($nodeResp.code -ne 0) { throw "nodes query failed: $($nodeResp.msg)" }
 
     if ($nodeResp.data.items) { $items += @($nodeResp.data.items) }
@@ -410,7 +461,7 @@ if ($cacheEnabled) {
     if ($needFetch) {
       LogInfo "Fetching docx raw_content: $($n.title) ($docId)"
       $docUrl = "$domain/open-apis/docx/v1/documents/$docId/raw_content?lang=$cacheLang"
-      $docResp = Invoke-RestMethod -Method Get -Uri $docUrl -Headers $headers
+      $docResp = Invoke-FeishuGet $docUrl
       if ($docResp.code -ne 0) { throw "docx raw_content failed ($docId): $($docResp.msg)" }
       $content = [string]$docResp.data.content
       Set-Content -Path $cacheFile -Value $content -Encoding UTF8
