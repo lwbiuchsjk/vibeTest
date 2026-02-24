@@ -31,10 +31,11 @@ Configured via `.vscode/tasks.json` + `.vscode/settings.json`.
    - `spaceId`: the wiki space to bind (overrides `kb.binding.json` if set)
    - `includeNodeTokens`: which wiki nodes to read and cache
    - `cache.*`: cache settings
+     - `cache.forceRefresh`: refresh Feishu doc content on every run (default `true`)
      - `cache.lang`: doc language enum `0/1/2` (the Feishu API requires numeric values)
      - `cache.allNodes`: cache all nodes in the space (default `true`). If `false`, `includeNodeTokens` is used as a whitelist.
 
 If `_kb_sync/kb.local.json` is missing, the script falls back to `kb.binding.json` + default cache settings (cache disabled).
 
-Note: caching is enabled by default now (docx raw_content). You can disable it via `cache.enabled=false` in
-`_kb_sync/kb.local.json` or `_kb_sync/kb.binding.json`.
+Note: caching is enabled by default (docx raw_content), and content is refreshed on every run by default (`cache.forceRefresh=true`).
+You can disable caching via `cache.enabled=false`, or keep cache but reuse local files via `cache.forceRefresh=false`.

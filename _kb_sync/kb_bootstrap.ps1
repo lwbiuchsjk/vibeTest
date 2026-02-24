@@ -395,14 +395,15 @@ $jsonOut | ConvertTo-Json -Depth 8 | Set-Content -Path $cacheJsonPath -Encoding 
 
 LogInfo "KB synced: $($space.name) / nodes=$($allNodes.Count)"
 
-# Optional: cache docx raw_content locally so agents can read without hitting network each time.
-# Default to enabled (can disable via kb.local.json / kb.binding.json: { "cache": { "enabled": false } })
+# Optional: cache docx raw_content locally.
+# Default behavior is to refresh from Feishu on every run, then overwrite local cache.
 $cacheEnabled = $true
 $cacheDir = Join-Path $scriptDir 'cache'
 $bundlePath = Join-Path $scriptDir 'KB_CACHE.md'
 $indexPath = Join-Path $scriptDir 'cache_index.json'
 $cacheLang = 0
 $cacheTtlHours = 24
+$cacheForceRefresh = $true
 $includeNodeTokens = @()
 $cacheAllNodes = $true
 
@@ -412,11 +413,12 @@ $bundlePath = Resolve-RelPath $scriptDir ([string](Get-CfgCache 'bundlePath' $bu
 $indexPath = Resolve-RelPath $scriptDir ([string](Get-CfgCache 'indexPath' $indexPath))
 $cacheLang = Normalize-DocLang (Get-CfgCache 'lang' $cacheLang)
 $cacheTtlHours = [int](Get-CfgCache 'ttlHours' $cacheTtlHours)
+$cacheForceRefresh = [bool](Get-CfgCache 'forceRefresh' $cacheForceRefresh)
 $includeNodeTokens = @(Get-CfgArr 'includeNodeTokens')
 $cacheAllNodes = [bool](Get-CfgCache 'allNodes' $cacheAllNodes)
 
 if ($cacheEnabled) {
-  LogInfo "Caching enabled. dir=$cacheDir ttlHours=$cacheTtlHours"
+  LogInfo "Caching enabled. dir=$cacheDir ttlHours=$cacheTtlHours forceRefresh=$cacheForceRefresh"
   New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
 
   $tokenSet = @{}
@@ -449,7 +451,7 @@ if ($cacheEnabled) {
 
     $cacheFile = Join-Path $cacheDir ("docx_{0}.txt" -f $docId)
     $needFetch = $true
-    if (Test-Path $cacheFile) {
+    if ((-not $cacheForceRefresh) -and (Test-Path $cacheFile)) {
       if ($cacheTtlHours -le 0) {
         $needFetch = $false
       } else {
