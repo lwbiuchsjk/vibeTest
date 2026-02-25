@@ -1,0 +1,50 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://test/role_showcase.gd" id="1_script"]
+[ext_resource type="FontFile" path="res://font/QingNiaoHuaGuangJianMeiHei-2.ttf" id="2_font"]
+
+[sub_resource type="Theme" id="Theme_role_showcase"]
+default_font = ExtResource("2_font")
+
+[node name="RoleShowcase" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = SubResource("Theme_role_showcase")
+script = ExtResource("1_script")
+
+[node name="Root" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Root"]
+layout_mode = 2
+text = "Role Showcase"
+horizontal_alignment = 1
+
+[node name="StatusLabel" type="Label" parent="Root"]
+layout_mode = 2
+text = "Loading..."
+horizontal_alignment = 1
+
+[node name="RoleScroll" type="ScrollContainer" parent="Root"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 2
+vertical_scroll_mode = 0
+
+[node name="RoleList" type="HBoxContainer" parent="Root/RoleScroll"]
+layout_mode = 2
+theme_override_constants/separation = 16
