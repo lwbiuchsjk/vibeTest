@@ -1,18 +1,19 @@
 extends Control
 
 const RoleState := preload("res://scripts/models/role_state.gd")
-const ROLES_CSV_PATH := "res://scripts/config/roles.csv"
+const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 
 @onready var status_label: Label = $Root/StatusLabel
 @onready var role_list: HBoxContainer = $Root/RoleScroll/RoleList
 
 func _ready() -> void:
-	var roles_result := _load_roles_from_csv(ROLES_CSV_PATH)
-	if not roles_result.get("ok", false):
-		status_label.text = "Load failed: %s" % roles_result.get("error", "unknown")
+	var runtime := ConfigRuntime.shared()
+	var load_result := runtime.ensure_loaded()
+	if not load_result.get("ok", false):
+		status_label.text = "Load failed: %s" % load_result.get("error", "unknown")
 		return
 
-	var roles: Array = roles_result.get("roles", [])
+	var roles := runtime.get_roles()
 	if roles.is_empty():
 		status_label.text = "No role data found."
 		return
@@ -57,49 +58,3 @@ func _build_role_card(role: RoleState) -> Control:
 	content.add_child(name_label)
 
 	return card
-
-func _load_roles_from_csv(path: String) -> Dictionary:
-	if not FileAccess.file_exists(path):
-		return {"ok": false, "error": "roles csv not found: %s" % path}
-
-	var file := FileAccess.open(path, FileAccess.READ)
-	if file == null:
-		return {"ok": false, "error": "cannot open roles csv: %s" % path}
-	if file.eof_reached():
-		return {"ok": false, "error": "roles csv is empty: %s" % path}
-
-	var header_row := file.get_csv_line()
-	var headers: Array[String] = []
-	for header in header_row:
-		headers.append(str(header).strip_edges())
-	if headers.is_empty():
-		return {"ok": false, "error": "roles csv header is empty: %s" % path}
-
-	var roles: Array = []
-	while not file.eof_reached():
-		var values := file.get_csv_line()
-		if values.is_empty():
-			continue
-		if values.size() == 1 and str(values[0]).strip_edges().is_empty():
-			continue
-
-		var row: Dictionary = {}
-		for i in headers.size():
-			var key := headers[i]
-			var value := ""
-			if i < values.size():
-				value = str(values[i]).strip_edges()
-			row[key] = value
-
-		var role := RoleState.new(
-			str(row.get("role_id", "")),
-			str(row.get("role_type", "")),
-			str(row.get("display_name", "")),
-			str(row.get("location_id", "")),
-			str(row.get("portrait_path", "")),
-			{},
-			{}
-		)
-		roles.append(role)
-
-	return {"ok": true, "roles": roles}
