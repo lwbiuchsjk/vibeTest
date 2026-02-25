@@ -8,7 +8,8 @@ const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 
 func _ready() -> void:
 	var runtime := ConfigRuntime.shared()
-	var load_result := runtime.ensure_loaded()
+	# 测试场景中始终强制重载，避免配置缓存导致展示与文件不一致。
+	var load_result := runtime.ensure_loaded({}, true)
 	if not load_result.get("ok", false):
 		status_label.text = "Load failed: %s" % load_result.get("error", "unknown")
 		return
@@ -47,8 +48,9 @@ func _build_role_card(role: RoleState) -> Control:
 
 	if portrait.texture == null:
 		var missing_label := Label.new()
-		missing_label.text = "No portrait"
+		missing_label.text = "No portrait: %s" % role.get_portrait_path()
 		missing_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		missing_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		content.add_child(missing_label)
 
 	var name_label := Label.new()
