@@ -44,10 +44,12 @@ static func run() -> Dictionary:
 
 	var can_move_to_market := RuleEngine.can_move(graph, player.location_id, "market")
 	var can_move_to_forest := RuleEngine.can_move(graph, player.location_id, "forest")
+	var player_portrait_loaded := player.load_portrait_texture() != null
 
 	return {
 		"ok": true,
 		"player": player.to_dict(),
+		"player_portrait_loaded": player_portrait_loaded,
 		"affinity_score": affinity.get_score(player.role_id, npc.role_id),
 		"affinity_tier": str(affinity_next["tier"]),
 		"can_move_to_market": can_move_to_market,
@@ -69,6 +71,7 @@ static func _load_roles_from_csv(path: String) -> Dictionary:
 			str(row.get("role_type", "")),
 			str(row.get("display_name", "")),
 			str(row.get("location_id", "")),
+			str(row.get("portrait_path", "")),
 			{
 				"will": _to_int(row.get("will", "1"), 1),
 				"intelligence": _to_int(row.get("intelligence", "1"), 1),
