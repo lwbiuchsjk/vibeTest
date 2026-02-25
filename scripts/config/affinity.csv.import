@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dc4ktyqrk8fyp"
+
+[deps]
+
+files=["res://scripts/config/affinity.to.translation", "res://scripts/config/affinity.score.translation"]
+
+source_file="res://scripts/config/affinity.csv"
+dest_files=["res://scripts/config/affinity.to.translation", "res://scripts/config/affinity.score.translation"]
+
+[params]
+
+compress=true
+delimiter=0

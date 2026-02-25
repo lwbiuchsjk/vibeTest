@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://85mrkecpxpj5"
+
+[deps]
+
+files=["res://scripts/config/location_graph.neighbors.translation"]
+
+source_file="res://scripts/config/location_graph.csv"
+dest_files=["res://scripts/config/location_graph.neighbors.translation"]
+
+[params]
+
+compress=true
+delimiter=0

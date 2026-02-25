@@ -1,0 +1,4 @@
+﻿role_id,role_type,display_name,location_id,will,intelligence,charm,luck,money,manpower
+player_001,player,Player,town,3,4,2,1,10,1
+npc_001,npc,NPC-A,market,2,2,3,2,3,0
+npc_002,npc,NPC-B,town,4,1,2,3,8,1

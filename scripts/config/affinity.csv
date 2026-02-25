@@ -1,0 +1,4 @@
+﻿from_role_id,to_role_id,score
+player_001,npc_001,20
+player_001,npc_002,-5
+npc_001,player_001,10
