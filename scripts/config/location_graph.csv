@@ -1,5 +1,5 @@
-﻿location_id,neighbors
-town,market;square
-market,town;dock
-square,town
-dock,market
+location_id,display_name,neighbors,art_file
+town,Town,market;square,town.svg
+market,Market,town;dock,market.svg
+square,Square,town,square.svg
+dock,Dock,market,dock.svg
