@@ -1,7 +1,7 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3 uid="uid://c2kl0bso5f3h6"]
 
-[ext_resource type="Script" path="res://test/role_showcase.gd" id="1_script"]
-[ext_resource type="FontFile" path="res://font/QingNiaoHuaGuangJianMeiHei-2.ttf" id="2_font"]
+[ext_resource type="Script" uid="uid://c83idyocjrw5y" path="res://test/role_showcase.gd" id="1_script"]
+[ext_resource type="FontFile" uid="uid://dtc16cg0dah4y" path="res://font/QingNiaoHuaGuangJianMeiHei-2.ttf" id="2_font"]
 
 [sub_resource type="Theme" id="Theme_role_showcase"]
 default_font = ExtResource("2_font")
