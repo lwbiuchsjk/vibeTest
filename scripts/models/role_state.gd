@@ -6,6 +6,7 @@ var role_id: String
 var role_type: String
 var display_name: String
 var location_id: String
+var portrait_path: String
 var attributes: Dictionary
 var resources: Dictionary
 
@@ -15,6 +16,7 @@ func _init(
 	p_role_type: String = "npc",
 	p_display_name: String = "",
 	p_location_id: String = "",
+	p_portrait_path: String = "",
 	p_attributes: Dictionary = {},
 	p_resources: Dictionary = {}
 ) -> void:
@@ -22,8 +24,22 @@ func _init(
 	role_type = p_role_type
 	display_name = p_display_name
 	location_id = p_location_id
+	portrait_path = p_portrait_path
 	attributes = p_attributes.duplicate(true)
 	resources = p_resources.duplicate(true)
+
+func has_portrait() -> bool:
+	return not portrait_path.strip_edges().is_empty()
+
+func load_portrait_texture() -> Texture2D:
+	if not has_portrait():
+		return null
+	if not ResourceLoader.exists(portrait_path):
+		return null
+	var resource := load(portrait_path)
+	if resource is Texture2D:
+		return resource
+	return null
 
 # 获取属性值；当键不存在时返回默认值（默认1）。
 func get_attribute(key: String, default_value: int = 1) -> int:
@@ -48,6 +64,7 @@ func to_dict() -> Dictionary:
 		"role_type": role_type,
 		"display_name": display_name,
 		"location_id": location_id,
+		"portrait_path": portrait_path,
 		"attributes": attributes.duplicate(true),
 		"resources": resources.duplicate(true)
 	}
@@ -59,6 +76,7 @@ static func from_dict(data: Dictionary) -> RoleState:
 		str(data.get("role_type", "npc")),
 		str(data.get("display_name", "")),
 		str(data.get("location_id", "")),
+		str(data.get("portrait_path", "")),
 		data.get("attributes", {}),
 		data.get("resources", {})
 	)
