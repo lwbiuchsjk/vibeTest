@@ -37,16 +37,17 @@ func is_loaded() -> bool:
 
 # 确保配置已完成加载并进入缓存。
 # 可选参数 `paths` 可覆盖 DEFAULT_PATHS 中的路径键。
-# 当解析后的路径与当前缓存一致时，直接复用缓存。
+# `force_reload=true` 时会忽略已缓存内容，重新加载磁盘配置。
+# 当解析后的路径与当前缓存一致且未强制重载时，直接复用缓存。
 # 返回：
 # - {"ok": true}
 # - {"ok": false, "error": String}
-func ensure_loaded(paths: Dictionary = {}) -> Dictionary:
+func ensure_loaded(paths: Dictionary = {}, force_reload: bool = false) -> Dictionary:
 	var resolved_paths := DEFAULT_PATHS.duplicate(true)
 	for key in paths.keys():
 		resolved_paths[str(key)] = str(paths[key])
 
-	if _loaded and resolved_paths == _source_paths:
+	if (not force_reload) and _loaded and resolved_paths == _source_paths:
 		return {"ok": true}
 
 	var roles_result := ConfigLoader.load_roles(str(resolved_paths.get("roles", "")))

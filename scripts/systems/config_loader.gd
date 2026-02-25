@@ -68,7 +68,7 @@ static func load_roles(path: String) -> Dictionary:
 			str(row.get("role_type", "")),
 			str(row.get("display_name", "")),
 			str(row.get("location_id", "")),
-			str(row.get("portrait_path", "")),
+			str(row.get("portrait_file", "")),
 			{
 				"will": _to_int(row.get("will", "1"), 1),
 				"intelligence": _to_int(row.get("intelligence", "1"), 1),

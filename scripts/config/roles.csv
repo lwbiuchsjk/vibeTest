@@ -1,4 +1,4 @@
-role_id,role_type,display_name,location_id,portrait_path,will,intelligence,charm,luck,money,manpower
-player_001,player,Player,town,res://icon.svg,3,4,2,1,10,1
-npc_001,npc,NPC-A,market,res://icon.svg,2,2,3,2,3,0
-npc_002,npc,NPC-B,town,res://icon.svg,4,1,2,3,8,1
+role_id,role_type,display_name,location_id,portrait_file,will,intelligence,charm,luck,money,manpower
+player_001,player,Player,town,icon.svg,3,4,2,1,10,1
+npc_001,npc,NPC-A,market,icon.svg,2,2,3,2,3,0
+npc_002,npc,NPC-B,town,icon.svg,4,1,2,3,8,1
