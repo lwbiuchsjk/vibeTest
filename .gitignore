@@ -13,3 +13,10 @@ _kb_sync/kb.local.json
 _kb_sync/KB_CACHE.md
 _kb_sync/cache/
 _kb_sync/cache_index.json
+
+# Local test playgrounds
+test/
+
+# Design docs/playground
+design/
+Design/
