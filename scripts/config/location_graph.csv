@@ -1,0 +1,5 @@
+﻿location_id,neighbors
+town,market;square
+market,town;dock
+square,town
+dock,market
