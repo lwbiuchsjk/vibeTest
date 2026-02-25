@@ -42,11 +42,15 @@ static func run_with_context(context: Dictionary) -> Dictionary:
 	var can_move_to_market := RuleEngine.can_move(graph, player.location_id, "market")
 	var can_move_to_forest := RuleEngine.can_move(graph, player.location_id, "forest")
 	var player_portrait_loaded := player.load_portrait_texture() != null
+	var current_location_art_loaded := graph.load_art_texture(player.location_id) != null
+	var current_location_name := graph.get_display_name(player.location_id)
 
 	return {
 		"ok": true,
 		"player": player.to_dict(),
 		"player_portrait_loaded": player_portrait_loaded,
+		"current_location_art_loaded": current_location_art_loaded,
+		"current_location_name": current_location_name,
 		"affinity_score": affinity.get_score(player.role_id, npc.role_id),
 		"affinity_tier": str(affinity_next["tier"]),
 		"can_move_to_market": can_move_to_market,

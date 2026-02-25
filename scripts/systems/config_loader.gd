@@ -108,6 +108,8 @@ static func load_location_graph(path: String) -> Dictionary:
 			if not normalized.is_empty():
 				neighbors.append(normalized)
 		graph.set_neighbors(location_id, neighbors)
+		graph.set_art_file(location_id, str(row.get("art_file", "")))
+		graph.set_display_name(location_id, str(row.get("display_name", "")))
 
 	return {"ok": true, "graph": graph}
 

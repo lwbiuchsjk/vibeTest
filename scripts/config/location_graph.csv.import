@@ -6,10 +6,10 @@ uid="uid://85mrkecpxpj5"
 
 [deps]
 
-files=["res://scripts/config/location_graph.neighbors.translation"]
+files=["res://scripts/config/location_graph.display.translation", "res://scripts/config/location_graph.neighbors.translation", "res://scripts/config/location_graph.art.translation"]
 
 source_file="res://scripts/config/location_graph.csv"
-dest_files=["res://scripts/config/location_graph.neighbors.translation"]
+dest_files=["res://scripts/config/location_graph.display.translation", "res://scripts/config/location_graph.neighbors.translation", "res://scripts/config/location_graph.art.translation"]
 
 [params]
 
