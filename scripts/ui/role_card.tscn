@@ -1,39 +1,46 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=2 format=3 uid="uid://bsv21eukem5jj"]
 
-[ext_resource type="Script" path="res://scripts/ui/role_card.gd" id="1_role_card"]
+[ext_resource type="Script" uid="uid://u640mj0iwkay" path="res://scripts/ui/role_card.gd" id="1_role_card"]
 
 [node name="RoleCard" type="PanelContainer"]
 custom_minimum_size = Vector2(180, 360)
 script = ExtResource("1_role_card")
 
 [node name="Content" type="VBoxContainer" parent="."]
-alignment = 1
+layout_mode = 2
 theme_override_constants/separation = 8
+alignment = 1
 
 [node name="Portrait" type="TextureRect" parent="Content"]
 custom_minimum_size = Vector2(150, 170)
+layout_mode = 2
 expand_mode = 1
 stretch_mode = 5
 
 [node name="PortraitMissingLabel" type="Label" parent="Content"]
 visible = false
+layout_mode = 2
 horizontal_alignment = 1
 autowrap_mode = 3
 
 [node name="NameLabel" type="Label" parent="Content"]
+layout_mode = 2
 horizontal_alignment = 1
 autowrap_mode = 3
 
 [node name="LocationNameLabel" type="Label" parent="Content"]
+layout_mode = 2
 horizontal_alignment = 1
 autowrap_mode = 3
 
 [node name="LocationArt" type="TextureRect" parent="Content"]
 custom_minimum_size = Vector2(150, 72)
+layout_mode = 2
 expand_mode = 1
 stretch_mode = 5
 
 [node name="LocationArtMissingLabel" type="Label" parent="Content"]
 visible = false
+layout_mode = 2
 horizontal_alignment = 1
 autowrap_mode = 3
