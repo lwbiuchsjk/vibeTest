@@ -1,0 +1,24 @@
+﻿{
+  "turn": 1,
+  "currentLocationId": "town_square",
+  "flags": {
+    "isWanted": false
+  },
+  "params": {
+    "danger": 10,
+    "prosperity": 20
+  },
+  "locationState": {
+    "town_square": {"security": 60},
+    "market": {"security": 55},
+    "harbor": {"security": 35}
+  },
+  "npcPresence": {
+    "town_square": ["npc_guard"],
+    "market": [],
+    "harbor": ["npc_smuggler", "npc_guard"]
+  },
+  "history": [],
+  "chainContext": null,
+  "forcedNextEventId": ""
+}

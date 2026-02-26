@@ -1,0 +1,149 @@
+﻿[
+  {
+    "id": "evt_idle",
+    "title": "整理思绪",
+    "baseWeight": 1,
+    "tags": ["idle"],
+    "eligibility": {},
+    "weightRules": [],
+    "continuationPolicy": "ReturnToScheduler",
+    "effects": {
+      "addParams": {"danger": -1}
+    }
+  },
+  {
+    "id": "evt_study_001",
+    "title": "学习",
+    "baseWeight": 18,
+    "tags": ["daily"],
+    "eligibility": {},
+    "weightRules": [
+      {"when": "params.danger < 20", "delta": 10}
+    ],
+    "continuationPolicy": "ReturnToScheduler",
+    "effects": {
+      "addParams": {"prosperity": 2}
+    }
+  },
+  {
+    "id": "evt_shop_001",
+    "title": "购物",
+    "baseWeight": 15,
+    "tags": ["daily"],
+    "eligibility": {
+      "requiredLocations": ["town_square", "market"]
+    },
+    "weightRules": [],
+    "continuationPolicy": "ReturnToScheduler",
+    "effects": {
+      "addParams": {"prosperity": 1}
+    }
+  },
+  {
+    "id": "evt_harbor_hint_001",
+    "title": "收到码头线报",
+    "baseWeight": 10,
+    "tags": ["smuggle", "hook"],
+    "eligibility": {
+      "requiredLocations": ["town_square", "market"]
+    },
+    "weightRules": [
+      {"when": "params.danger >= 12", "delta": 12}
+    ],
+    "continuationPolicy": "ChainContinue",
+    "chainPatch": {
+      "chainId": "chain_smuggle",
+      "stage": 1,
+      "allowedTags": ["smuggle", "escape", "force"],
+      "weightBias": {"smuggle": 20, "escape": 10, "force": 8},
+      "exitWhenStageGte": 5
+    },
+    "effects": {
+      "setLocation": "harbor",
+      "addParams": {"danger": 4}
+    }
+  },
+  {
+    "id": "evt_harbor_deal_001",
+    "title": "码头交易",
+    "baseWeight": 12,
+    "tags": ["smuggle"],
+    "eligibility": {
+      "requiredLocations": ["harbor"],
+      "requiredLocationFlags": [
+        {"key": "security", "op": "<=", "value": 40}
+      ],
+      "requiredNPCsPresent": ["npc_smuggler"]
+    },
+    "weightRules": [
+      {"when": "params.danger >= 20", "delta": 15}
+    ],
+    "continuationPolicy": "ChainContinue",
+    "chainPatch": {
+      "stageDelta": 1
+    },
+    "effects": {
+      "setFlags": {"isWanted": true},
+      "addParams": {"danger": 5}
+    }
+  },
+  {
+    "id": "evt_story_force_001",
+    "title": "剧情急转",
+    "baseWeight": 8,
+    "tags": ["force", "smuggle"],
+    "eligibility": {
+      "requiredLocations": ["harbor"]
+    },
+    "weightRules": [
+      {"when": "flags.isWanted == true", "delta": 25}
+    ],
+    "continuationPolicy": "ChainContinueWithForcedNext",
+    "chainPatch": {
+      "stageDelta": 1
+    },
+    "effects": {
+      "forcedNextEventId": "evt_guard_chase_001",
+      "addParams": {"danger": 3}
+    }
+  },
+  {
+    "id": "evt_guard_chase_001",
+    "title": "守卫追捕",
+    "baseWeight": 14,
+    "tags": ["escape"],
+    "eligibility": {
+      "requiredLocations": ["harbor"]
+    },
+    "weightRules": [
+      {"when": "flags.isWanted == true", "delta": 20}
+    ],
+    "continuationPolicy": "ChainContinue",
+    "chainPatch": {
+      "stageDelta": 1
+    },
+    "effects": {
+      "addParams": {"danger": -2}
+    }
+  },
+  {
+    "id": "evt_smuggle_escape_001",
+    "title": "脱离追踪",
+    "baseWeight": 10,
+    "tags": ["escape", "smuggle"],
+    "eligibility": {
+      "requiredLocations": ["harbor"]
+    },
+    "weightRules": [
+      {"when": "params.danger >= 18", "delta": 5}
+    ],
+    "continuationPolicy": "ReturnToScheduler",
+    "effects": {
+      "setLocation": "town_square",
+      "setFlags": {"isWanted": false},
+      "addParams": {"danger": -6},
+      "endChain": true,
+      "clearForcedNext": true
+    }
+  }
+]
