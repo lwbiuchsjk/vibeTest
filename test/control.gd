@@ -20,7 +20,7 @@ func _ready() -> void:
 	#print("[MilestoneA]", milestone_result)
 
 	# MVP 世界与事件引擎回归输出。
-	var mvp_result: Dictionary = MvpWorldEventSmokeTest.run()
+	var mvp_result: Dictionary = MvpWorldEventSmokeTest.run_from_csv()
 	#print("[MVP-WorldEvent]", mvp_result)
 	if mvp_result.get("ok", false):
 		var turns: Array = mvp_result.get("turns", [])
