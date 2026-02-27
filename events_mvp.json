@@ -21,6 +21,7 @@
       {"when": "params.danger < 20", "delta": 10}
     ],
     "continuationPolicy": "ReturnToScheduler",
+    "choicePointId": "cp_study_plan",
     "effects": {
       "addParams": {"prosperity": 2}
     }

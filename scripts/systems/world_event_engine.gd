@@ -14,6 +14,7 @@ var choice_points: Array = []
 var _event_map: Dictionary = {}
 var _choice_point_map: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
+var _pending_choice_context: Dictionary = {}
 
 # 功能：初始化随机源。
 # 说明：seed=0 使用随机种子；指定 seed 可复现结果，便于测试回归。
@@ -80,6 +81,10 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 	if events.is_empty():
 		return {"ok": false, "error": "event pool is empty"}
 
+	# 说明：若上回合停在选择点，本回合只允许等待或消费外部传入选项。
+	if not _pending_choice_context.is_empty():
+		return _resolve_pending_choice(selected_option_id)
+
 	var expected_forced := str(world_state.get("forcedNextEventId", ""))
 	var next_event_id := ""
 	var route := "scheduler"
@@ -126,13 +131,45 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 		else:
 			var options_eval := _build_option_set(choice_point_def)
 			choice_result["options"] = _option_public_states(options_eval)
-			var selected := _select_option(options_eval, selected_option_id)
-			if selected.is_empty():
-				# 说明：无可选项（全不可见/不可选）时，回退到事件默认效果。
-				choice_result["resolved_by"] = "no_selectable_option_fallback_event_effects"
-				_apply_event_effects(event_def)
-				_apply_continuation_policy(event_def)
+			var selected := {}
+			if selected_option_id.strip_edges().is_empty():
+				selected = _select_first_selectable(options_eval)
+				if selected.is_empty():
+					# 说明：无可选项（全不可见/不可选）时，回退到事件默认效果。
+					choice_result["resolved_by"] = "no_selectable_option_fallback_event_effects"
+					_apply_event_effects(event_def)
+					_apply_continuation_policy(event_def)
+				else:
+					# 说明：存在可选项但未传入外部选择时，进入等待态，不推进回合。
+					_pending_choice_context = {
+						"event_id": next_event_id,
+						"route": route,
+						"expected_forced": expected_forced
+					}
+					choice_result["resolved_by"] = "pending_external_selection"
+					return {
+						"ok": true,
+						"awaiting_choice": true,
+						"route": route,
+						"event_id": next_event_id,
+						"title": str(event_def.get("title", "")),
+						"policy": str(event_def.get("continuationPolicy", POLICY_RETURN)),
+						"expected_forced": expected_forced,
+						"chain_active": not (world_state.get("chainContext", null) == null),
+						"has_choice": true,
+						"choice": choice_result
+					}
 			else:
+				selected = _select_option_by_id(options_eval, selected_option_id)
+				if selected.is_empty():
+					return {
+						"ok": false,
+						"error": "selected option is not selectable: %s" % selected_option_id,
+						"event_id": next_event_id,
+						"choice_point_id": choice_point_id,
+						"options": choice_result["options"]
+					}
+			if not selected.is_empty():
 				choice_result["selected_option_id"] = str(selected.get("id", ""))
 				choice_result["resolved_by"] = "option_resolution"
 				_apply_option_resolution(selected, event_def)
@@ -152,6 +189,80 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 		"expected_forced": expected_forced,
 		"chain_active": not (world_state.get("chainContext", null) == null),
 		"has_choice": has_choice,
+		"choice": choice_result
+	}
+
+# 功能：处理等待中的选择点。
+# 说明：无选项输入时返回等待态；有输入时仅在可选时结算并推进回合。
+func _resolve_pending_choice(selected_option_id: String) -> Dictionary:
+	var event_id := str(_pending_choice_context.get("event_id", ""))
+	var route := str(_pending_choice_context.get("route", "scheduler"))
+	var expected_forced := str(_pending_choice_context.get("expected_forced", ""))
+	var event_def: Dictionary = _event_map.get(event_id, {})
+	if event_def.is_empty():
+		_pending_choice_context.clear()
+		return {"ok": false, "error": "pending event not found: %s" % event_id}
+
+	var choice_point_id := str(event_def.get("choicePointId", "")).strip_edges()
+	if choice_point_id.is_empty():
+		_pending_choice_context.clear()
+		return {"ok": false, "error": "pending event has no choice point: %s" % event_id}
+
+	var choice_point_def: Dictionary = _choice_point_map.get(choice_point_id, {})
+	if choice_point_def.is_empty():
+		_pending_choice_context.clear()
+		return {"ok": false, "error": "pending choice point not found: %s" % choice_point_id}
+
+	var options_eval := _build_option_set(choice_point_def)
+	var choice_result := {
+		"choice_point_id": choice_point_id,
+		"selected_option_id": "",
+		"resolved_by": "",
+		"options": _option_public_states(options_eval)
+	}
+
+	if selected_option_id.strip_edges().is_empty():
+		choice_result["resolved_by"] = "pending_external_selection"
+		return {
+			"ok": true,
+			"awaiting_choice": true,
+			"route": route,
+			"event_id": event_id,
+			"title": str(event_def.get("title", "")),
+			"policy": str(event_def.get("continuationPolicy", POLICY_RETURN)),
+			"expected_forced": expected_forced,
+			"chain_active": not (world_state.get("chainContext", null) == null),
+			"has_choice": true,
+			"choice": choice_result
+		}
+
+	var selected := _select_option_by_id(options_eval, selected_option_id)
+	if selected.is_empty():
+		return {
+			"ok": false,
+			"error": "selected option is not selectable: %s" % selected_option_id,
+			"event_id": event_id,
+			"choice_point_id": choice_point_id,
+			"options": choice_result["options"]
+		}
+
+	choice_result["selected_option_id"] = str(selected.get("id", ""))
+	choice_result["resolved_by"] = "option_resolution"
+	_apply_option_resolution(selected, event_def)
+	_record_history(event_id)
+	world_state["turn"] = int(world_state.get("turn", 0)) + 1
+	_pending_choice_context.clear()
+
+	return {
+		"ok": true,
+		"awaiting_choice": false,
+		"route": route,
+		"event_id": event_id,
+		"title": str(event_def.get("title", "")),
+		"policy": str(event_def.get("continuationPolicy", POLICY_RETURN)),
+		"expected_forced": expected_forced,
+		"chain_active": not (world_state.get("chainContext", null) == null),
+		"has_choice": true,
 		"choice": choice_result
 	}
 
@@ -585,17 +696,21 @@ func _apply_cost(cost: Dictionary) -> void:
 		player[key] = int(player.get(key, 0)) - int(cost[key_variant])
 	world_state["player"] = player
 
-# 功能：在可选项中确定最终选择。
-# 说明：优先 preferred_option_id，否则取第一个可选项。
-func _select_option(options_eval: Array, preferred_option_id: String) -> Dictionary:
-	var preferred := preferred_option_id.strip_edges()
-	if not preferred.is_empty():
-		# 说明：调试/测试可指定 preferred_option_id，仅在其可选时命中。
-		for option_variant in options_eval:
-			var option_def: Dictionary = option_variant
-			if str(option_def.get("id", "")) == preferred and str(option_def.get("state", "")) == "selectable":
-				return option_def
-	# 说明：常规路径自动选择第一个可选项。
+# 功能：在可选项中按外部传入 ID 精确选择。
+# 说明：仅当目标选项状态为 selectable 时返回，否则返回空字典。
+func _select_option_by_id(options_eval: Array, option_id: String) -> Dictionary:
+	var target := option_id.strip_edges()
+	if target.is_empty():
+		return {}
+	for option_variant in options_eval:
+		var option_def: Dictionary = option_variant
+		if str(option_def.get("id", "")) == target and str(option_def.get("state", "")) == "selectable":
+			return option_def
+	return {}
+
+# 功能：在可选项中查找第一个 selectable 选项。
+# 说明：仅用于判断“是否存在可选项”，不用于自动结算。
+func _select_first_selectable(options_eval: Array) -> Dictionary:
 	for option_variant in options_eval:
 		var option_def: Dictionary = option_variant
 		if str(option_def.get("state", "")) == "selectable":

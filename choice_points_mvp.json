@@ -1,5 +1,63 @@
 [
   {
+    "id": "cp_study_plan",
+    "options": [
+      {
+        "id": "opt_study_focus_knowledge",
+        "text": "Focus on knowledge (cost 1 energy)",
+        "eligibility": {
+          "player.energy": ">=1"
+        },
+        "cost": {
+          "energy": 1
+        },
+        "check": null,
+        "resolution": {
+          "worldStatePatch": {
+            "params": {"prosperity": 1, "morale": 1}
+          },
+          "forcedNextEventId": "",
+          "chainContextPatch": {}
+        }
+      },
+      {
+        "id": "opt_study_take_rest",
+        "text": "Take a short break",
+        "eligibility": {},
+        "cost": {},
+        "check": null,
+        "resolution": {
+          "worldStatePatch": {
+            "params": {"morale": 2}
+          },
+          "forcedNextEventId": "",
+          "chainContextPatch": {}
+        }
+      },
+      {
+        "id": "opt_study_secret_notes",
+        "text": "Read secret notes",
+        "visibilityWhen": [
+          "flags.isWanted == true"
+        ],
+        "eligibility": {
+          "player.gold": ">=5"
+        },
+        "cost": {
+          "gold": 5
+        },
+        "check": null,
+        "resolution": {
+          "worldStatePatch": {
+            "params": {"danger": 2, "prosperity": 1}
+          },
+          "forcedNextEventId": "",
+          "chainContextPatch": {}
+        }
+      }
+    ]
+  },
+  {
     "id": "cp_market_trade",
     "options": [
       {
