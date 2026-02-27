@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://b71l8hjdit44n"
+
+[deps]
+
+files=["res://scripts/config/world_event_mvp/event_eligibility_npcs.npc.translation"]
+
+source_file="res://scripts/config/world_event_mvp/event_eligibility_npcs.csv"
+dest_files=["res://scripts/config/world_event_mvp/event_eligibility_npcs.npc.translation"]
+
+[params]
+
+compress=true
+delimiter=0

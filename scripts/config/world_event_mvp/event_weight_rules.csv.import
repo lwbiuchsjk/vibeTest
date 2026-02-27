@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://bypgq542gdf8a"
+
+[deps]
+
+files=["res://scripts/config/world_event_mvp/event_weight_rules.left.translation", "res://scripts/config/world_event_mvp/event_weight_rules.op.translation", "res://scripts/config/world_event_mvp/event_weight_rules.right.translation", "res://scripts/config/world_event_mvp/event_weight_rules.delta.translation"]
+
+source_file="res://scripts/config/world_event_mvp/event_weight_rules.csv"
+dest_files=["res://scripts/config/world_event_mvp/event_weight_rules.left.translation", "res://scripts/config/world_event_mvp/event_weight_rules.op.translation", "res://scripts/config/world_event_mvp/event_weight_rules.right.translation", "res://scripts/config/world_event_mvp/event_weight_rules.delta.translation"]
+
+[params]
+
+compress=true
+delimiter=0

@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dpol7h1g1d54r"
+
+[deps]
+
+files=["res://scripts/config/world_event_mvp/option_visibility_rules.left.translation", "res://scripts/config/world_event_mvp/option_visibility_rules.op.translation", "res://scripts/config/world_event_mvp/option_visibility_rules.right.translation"]
+
+source_file="res://scripts/config/world_event_mvp/option_visibility_rules.csv"
+dest_files=["res://scripts/config/world_event_mvp/option_visibility_rules.left.translation", "res://scripts/config/world_event_mvp/option_visibility_rules.op.translation", "res://scripts/config/world_event_mvp/option_visibility_rules.right.translation"]
+
+[params]
+
+compress=true
+delimiter=0

@@ -1,0 +1,4 @@
+﻿"option_id","left","op","right"
+"opt_study_secret_notes","flags.isWanted","==","true"
+"opt_market_black_deal","flags.isWanted","==","true"
+
