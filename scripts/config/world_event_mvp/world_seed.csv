@@ -1,0 +1,17 @@
+﻿section,scope_a,scope_b,key,value
+core,,,turn,1
+core,,,current_location_id,town_square
+core,,,forced_next_event_id,
+flag,,,isWanted,false
+param,,,danger,10
+param,,,prosperity,20
+param,,,morale,50
+player,,,hp,100
+player,,,gold,30
+player,,,energy,3
+location_state,town_square,,security,60
+location_state,market,,security,55
+location_state,harbor,,security,35
+npc_presence,town_square,,npc_id,npc_guard
+npc_presence,harbor,,npc_id,npc_smuggler
+npc_presence,harbor,,npc_id,npc_guard

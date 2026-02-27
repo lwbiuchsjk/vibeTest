@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://bgreqj1e4rbsd"
+
+[deps]
+
+files=["res://scripts/config/world_event_mvp/option_rules.rule.translation", "res://scripts/config/world_event_mvp/option_rules.branch.translation", "res://scripts/config/world_event_mvp/option_rules.left.translation", "res://scripts/config/world_event_mvp/option_rules.op.translation", "res://scripts/config/world_event_mvp/option_rules.right.translation", "res://scripts/config/world_event_mvp/option_rules.target.translation", "res://scripts/config/world_event_mvp/option_rules.key.translation", "res://scripts/config/world_event_mvp/option_rules.value.translation"]
+
+source_file="res://scripts/config/world_event_mvp/option_rules.csv"
+dest_files=["res://scripts/config/world_event_mvp/option_rules.rule.translation", "res://scripts/config/world_event_mvp/option_rules.branch.translation", "res://scripts/config/world_event_mvp/option_rules.left.translation", "res://scripts/config/world_event_mvp/option_rules.op.translation", "res://scripts/config/world_event_mvp/option_rules.right.translation", "res://scripts/config/world_event_mvp/option_rules.target.translation", "res://scripts/config/world_event_mvp/option_rules.key.translation", "res://scripts/config/world_event_mvp/option_rules.value.translation"]
+
+[params]
+
+compress=true
+delimiter=0

@@ -1,8 +1,0 @@
-﻿"event_id","left","op","right","delta"
-"evt_study_001","params.danger","<","20","10"
-"evt_harbor_hint_001","params.danger",">=","12","12"
-"evt_harbor_deal_001","params.danger",">=","20","15"
-"evt_story_force_001","flags.isWanted","==","true","25"
-"evt_guard_chase_001","flags.isWanted","==","true","20"
-"evt_smuggle_escape_001","params.danger",">=","18","5"
-

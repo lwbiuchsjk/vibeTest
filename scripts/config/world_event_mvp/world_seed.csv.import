@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://brg1ltt833pg6"
+
+[deps]
+
+files=["res://scripts/config/world_event_mvp/world_seed.scope.translation", "res://scripts/config/world_event_mvp/world_seed.scope.translation", "res://scripts/config/world_event_mvp/world_seed.key.translation", "res://scripts/config/world_event_mvp/world_seed.value.translation"]
+
+source_file="res://scripts/config/world_event_mvp/world_seed.csv"
+dest_files=["res://scripts/config/world_event_mvp/world_seed.scope.translation", "res://scripts/config/world_event_mvp/world_seed.scope.translation", "res://scripts/config/world_event_mvp/world_seed.key.translation", "res://scripts/config/world_event_mvp/world_seed.value.translation"]
+
+[params]
+
+compress=true
+delimiter=0
