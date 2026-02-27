@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://cfaogj0kuwvks"
+
+[deps]
+
+files=["res://scripts/config/world_event_mvp/world_seed_flags.flag.translation"]
+
+source_file="res://scripts/config/world_event_mvp/world_seed_flags.csv"
+dest_files=["res://scripts/config/world_event_mvp/world_seed_flags.flag.translation"]
+
+[params]
+
+compress=true
+delimiter=0

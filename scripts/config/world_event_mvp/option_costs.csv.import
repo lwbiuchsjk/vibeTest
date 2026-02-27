@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://c54ecadqwjfm0"
+
+[deps]
+
+files=["res://scripts/config/world_event_mvp/option_costs.key.translation", "res://scripts/config/world_event_mvp/option_costs.value.translation"]
+
+source_file="res://scripts/config/world_event_mvp/option_costs.csv"
+dest_files=["res://scripts/config/world_event_mvp/option_costs.key.translation", "res://scripts/config/world_event_mvp/option_costs.value.translation"]
+
+[params]
+
+compress=true
+delimiter=0

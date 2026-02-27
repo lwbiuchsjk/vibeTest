@@ -7,6 +7,7 @@ class_name WorldEventEngine
 const POLICY_RETURN := "ReturnToScheduler"
 const POLICY_CHAIN := "ChainContinue"
 const POLICY_CHAIN_FORCED := "ChainContinueWithForcedNext"
+const WorldEventConfigAssembler := preload("res://scripts/systems/world_event_config_assembler.gd")
 
 var world_state: Dictionary = {}
 var events: Array = []
@@ -47,6 +48,14 @@ func load_from_files(
 
 	return load_from_json_text(world_text, events_text, choice_points_text)
 
+# 功能：从 CSV 配置目录加载 world_state、events、choice_points。
+# 说明：先执行配置编译，再使用统一内存加载入口，确保行为与 JSON 加载一致。
+func load_from_csv_dir(csv_dir_path: String) -> Dictionary:
+	var compile_result := WorldEventConfigAssembler.compile_from_csv_dir(csv_dir_path)
+	if not compile_result.get("ok", false):
+		return compile_result
+	return load_from_data(compile_result.get("data", {}))
+
 # 功能：从 JSON 文本加载数据。
 # 说明：适合测试/热重载，成功后会重建事件与选择点索引。
 func load_from_json_text(
@@ -71,6 +80,29 @@ func load_from_json_text(
 	world_state = (parsed_world as Dictionary).duplicate(true)
 	events = (parsed_events as Array).duplicate(true)
 	choice_points = (parsed_choice_points as Array).duplicate(true)
+	_rebuild_event_map()
+	_rebuild_choice_point_map()
+	return {"ok": true}
+
+# 功能：从内存对象加载数据。
+# 说明：用于承接 CSV 编译结果，避免二次 JSON 序列化产生歧义。
+func load_from_data(data: Dictionary) -> Dictionary:
+	if data.is_empty():
+		return {"ok": false, "error": "compiled data is empty"}
+	var raw_world: Variant = data.get("world_state", null)
+	var raw_events: Variant = data.get("events", null)
+	var raw_choice_points: Variant = data.get("choice_points", [])
+
+	if typeof(raw_world) != TYPE_DICTIONARY:
+		return {"ok": false, "error": "compiled world_state is invalid"}
+	if typeof(raw_events) != TYPE_ARRAY:
+		return {"ok": false, "error": "compiled events is invalid"}
+	if typeof(raw_choice_points) != TYPE_ARRAY:
+		return {"ok": false, "error": "compiled choice_points is invalid"}
+
+	world_state = (raw_world as Dictionary).duplicate(true)
+	events = (raw_events as Array).duplicate(true)
+	choice_points = (raw_choice_points as Array).duplicate(true)
 	_rebuild_event_map()
 	_rebuild_choice_point_map()
 	return {"ok": true}

@@ -1,0 +1,8 @@
+﻿"event_id","tag","bias","source"
+"evt_harbor_hint_001","smuggle","","allowed_tag"
+"evt_harbor_hint_001","escape","","allowed_tag"
+"evt_harbor_hint_001","force","","allowed_tag"
+"evt_harbor_hint_001","smuggle","20","weight_bias"
+"evt_harbor_hint_001","escape","10","weight_bias"
+"evt_harbor_hint_001","force","8","weight_bias"
+

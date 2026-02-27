@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://crtb0fbwp0vwh"
+
+[deps]
+
+files=["res://scripts/config/world_event_mvp/event_tags.tag.translation"]
+
+source_file="res://scripts/config/world_event_mvp/event_tags.csv"
+dest_files=["res://scripts/config/world_event_mvp/event_tags.tag.translation"]
+
+[params]
+
+compress=true
+delimiter=0

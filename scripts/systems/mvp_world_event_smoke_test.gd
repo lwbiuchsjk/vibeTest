@@ -14,7 +14,22 @@ static func run() -> Dictionary:
 	)
 	if not load_result.get("ok", false):
 		return load_result
+	return _run_loop(engine, option_rng)
 
+# 功能：使用 CSV 配置目录执行世界事件引擎冒烟测试。
+# 说明：覆盖“CSV 编译 -> 引擎加载 -> 回合循环”的完整路径。
+static func run_from_csv(csv_dir: String = "res://scripts/config/world_event_mvp") -> Dictionary:
+	var engine := WorldEventEngine.new(20260226)
+	var option_rng := RandomNumberGenerator.new()
+	option_rng.seed = 20260227
+	var load_result := engine.load_from_csv_dir(csv_dir)
+	if not load_result.get("ok", false):
+		return load_result
+	return _run_loop(engine, option_rng)
+
+# 功能：执行固定回合的冒烟测试循环。
+# 说明：抽离公共回合逻辑，复用 JSON 与 CSV 两种加载入口。
+static func _run_loop(engine: WorldEventEngine, option_rng: RandomNumberGenerator) -> Dictionary:
 	var turns: Array = []
 	var forced_checks := 0
 	var chain_hits := 0

@@ -1,0 +1,15 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dv3inw5mr5tvx"
+valid=false
+
+[deps]
+
+source_file="res://scripts/config/world_event_mvp/choice_points.csv"
+
+[params]
+
+compress=true
+delimiter=0
