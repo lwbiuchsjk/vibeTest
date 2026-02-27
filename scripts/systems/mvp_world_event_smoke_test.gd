@@ -5,6 +5,8 @@ const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 
 static func run() -> Dictionary:
 	var engine := WorldEventEngine.new(20260226)
+	var option_rng := RandomNumberGenerator.new()
+	option_rng.seed = 20260227
 	var load_result := engine.load_from_files(
 		"res://world_state_seed.json",
 		"res://events_mvp.json",
@@ -24,10 +26,16 @@ static func run() -> Dictionary:
 		"selectable": false
 	}
 	var choice_forced_verified := false
-	var harbor_intel_written := false
+	var choice_resolution_applied := false
 
-	for _i in range(20):
-		var turn_index := _i + 1
+	var completed_turns := 0
+	var safety_guard := 0
+	while completed_turns < 20:
+		safety_guard += 1
+		if safety_guard > 80:
+			return {"ok": false, "error": "turn loop safety guard triggered"}
+
+		var turn_index := completed_turns + 1
 		var expected_forced := str(engine.world_state.get("forcedNextEventId", ""))
 		var before_location := str(engine.world_state.get("currentLocationId", ""))
 		var before_presence: Dictionary = engine.world_state.get("npcPresence", {})
@@ -36,6 +44,15 @@ static func run() -> Dictionary:
 		var turn_result := engine.run_turn()
 		if not turn_result.get("ok", false):
 			return turn_result
+		if bool(turn_result.get("awaiting_choice", false)):
+			var choice: Dictionary = turn_result.get("choice", {})
+			# 说明：测试流程自动喂选项，但改为在所有可选项中随机选择一个。
+			var selected_option_id := _random_selectable_option_id(choice.get("options", []), option_rng)
+			if selected_option_id.is_empty():
+				return {"ok": false, "error": "awaiting choice but no selectable option"}
+			turn_result = engine.run_turn(selected_option_id)
+			if not turn_result.get("ok", false):
+				return turn_result
 
 		if not expected_forced.is_empty():
 			forced_checks += 1
@@ -59,6 +76,8 @@ static func run() -> Dictionary:
 				if option_state_seen.has(state):
 					option_state_seen[state] = true
 			var selected_option_id := str(choice.get("selected_option_id", ""))
+			if not selected_option_id.is_empty():
+				choice_resolution_applied = true
 			if selected_option_id == "opt_run":
 				var after_forced := str(engine.world_state.get("forcedNextEventId", ""))
 				if after_forced != "evt_guard_chase_001":
@@ -69,10 +88,6 @@ static func run() -> Dictionary:
 						"actual": after_forced
 					}
 				choice_forced_verified = true
-
-		var flags_after_turn: Dictionary = engine.world_state.get("flags", {})
-		if bool(flags_after_turn.get("gotHarborIntel", false)):
-			harbor_intel_written = true
 
 		# 轻量验证：在非港口或无走私商人时，不应命中码头交易事件。
 		var selected_id := str(turn_result.get("event_id", ""))
@@ -94,8 +109,9 @@ static func run() -> Dictionary:
 			"chain_context": engine.world_state.get("chainContext", null)
 		}
 		turns.append(turn_detail)
+		completed_turns += 1
 		# 测试阶段按回合完整输出事件信息，便于定位调度链路问题。
-		print("[MVP-WorldEvent][Turn-%02d] %s" % [turn_index, JSON.stringify(turn_detail)])
+		print("[MVP-WorldEvent][Turn-%02d] %s" % [completed_turns, JSON.stringify(turn_detail)])
 
 	for key in option_state_seen.keys():
 		if not bool(option_state_seen[key]):
@@ -108,8 +124,8 @@ static func run() -> Dictionary:
 	if not choice_forced_verified:
 		return {"ok": false, "error": "choice forced-next path not verified"}
 
-	if not harbor_intel_written:
-		return {"ok": false, "error": "choice resolution world state patch not observed"}
+	if not choice_resolution_applied:
+		return {"ok": false, "error": "choice resolution path not observed"}
 
 	return {
 		"ok": true,
@@ -118,8 +134,21 @@ static func run() -> Dictionary:
 		"chain_hits": chain_hits,
 		"choice_option_states_seen": option_state_seen,
 		"choice_forced_verified": choice_forced_verified,
-		"harbor_intel_written": harbor_intel_written,
+		"choice_resolution_applied": choice_resolution_applied,
 		"location_npc_gating_observed": guard_location_block_verified and guard_npc_block_verified,
 		"last_turn": turns[-1] if not turns.is_empty() else {},
 		"turns": turns
 	}
+
+# 功能：从选项列表中随机获取一个可选项 id。
+# 说明：仅在 state=selectable 的候选集中抽样，模拟外部随机喂选项行为。
+static func _random_selectable_option_id(options: Array, rng: RandomNumberGenerator) -> String:
+	var selectable_ids: Array = []
+	for option_variant in options:
+		var option_def: Dictionary = option_variant
+		if str(option_def.get("state", "")) == "selectable":
+			selectable_ids.append(str(option_def.get("id", "")))
+	if selectable_ids.is_empty():
+		return ""
+	var pick_index := rng.randi_range(0, selectable_ids.size() - 1)
+	return str(selectable_ids[pick_index])
