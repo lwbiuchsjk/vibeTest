@@ -1,0 +1,27 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/event_option_card.gd" id="1_script"]
+
+[node name="EventOptionCard" type="PanelContainer"]
+custom_minimum_size = Vector2(300, 110)
+size_flags_horizontal = 3
+script = ExtResource("1_script")
+
+[node name="Content" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="TitleLabel" type="Label" parent="Content"]
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="MetaLabel" type="Label" parent="Content"]
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="DetailLabel" type="RichTextLabel" parent="Content"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+bbcode_enabled = false
+scroll_active = false
+fit_content = true
