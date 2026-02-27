@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://ceys4wtmhjx17"
+
+[deps]
+
+files=["res://scripts/config/world_event_mvp/event_outcomes.branch.translation", "res://scripts/config/world_event_mvp/event_outcomes.target.translation", "res://scripts/config/world_event_mvp/event_outcomes.op.translation", "res://scripts/config/world_event_mvp/event_outcomes.key.translation", "res://scripts/config/world_event_mvp/event_outcomes.value.translation"]
+
+source_file="res://scripts/config/world_event_mvp/event_outcomes.csv"
+dest_files=["res://scripts/config/world_event_mvp/event_outcomes.branch.translation", "res://scripts/config/world_event_mvp/event_outcomes.target.translation", "res://scripts/config/world_event_mvp/event_outcomes.op.translation", "res://scripts/config/world_event_mvp/event_outcomes.key.translation", "res://scripts/config/world_event_mvp/event_outcomes.value.translation"]
+
+[params]
+
+compress=true
+delimiter=0

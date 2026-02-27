@@ -1,6 +1,0 @@
-﻿"event_id","chain_id","stage","stage_delta","exit_when_stage_gte"
-"evt_harbor_hint_001","chain_smuggle","1","","5"
-"evt_harbor_deal_001","","","1",""
-"evt_story_force_001","","","1",""
-"evt_guard_chase_001","","","1",""
-

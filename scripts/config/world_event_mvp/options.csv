@@ -1,11 +1,10 @@
-﻿"option_id","choice_point_id","text"
-"opt_study_focus_knowledge","cp_study_plan","Focus on knowledge (cost 1 energy)"
-"opt_study_take_rest","cp_study_plan","Take a short break"
-"opt_study_secret_notes","cp_study_plan","Read secret notes"
-"opt_market_buy","cp_market_trade","Buy supplies (10 gold)"
-"opt_market_bargain","cp_market_trade","Bargain (cost 1 energy)"
-"opt_market_black_deal","cp_market_trade","Black market deal"
-"opt_buy_info","cp_harbor_deal","Buy intel (10 gold)"
-"opt_run","cp_harbor_deal","Leave now"
-"opt_bribe_guard","cp_harbor_deal","Bribe guard (50 gold)"
-
+﻿option_id,choice_point_id,text,display_order
+opt_study_focus_knowledge,cp_study_plan,Focus on knowledge (cost 1 energy),1
+opt_study_take_rest,cp_study_plan,Take a short break,2
+opt_study_secret_notes,cp_study_plan,Read secret notes,3
+opt_market_buy,cp_market_trade,Buy supplies (10 gold),1
+opt_market_bargain,cp_market_trade,Bargain (cost 1 energy),2
+opt_market_black_deal,cp_market_trade,Black market deal,3
+opt_buy_info,cp_harbor_deal,Buy intel (10 gold),1
+opt_run,cp_harbor_deal,Leave now,2
+opt_bribe_guard,cp_harbor_deal,Bribe guard (50 gold),3
