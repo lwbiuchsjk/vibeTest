@@ -7,7 +7,7 @@ class_name WorldEventEngine
 const POLICY_RETURN := "ReturnToScheduler"
 const POLICY_CHAIN := "ChainContinue"
 const POLICY_CHAIN_FORCED := "ChainContinueWithForcedNext"
-const WorldEventConfigAssembler := preload("res://scripts/systems/world_event_config_assembler.gd")
+const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 
 var world_state: Dictionary = {}
 var events: Array = []
@@ -49,12 +49,16 @@ func load_from_files(
 	return load_from_json_text(world_text, events_text, choice_points_text)
 
 # 功能：从 CSV 配置目录加载 world_state、events、choice_points。
-# 说明：先执行配置编译，再使用统一内存加载入口，确保行为与 JSON 加载一致。
+# 说明：统一通过 ConfigRuntime 管理配置加载/缓存，避免引擎层直接编译 CSV。
 func load_from_csv_dir(csv_dir_path: String) -> Dictionary:
-	var compile_result := WorldEventConfigAssembler.compile_from_csv_dir(csv_dir_path)
-	if not compile_result.get("ok", false):
-		return compile_result
-	return load_from_data(compile_result.get("data", {}))
+	var runtime := ConfigRuntime.shared()
+	var load_result := runtime.ensure_loaded({"world_event_csv_dir": csv_dir_path})
+	if not load_result.get("ok", false):
+		return load_result
+	var world_event_data := runtime.get_world_event_data()
+	if world_event_data.is_empty():
+		return {"ok": false, "error": "world event config is empty in config runtime"}
+	return load_from_data(world_event_data)
 
 # 功能：从 JSON 文本加载数据。
 # 说明：适合测试/热重载，成功后会重建事件与选择点索引。
