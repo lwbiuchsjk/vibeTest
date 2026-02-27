@@ -1,0 +1,131 @@
+[
+  {
+    "id": "cp_market_trade",
+    "options": [
+      {
+        "id": "opt_market_buy",
+        "text": "Buy supplies (10 gold)",
+        "eligibility": {
+          "player.gold": ">=10"
+        },
+        "cost": {
+          "gold": 10
+        },
+        "check": null,
+        "resolution": {
+          "worldStatePatch": {
+            "params": {"prosperity": 2}
+          },
+          "forcedNextEventId": "",
+          "chainContextPatch": {}
+        }
+      },
+      {
+        "id": "opt_market_bargain",
+        "text": "Bargain (cost 1 energy)",
+        "eligibility": {
+          "player.energy": ">=1"
+        },
+        "cost": {
+          "energy": 1
+        },
+        "check": {
+          "type": "chance",
+          "successRate": 0.6,
+          "onFailResolution": {
+            "worldStatePatch": {
+              "params": {"morale": -2}
+            },
+            "forcedNextEventId": "",
+            "chainContextPatch": {}
+          }
+        },
+        "resolution": {
+          "worldStatePatch": {
+            "params": {"prosperity": 1, "morale": 1}
+          },
+          "forcedNextEventId": "",
+          "chainContextPatch": {}
+        }
+      },
+      {
+        "id": "opt_market_black_deal",
+        "text": "Black market deal",
+        "visibilityWhen": [
+          "flags.isWanted == true"
+        ],
+        "eligibility": {
+          "player.gold": ">=20"
+        },
+        "cost": {
+          "gold": 20
+        },
+        "check": null,
+        "resolution": {
+          "worldStatePatch": {
+            "params": {"danger": 5, "prosperity": 3}
+          },
+          "forcedNextEventId": "",
+          "chainContextPatch": {}
+        }
+      }
+    ]
+  },
+  {
+    "id": "cp_harbor_deal",
+    "options": [
+      {
+        "id": "opt_buy_info",
+        "text": "Buy intel (10 gold)",
+        "eligibility": {
+          "player.gold": ">=10"
+        },
+        "cost": {
+          "gold": 10
+        },
+        "check": null,
+        "resolution": {
+          "worldStatePatch": {
+            "flags": {"gotHarborIntel": true, "isWanted": true},
+            "params": {"danger": 3}
+          },
+          "forcedNextEventId": "",
+          "chainContextPatch": {"stageDelta": 1}
+        }
+      },
+      {
+        "id": "opt_run",
+        "text": "Leave now",
+        "eligibility": {},
+        "cost": {},
+        "check": null,
+        "resolution": {
+          "worldStatePatch": {
+            "params": {"morale": -2}
+          },
+          "forcedNextEventId": "evt_guard_chase_001",
+          "chainContextPatch": {"stageDelta": 1}
+        }
+      },
+      {
+        "id": "opt_bribe_guard",
+        "text": "Bribe guard (50 gold)",
+        "eligibility": {
+          "player.gold": ">=50"
+        },
+        "cost": {
+          "gold": 50
+        },
+        "check": null,
+        "resolution": {
+          "worldStatePatch": {
+            "params": {"danger": -4},
+            "flags": {"isWanted": false}
+          },
+          "forcedNextEventId": "",
+          "chainContextPatch": {}
+        }
+      }
+    ]
+  }
+]

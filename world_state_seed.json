@@ -6,7 +6,8 @@
   },
   "params": {
     "danger": 10,
-    "prosperity": 20
+    "prosperity": 20,
+    "morale": 50
   },
   "locationState": {
     "town_square": {"security": 60},
@@ -17,6 +18,11 @@
     "town_square": ["npc_guard"],
     "market": [],
     "harbor": ["npc_smuggler", "npc_guard"]
+  },
+  "player": {
+    "hp": 100,
+    "gold": 30,
+    "energy": 3
   },
   "history": [],
   "chainContext": null,

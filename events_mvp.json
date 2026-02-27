@@ -26,15 +26,16 @@
     }
   },
   {
-    "id": "evt_shop_001",
-    "title": "购物",
+    "id": "evt_market_001",
+    "title": "市场交易",
     "baseWeight": 15,
-    "tags": ["daily"],
+    "tags": ["daily", "market"],
     "eligibility": {
       "requiredLocations": ["town_square", "market"]
     },
     "weightRules": [],
     "continuationPolicy": "ReturnToScheduler",
+    "choicePointId": "cp_market_trade",
     "effects": {
       "addParams": {"prosperity": 1}
     }
@@ -79,12 +80,12 @@
       {"when": "params.danger >= 20", "delta": 15}
     ],
     "continuationPolicy": "ChainContinue",
+    "choicePointId": "cp_harbor_deal",
     "chainPatch": {
       "stageDelta": 1
     },
     "effects": {
-      "setFlags": {"isWanted": true},
-      "addParams": {"danger": 5}
+      "addParams": {"danger": 1}
     }
   },
   {
