@@ -17,3 +17,6 @@ _kb_sync/cache_index.json
 # Design docs/playground
 design/
 Design/
+
+# Local IDE settings
+.vscode/settings.json
