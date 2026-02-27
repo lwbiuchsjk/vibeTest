@@ -7,6 +7,7 @@ class_name ConfigRuntime
 # - 对业务/测试脚本屏蔽 ConfigLoader 与文件 IO 细节。
 # - 提供全局共享单例，贯穿应用生命周期。
 const ConfigLoader := preload("res://scripts/systems/config_loader.gd")
+const WorldEventConfigAssembler := preload("res://scripts/systems/world_event_config_assembler.gd")
 const RoleState := preload("res://scripts/models/role_state.gd")
 const LocationGraph := preload("res://scripts/models/location_graph.gd")
 const AffinityMap := preload("res://scripts/models/affinity_map.gd")
@@ -15,7 +16,8 @@ const AffinityMap := preload("res://scripts/models/affinity_map.gd")
 const DEFAULT_PATHS := {
 	"roles": "res://scripts/config/roles.csv",
 	"location_graph": "res://scripts/config/location_graph.csv",
-	"affinity": "res://scripts/config/affinity.csv"
+	"affinity": "res://scripts/config/affinity.csv",
+	"world_event_csv_dir": "res://scripts/config/world_event_mvp"
 }
 
 static var _shared_instance: ConfigRuntime
@@ -25,6 +27,7 @@ var _source_paths: Dictionary = {}
 var _roles: Array = []
 var _location_graph: LocationGraph
 var _affinity_map: AffinityMap
+var _world_event_data: Dictionary = {}
 
 # 全局单例入口。业务代码应通过此方法获取实例，而不是直接 new()。
 static func shared() -> ConfigRuntime:
@@ -67,9 +70,20 @@ func ensure_loaded(paths: Dictionary = {}, force_reload: bool = false) -> Dictio
 	if not affinity_result.get("ok", false):
 		return affinity_result
 
+	var world_event_dir := str(resolved_paths.get("world_event_csv_dir", "")).strip_edges()
+	if world_event_dir.is_empty():
+		return {"ok": false, "error": "world event csv dir is empty"}
+	var world_event_result := WorldEventConfigAssembler.compile_from_csv_dir(world_event_dir)
+	if not world_event_result.get("ok", false):
+		return {
+			"ok": false,
+			"error": "world event config compile failed: %s" % str(world_event_result.get("error", "unknown"))
+		}
+
 	_roles = roles
 	_location_graph = graph_result["graph"]
 	_affinity_map = affinity_result["affinity"]
+	_world_event_data = (world_event_result.get("data", {}) as Dictionary).duplicate(true)
 	_source_paths = resolved_paths
 	_loaded = true
 	return {"ok": true}
@@ -102,8 +116,17 @@ func build_context() -> Dictionary:
 		"player": pick_result["player"],
 		"npc": pick_result["npc"],
 		"graph": LocationGraph.from_dict(_location_graph.to_dict()),
-		"affinity": AffinityMap.from_dict(_affinity_map.to_dict())
+		"affinity": AffinityMap.from_dict(_affinity_map.to_dict()),
+		"world_event": get_world_event_data()
 	}
+
+# 返回世界事件编译结果副本，避免外部直接修改运行时缓存。
+# 返回：
+# - {"world_state": Dictionary, "events": Array, "choice_points": Array}
+func get_world_event_data() -> Dictionary:
+	if not _loaded:
+		return {}
+	return _world_event_data.duplicate(true)
 
 # 运行时层的业务规则：
 # roles 配置中至少要包含一个 player 和一个 npc。
