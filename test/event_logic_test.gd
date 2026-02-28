@@ -18,7 +18,7 @@ var _current_turn_result: Dictionary = {}
 
 
 # 功能：初始化事件逻辑测试场景。
-# 说明：统一加载现有 CSV 配置，并自动推进到第一个需要玩家选择的事件。
+# 说明：加载配置后先预览首个事件，不在进入场景时立即推进 world turn。
 func _ready() -> void:
 	continue_button.pressed.connect(_on_continue_button_pressed)
 
@@ -27,18 +27,18 @@ func _ready() -> void:
 		status_label.text = "加载失败：%s" % str(load_result.get("error", "unknown"))
 		return
 
-	_append_log("测试环境启动，开始生成第一个事件。")
-	_generate_next_event()
+	_append_log("测试环境启动，开始预览第一个事件。")
+	_preview_next_event()
 
 
-# 功能：生成下一个事件并停在当前事件上。
-# 说明：无论事件是否带选择，本函数都只推进一步，后续由按钮或选项点击触发下一步。
-func _generate_next_event() -> void:
+# 功能：预览下一事件并停留在当前界面。
+# 说明：预览阶段只展示事件内容，不执行结算，也不增加 world turn。
+func _preview_next_event() -> void:
 	_current_turn_result.clear()
 
-	var turn_result := _engine.run_turn()
+	var turn_result := _engine.preview_next_turn()
 	if not turn_result.get("ok", false):
-		status_label.text = "事件推进失败：%s" % str(turn_result.get("error", "unknown"))
+		status_label.text = "事件预览失败：%s" % str(turn_result.get("error", "unknown"))
 		_update_side_panels()
 		return
 
@@ -49,7 +49,7 @@ func _generate_next_event() -> void:
 
 
 # 功能：渲染当前事件。
-# 说明：若事件带选择，则显示选项并隐藏继续按钮；若无选择，则显示继续按钮等待外部指令。
+# 说明：若事件带可选项，则显示选项按钮；若事件待继续确认，则仅显示继续按钮。
 func _render_current_event(turn_result: Dictionary) -> void:
 	var choice: Dictionary = turn_result.get("choice", {})
 	var options: Array = choice.get("options", [])
@@ -68,7 +68,7 @@ func _render_current_event(turn_result: Dictionary) -> void:
 	if awaiting_choice:
 		status_label.text = "等待选择：点击下方任一可用选项。"
 	else:
-		status_label.text = "当前事件无选项，点击继续后生成下一个事件。"
+		status_label.text = "当前事件待确认，点击继续后结算并预览下一个事件。"
 		continue_button.visible = true
 		continue_button.disabled = false
 
@@ -93,13 +93,13 @@ func _render_current_event(turn_result: Dictionary) -> void:
 
 
 # 功能：处理玩家点击选项。
-# 说明：先结算当前事件选择，再立即生成下一个事件；若下一事件无选项，则停住等待继续指令。
+# 说明：先结算当前待处理事件，再预览下一事件，保证界面总是停在“未结算事件”上。
 func _on_option_pressed(option_id: String) -> void:
 	if _current_turn_result.is_empty():
 		status_label.text = "当前没有待处理的事件选择。"
 		return
 
-	var turn_result := _engine.run_turn(option_id)
+	var turn_result := _engine.confirm_pending_turn(option_id)
 	if not turn_result.get("ok", false):
 		status_label.text = "选项结算失败：%s" % str(turn_result.get("error", "unknown"))
 		_update_side_panels()
@@ -113,24 +113,38 @@ func _on_option_pressed(option_id: String) -> void:
 			str(turn_result.get("title", ""))
 		]
 	)
-	_generate_next_event()
+	_update_side_panels()
+	_preview_next_event()
 
 
 # 功能：处理继续指令。
-# 说明：仅在当前事件没有待选择分支时允许继续生成下一个事件。
+# 说明：继续按钮用于确认当前待继续事件，然后再预览下一事件。
 func _on_continue_button_pressed() -> void:
 	if _current_turn_result.is_empty():
-		_generate_next_event()
+		_preview_next_event()
 		return
 	if bool(_current_turn_result.get("awaiting_choice", false)):
 		status_label.text = "当前事件需要先完成选项选择。"
 		return
-	_append_log("收到继续指令，生成下一个事件。")
-	_generate_next_event()
+
+	var turn_result := _engine.confirm_pending_turn()
+	if not turn_result.get("ok", false):
+		status_label.text = "事件结算失败：%s" % str(turn_result.get("error", "unknown"))
+		_update_side_panels()
+		return
+
+	_append_log(
+		"已确认继续 -> %s | %s" % [
+			str(turn_result.get("event_id", "")),
+			str(turn_result.get("title", ""))
+		]
+	)
+	_update_side_panels()
+	_preview_next_event()
 
 
 # 功能：构建事件详情文本。
-# 说明：补充 route、policy、chain 状态与 choice_point，便于验证事件触发逻辑。
+# 说明：补充 route、policy、chain 状态与当前 world turn，便于核对推进时机。
 func _build_event_detail_text(turn_result: Dictionary) -> String:
 	var choice: Dictionary = turn_result.get("choice", {})
 	var lines: Array[String] = []
@@ -143,7 +157,7 @@ func _build_event_detail_text(turn_result: Dictionary) -> String:
 
 
 # 功能：生成选项按钮文本。
-# 说明：在按钮文本里直接标记当前选项状态，方便确认可选性判断是否符合预期。
+# 说明：在按钮上直接标记状态，便于确认选项可选性是否符合预期。
 func _build_option_button_text(option_def: Dictionary) -> String:
 	var state := str(option_def.get("state", "disabled"))
 	var state_text := "可选"
@@ -157,7 +171,7 @@ func _build_option_button_text(option_def: Dictionary) -> String:
 
 
 # 功能：刷新右侧世界状态与底部日志。
-# 说明：把玩家数据、世界参数、链上下文和历史事件集中展示，便于验证选择结果。
+# 说明：集中展示玩家数据、世界参数、链上下文和历史事件，便于验证结算结果。
 func _update_side_panels() -> void:
 	var world_state := _engine.world_state
 	var player: Dictionary = world_state.get("player", {})
@@ -207,13 +221,13 @@ func _update_side_panels() -> void:
 	lines.append(", ".join(_history_to_string_array(history)))
 
 	world_state_label.text = "\n".join(lines)
-	# 说明：文本刷新后延迟一帧再复位滚动，避免 RichTextLabel 在重排后覆盖滚动位置。
+	# 说明：文本刷新后延迟一帧再复位滚动，避免 RichTextLabel 重排后覆盖滚动位置。
 	world_state_label.call_deferred("scroll_to_line", 0)
 	log_label.text = "\n".join(_event_logs)
 
 
-# 功能：记录每次事件推进日志。
-# 说明：自动推进和等待选择都会落日志，便于回溯事件链路。
+# 功能：记录每次事件预览日志。
+# 说明：将“等待选择”和“等待继续”显式写入日志，便于核对界面状态。
 func _append_turn_log(turn_result: Dictionary) -> void:
 	var line := "Turn %s | %s | %s | route=%s | policy=%s" % [
 		str(_engine.world_state.get("turn", 0)),
@@ -224,6 +238,8 @@ func _append_turn_log(turn_result: Dictionary) -> void:
 	]
 	if turn_result.get("awaiting_choice", false):
 		line += " | 等待选择"
+	else:
+		line += " | 等待继续"
 	_append_log(line)
 
 
@@ -243,7 +259,7 @@ func _clear_option_list() -> void:
 
 
 # 功能：添加选项区域提示文本。
-# 说明：用于展示“无可选项”等状态说明。
+# 说明：用于展示“无可见选项”等状态说明。
 func _add_option_hint(text: String) -> void:
 	var hint_label := Label.new()
 	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

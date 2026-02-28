@@ -15,7 +15,7 @@ var choice_points: Array = []
 var _event_map: Dictionary = {}
 var _choice_point_map: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
-var _pending_choice_context: Dictionary = {}
+var _pending_turn_context: Dictionary = {}
 
 # 功能：初始化随机源。
 # 说明：seed=0 使用随机种子；指定 seed 可复现结果，便于测试回归。
@@ -111,6 +111,72 @@ func load_from_data(data: Dictionary) -> Dictionary:
 	_rebuild_choice_point_map()
 	return {"ok": true}
 
+# 功能：预览下一回合事件，但不立即结算。
+# 说明：用于测试界面的“先展示、后结算”交互；若已有待处理事件，则直接返回当前待处理内容。
+func preview_next_turn() -> Dictionary:
+	if events.is_empty():
+		return {"ok": false, "error": "event pool is empty"}
+
+	if not _pending_turn_context.is_empty():
+		return _build_pending_turn_response(_pending_turn_context)
+
+	var next_event_result := _select_next_event()
+	if not next_event_result.get("ok", false):
+		return next_event_result
+
+	var event_def: Dictionary = next_event_result.get("event_def", {})
+	var next_event_id := str(next_event_result.get("event_id", ""))
+	var route := str(next_event_result.get("route", "scheduler"))
+	var expected_forced := str(next_event_result.get("expected_forced", ""))
+	var policy := str(event_def.get("continuationPolicy", POLICY_RETURN))
+	var has_choice := false
+	var awaiting_choice := false
+	var choice_result := {
+		"choice_point_id": "",
+		"selected_option_id": "",
+		"resolved_by": "",
+		"options": []
+	}
+	var resolution_mode := "event_effects"
+	var choice_point_id := str(event_def.get("choicePointId", "")).strip_edges()
+
+	if not choice_point_id.is_empty():
+		has_choice = true
+		choice_result["choice_point_id"] = choice_point_id
+		var choice_point_def: Dictionary = _choice_point_map.get(choice_point_id, {})
+		if choice_point_def.is_empty():
+			# 说明：选择点定义缺失时，仍允许界面先展示事件，再在确认时走事件默认 effects。
+			choice_result["resolved_by"] = "missing_choice_point_fallback_event_effects"
+		else:
+			var options_eval := _build_option_set(choice_point_def)
+			choice_result["options"] = _option_public_states(options_eval)
+			var first_selectable := _select_first_selectable(options_eval)
+			if first_selectable.is_empty():
+				# 说明：无可选项时改为等待外部确认，避免预览阶段提前推进回合。
+				choice_result["resolved_by"] = "no_selectable_option_fallback_event_effects"
+			else:
+				awaiting_choice = true
+				resolution_mode = "choice_resolution"
+				choice_result["resolved_by"] = "pending_external_selection"
+
+	_pending_turn_context = {
+		"event_id": next_event_id,
+		"route": route,
+		"expected_forced": expected_forced,
+		"resolution_mode": resolution_mode,
+		"has_choice": has_choice,
+		"choice": choice_result,
+		"policy": policy
+	}
+	return _build_pending_turn_response(_pending_turn_context)
+
+# 功能：确认并结算当前待处理事件。
+# 说明：无选项事件传空字符串即可；有选项事件必须传入可选 option_id。
+func confirm_pending_turn(selected_option_id: String = "") -> Dictionary:
+	if _pending_turn_context.is_empty():
+		return {"ok": false, "error": "no pending turn to confirm"}
+	return _resolve_pending_turn(selected_option_id)
+
 # 功能：执行一个回合（主循环单步）。
 # 说明：先判 forced，再走调度；命中事件后执行效果/选择结算并推进状态。
 func run_turn(selected_option_id: String = "") -> Dictionary:
@@ -118,29 +184,17 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 		return {"ok": false, "error": "event pool is empty"}
 
 	# 说明：若上回合停在选择点，本回合只允许等待或消费外部传入选项。
-	if not _pending_choice_context.is_empty():
-		return _resolve_pending_choice(selected_option_id)
+	if not _pending_turn_context.is_empty():
+		return _resolve_pending_turn(selected_option_id)
 
-	var expected_forced := str(world_state.get("forcedNextEventId", ""))
-	var next_event_id := ""
-	var route := "scheduler"
+	var next_event_result := _select_next_event()
+	if not next_event_result.get("ok", false):
+		return next_event_result
 
-	if not expected_forced.is_empty():
-		next_event_id = expected_forced
-		route = "forced"
-	else:
-		var candidates := _build_candidates()
-		if candidates.is_empty():
-			next_event_id = _fallback_event_id()
-			if next_event_id.is_empty():
-				return {"ok": false, "error": "no eligible event and no fallback event"}
-			route = "fallback"
-		else:
-			next_event_id = _weighted_pick(candidates)
-
-	var event_def: Dictionary = _event_map.get(next_event_id, {})
-	if event_def.is_empty():
-		return {"ok": false, "error": "event not found: %s" % next_event_id}
+	var expected_forced := str(next_event_result.get("expected_forced", ""))
+	var next_event_id := str(next_event_result.get("event_id", ""))
+	var route := str(next_event_result.get("route", "scheduler"))
+	var event_def: Dictionary = next_event_result.get("event_def", {})
 
 	# 说明：forced 路由只消费一次，执行前清空，避免重复锁死。
 	world_state["forcedNextEventId"] = ""
@@ -177,10 +231,14 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 					_apply_continuation_policy(event_def)
 				else:
 					# 说明：存在可选项但未传入外部选择时，进入等待态，不推进回合。
-					_pending_choice_context = {
+					_pending_turn_context = {
 						"event_id": next_event_id,
 						"route": route,
-						"expected_forced": expected_forced
+						"expected_forced": expected_forced,
+						"resolution_mode": "choice_resolution",
+						"has_choice": true,
+						"choice": choice_result,
+						"policy": str(event_def.get("continuationPolicy", POLICY_RETURN))
 					}
 					choice_result["resolved_by"] = "pending_external_selection"
 					return {
@@ -228,77 +286,167 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 		"choice": choice_result
 	}
 
-# 功能：处理等待中的选择点。
-# 说明：无选项输入时返回等待态；有输入时仅在可选时结算并推进回合。
-func _resolve_pending_choice(selected_option_id: String) -> Dictionary:
-	var event_id := str(_pending_choice_context.get("event_id", ""))
-	var route := str(_pending_choice_context.get("route", "scheduler"))
-	var expected_forced := str(_pending_choice_context.get("expected_forced", ""))
+# 功能：处理待确认事件。
+# 说明：兼容“待选项事件”和“待继续事件”两类上下文，并在确认时统一推进回合。
+func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
+	var event_id := str(_pending_turn_context.get("event_id", ""))
+	var route := str(_pending_turn_context.get("route", "scheduler"))
+	var expected_forced := str(_pending_turn_context.get("expected_forced", ""))
+	var resolution_mode := str(_pending_turn_context.get("resolution_mode", "event_effects"))
+	var pending_has_choice := bool(_pending_turn_context.get("has_choice", false))
+	var pending_choice: Dictionary = _dict_or_empty(_pending_turn_context.get("choice", {}))
 	var event_def: Dictionary = _event_map.get(event_id, {})
 	if event_def.is_empty():
-		_pending_choice_context.clear()
+		_pending_turn_context.clear()
 		return {"ok": false, "error": "pending event not found: %s" % event_id}
 
-	var choice_point_id := str(event_def.get("choicePointId", "")).strip_edges()
-	if choice_point_id.is_empty():
-		_pending_choice_context.clear()
-		return {"ok": false, "error": "pending event has no choice point: %s" % event_id}
+	var choice_result := pending_choice.duplicate(true)
+	if resolution_mode == "choice_resolution":
+		var choice_point_id := str(event_def.get("choicePointId", "")).strip_edges()
+		if choice_point_id.is_empty():
+			_pending_turn_context.clear()
+			return {"ok": false, "error": "pending event has no choice point: %s" % event_id}
 
-	var choice_point_def: Dictionary = _choice_point_map.get(choice_point_id, {})
-	if choice_point_def.is_empty():
-		_pending_choice_context.clear()
-		return {"ok": false, "error": "pending choice point not found: %s" % choice_point_id}
+		var choice_point_def: Dictionary = _choice_point_map.get(choice_point_id, {})
+		if choice_point_def.is_empty():
+			_pending_turn_context.clear()
+			return {"ok": false, "error": "pending choice point not found: %s" % choice_point_id}
 
-	var options_eval := _build_option_set(choice_point_def)
-	var choice_result := {
-		"choice_point_id": choice_point_id,
-		"selected_option_id": "",
-		"resolved_by": "",
-		"options": _option_public_states(options_eval)
-	}
+		var options_eval := _build_option_set(choice_point_def)
+		choice_result["options"] = _option_public_states(options_eval)
 
-	if selected_option_id.strip_edges().is_empty():
-		choice_result["resolved_by"] = "pending_external_selection"
-		return {
-			"ok": true,
-			"awaiting_choice": true,
-			"route": route,
-			"event_id": event_id,
-			"title": str(event_def.get("title", "")),
-			"policy": str(event_def.get("continuationPolicy", POLICY_RETURN)),
-			"expected_forced": expected_forced,
-			"chain_active": not (world_state.get("chainContext", null) == null),
-			"has_choice": true,
-			"choice": choice_result
-		}
+		if selected_option_id.strip_edges().is_empty():
+			choice_result["resolved_by"] = "pending_external_selection"
+			return _build_result_payload(
+				route,
+				event_id,
+				event_def,
+				expected_forced,
+				true,
+				true,
+				choice_result
+			)
 
-	var selected := _select_option_by_id(options_eval, selected_option_id)
-	if selected.is_empty():
-		return {
-			"ok": false,
-			"error": "selected option is not selectable: %s" % selected_option_id,
-			"event_id": event_id,
-			"choice_point_id": choice_point_id,
-			"options": choice_result["options"]
-		}
+		var selected := _select_option_by_id(options_eval, selected_option_id)
+		if selected.is_empty():
+			return {
+				"ok": false,
+				"error": "selected option is not selectable: %s" % selected_option_id,
+				"event_id": event_id,
+				"choice_point_id": choice_point_id,
+				"options": choice_result["options"]
+			}
 
-	choice_result["selected_option_id"] = str(selected.get("id", ""))
-	choice_result["resolved_by"] = "option_resolution"
-	_apply_option_resolution(selected, event_def)
+		# 说明：与 run_turn 保持一致，真正落地选择结果时才消费 forcedNextEventId。
+		world_state["forcedNextEventId"] = ""
+		choice_result["selected_option_id"] = str(selected.get("id", ""))
+		choice_result["resolved_by"] = "option_resolution"
+		_apply_option_resolution(selected, event_def)
+	else:
+		# 说明：普通事件、缺失选择点、或无可选项事件都在这里统一按事件默认效果结算。
+		world_state["forcedNextEventId"] = ""
+		_apply_event_effects(event_def)
+		_apply_continuation_policy(event_def)
+
 	_record_history(event_id)
 	world_state["turn"] = int(world_state.get("turn", 0)) + 1
-	_pending_choice_context.clear()
+	_pending_turn_context.clear()
+
+	return _build_result_payload(
+		route,
+		event_id,
+		event_def,
+		expected_forced,
+		false,
+		pending_has_choice,
+		choice_result
+	)
+
+# 功能：选择下一条事件路由并返回事件定义。
+# 说明：该步骤只做选路，不产生副作用，便于“预览”和“直接执行”共用。
+func _select_next_event() -> Dictionary:
+	var expected_forced := str(world_state.get("forcedNextEventId", ""))
+	var next_event_id := ""
+	var route := "scheduler"
+
+	if not expected_forced.is_empty():
+		next_event_id = expected_forced
+		route = "forced"
+	else:
+		var candidates := _build_candidates()
+		if candidates.is_empty():
+			next_event_id = _fallback_event_id()
+			if next_event_id.is_empty():
+				return {"ok": false, "error": "no eligible event and no fallback event"}
+			route = "fallback"
+		else:
+			next_event_id = _weighted_pick(candidates)
+
+	var event_def: Dictionary = _event_map.get(next_event_id, {})
+	if event_def.is_empty():
+		return {"ok": false, "error": "event not found: %s" % next_event_id}
 
 	return {
 		"ok": true,
-		"awaiting_choice": false,
+		"expected_forced": expected_forced,
+		"event_id": next_event_id,
+		"route": route,
+		"event_def": event_def
+	}
+
+# 功能：构建待处理事件的统一返回结构。
+# 说明：预览态与待选择态都复用此函数，避免界面层依赖多套字段格式。
+func _build_pending_turn_response(pending_context: Dictionary) -> Dictionary:
+	var event_id := str(pending_context.get("event_id", ""))
+	var route := str(pending_context.get("route", "scheduler"))
+	var expected_forced := str(pending_context.get("expected_forced", ""))
+	var has_choice := bool(pending_context.get("has_choice", false))
+	var resolution_mode := str(pending_context.get("resolution_mode", "event_effects"))
+	var event_def: Dictionary = _event_map.get(event_id, {})
+	if event_def.is_empty():
+		return {"ok": false, "error": "pending event not found: %s" % event_id}
+
+	var choice_result: Dictionary = _dict_or_empty(pending_context.get("choice", {})).duplicate(true)
+	var awaiting_choice := resolution_mode == "choice_resolution"
+	if awaiting_choice and choice_result.is_empty():
+		choice_result = {
+			"choice_point_id": str(event_def.get("choicePointId", "")),
+			"selected_option_id": "",
+			"resolved_by": "pending_external_selection",
+			"options": []
+		}
+
+	return _build_result_payload(
+		route,
+		event_id,
+		event_def,
+		expected_forced,
+		awaiting_choice,
+		has_choice,
+		choice_result
+	)
+
+# 功能：构建统一的回合结果字典。
+# 说明：集中维护界面依赖字段，避免不同执行路径返回结构漂移。
+func _build_result_payload(
+	route: String,
+	event_id: String,
+	event_def: Dictionary,
+	expected_forced: String,
+	awaiting_choice: bool,
+	has_choice: bool,
+	choice_result: Dictionary
+) -> Dictionary:
+	return {
+		"ok": true,
+		"awaiting_choice": awaiting_choice,
 		"route": route,
 		"event_id": event_id,
 		"title": str(event_def.get("title", "")),
 		"policy": str(event_def.get("continuationPolicy", POLICY_RETURN)),
 		"expected_forced": expected_forced,
 		"chain_active": not (world_state.get("chainContext", null) == null),
-		"has_choice": true,
+		"has_choice": has_choice,
 		"choice": choice_result
 	}
 
