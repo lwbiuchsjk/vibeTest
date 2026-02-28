@@ -3,8 +3,9 @@ extends Control
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 
 const CSV_DIR := "res://scripts/config/world_event_mvp"
+const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
 
-var _engine := WorldEventEngine.new(20260228)
+var _engine: WorldEventEngine
 var _event_logs: Array[String] = []
 var _current_turn_result: Dictionary = {}
 
@@ -21,6 +22,7 @@ var _current_turn_result: Dictionary = {}
 # 说明：加载配置后先预览首个事件，不在进入场景时立即推进 world turn。
 func _ready() -> void:
 	continue_button.pressed.connect(_on_continue_button_pressed)
+	_engine = WorldEventEngine.new(_load_test_random_seed())
 
 	var load_result := _engine.load_from_csv_dir(CSV_DIR)
 	if not load_result.get("ok", false):
@@ -274,3 +276,29 @@ func _history_to_string_array(history: Array) -> Array[String]:
 	for item in history:
 		result.append(str(item))
 	return result
+
+
+# 功能：读取测试场景的随机种子配置。
+# 说明：仅测试场景使用该配置；当配置缺失、格式错误或未填写正整数时，回退为 0 以启用随机种子。
+func _load_test_random_seed() -> int:
+	if not FileAccess.file_exists(TEST_CONFIG_PATH):
+		return 0
+
+	var config_text := FileAccess.get_file_as_string(TEST_CONFIG_PATH)
+	if config_text.strip_edges().is_empty():
+		return 0
+
+	var parsed_config: Variant = JSON.parse_string(config_text)
+	if typeof(parsed_config) != TYPE_DICTIONARY or parsed_config == null:
+		return 0
+
+	var config: Dictionary = parsed_config
+	var raw_seed: Variant = config.get("random_seed", 0)
+	var seed_text := str(raw_seed).strip_edges()
+	if seed_text.is_empty() or not seed_text.is_valid_int():
+		return 0
+
+	var seed := int(seed_text)
+	if seed < 0:
+		return 0
+	return seed
