@@ -1,3 +1,4 @@
 {
-  "random_seed": 20260228
+  "random_seed": 20260228,
+  "world_event_csv_dir": "res://scripts/config/world_event_mvp"
 }
