@@ -1,8 +1,8 @@
 extends Control
 
+const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 
-const CSV_DIR := "res://scripts/config/world_event_mvp"
 const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
 
 var _engine: WorldEventEngine
@@ -22,9 +22,10 @@ var _current_turn_result: Dictionary = {}
 # 说明：加载配置后先预览首个事件，不在进入场景时立即推进 world turn。
 func _ready() -> void:
 	continue_button.pressed.connect(_on_continue_button_pressed)
-	_engine = WorldEventEngine.new(_load_test_random_seed())
+	var test_config := _load_test_config()
+	_engine = WorldEventEngine.new(_get_test_random_seed(test_config))
 
-	var load_result := _engine.load_from_csv_dir(CSV_DIR)
+	var load_result := _load_world_event_test_config(test_config)
 	if not load_result.get("ok", false):
 		status_label.text = "加载失败：%s" % str(load_result.get("error", "unknown"))
 		return
@@ -280,20 +281,25 @@ func _history_to_string_array(history: Array) -> Array[String]:
 
 # 功能：读取测试场景的随机种子配置。
 # 说明：仅测试场景使用该配置；当配置缺失、格式错误或未填写正整数时，回退为 0 以启用随机种子。
-func _load_test_random_seed() -> int:
+func _load_test_config() -> Dictionary:
 	if not FileAccess.file_exists(TEST_CONFIG_PATH):
-		return 0
+		return {}
 
 	var config_text := FileAccess.get_file_as_string(TEST_CONFIG_PATH)
 	if config_text.strip_edges().is_empty():
-		return 0
+		return {}
 
 	var parsed_config: Variant = JSON.parse_string(config_text)
 	if typeof(parsed_config) != TYPE_DICTIONARY or parsed_config == null:
-		return 0
+		return {}
 
-	var config: Dictionary = parsed_config
-	var raw_seed: Variant = config.get("random_seed", 0)
+	return parsed_config
+
+
+# 功能：读取测试场景的随机种子配置。
+# 说明：当配置缺失、格式错误或未填写正整数时，回退为 0 以启用随机种子。
+func _get_test_random_seed(test_config: Dictionary) -> int:
+	var raw_seed: Variant = test_config.get("random_seed", 0)
 	var seed_text := str(raw_seed).strip_edges()
 	if seed_text.is_empty() or not seed_text.is_valid_int():
 		return 0
@@ -302,3 +308,23 @@ func _load_test_random_seed() -> int:
 	if seed < 0:
 		return 0
 	return seed
+
+
+# 功能：按测试配置加载世界事件 CSV 数据。
+# 说明：CSV 目录选择交由测试配置显式控制，但实际加载、编译与缓存仍统一走 ConfigRuntime。
+func _load_world_event_test_config(test_config: Dictionary) -> Dictionary:
+	var runtime := ConfigRuntime.shared()
+	var override_paths: Dictionary = {}
+	var csv_dir := str(test_config.get("world_event_csv_dir", "")).strip_edges()
+	if not csv_dir.is_empty():
+		override_paths["world_event_csv_dir"] = csv_dir
+
+	var load_result := runtime.ensure_loaded(override_paths)
+	if not load_result.get("ok", false):
+		return load_result
+
+	var world_event_data := runtime.get_world_event_data()
+	if world_event_data.is_empty():
+		return {"ok": false, "error": "world event config is empty in config runtime"}
+
+	return _engine.load_from_data(world_event_data)
