@@ -347,6 +347,7 @@ static func _apply_event_condition_row(event_def: Dictionary, row: Dictionary) -
 # 功能：应用单行事件后果。
 # 说明：branch 当前仅处理 default，其他分支预留给未来扩展。
 static func _apply_event_outcome_row(event_def: Dictionary, row: Dictionary) -> void:
+	# 说明：branch 当前仅在 resolution 下识别 fail；default 与其他非 fail 值都按默认结算处理。
 	var branch := str(row.get("branch", "default")).strip_edges()
 	if not branch.is_empty() and branch != "default":
 		return
@@ -383,7 +384,8 @@ static func _apply_option_rule_row(row: Dictionary, cp_map: Dictionary, option_r
 
 	var option: Dictionary = options[index]
 	var rule_type := str(row.get("rule_type", "")).strip_edges()
-	var branch := str(row.get("branch", "default")).strip_edges()
+	# 说明：branch 当前仅在 resolution 下识别 fail；空值与其他值都按默认结算处理。
+	var branch := str(row.get("branch", "")).strip_edges()
 	var left := str(row.get("left", "")).strip_edges()
 	var op := str(row.get("op", "")).strip_edges()
 	var right := str(row.get("right", "")).strip_edges()
