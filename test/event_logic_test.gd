@@ -1,7 +1,6 @@
 extends Control
 
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
-const LocationGraph := preload("res://scripts/models/location_graph.gd")
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 
 const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
@@ -9,7 +8,6 @@ const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
 var _engine: WorldEventEngine
 var _event_logs: Array[String] = []
 var _current_turn_result: Dictionary = {}
-var _location_graph: LocationGraph
 
 @onready var status_label: Label = $Root/Header/StatusLabel
 @onready var event_background_rect: TextureRect = $Root/LeftPanel/LeftMargin/LeftContent/EventBackground
@@ -61,7 +59,7 @@ func _render_current_event(turn_result: Dictionary) -> void:
 	var options: Array = choice.get("options", [])
 	var awaiting_choice := bool(turn_result.get("awaiting_choice", false))
 
-	_render_event_background(str(turn_result.get("background_art", "")))
+	_render_event_background(str(turn_result.get("resolved_background_art", "")))
 	event_title_label.text = "%s | %s" % [
 		str(turn_result.get("event_id", "")),
 		str(turn_result.get("title", ""))
@@ -151,11 +149,13 @@ func _on_continue_button_pressed() -> void:
 
 
 # 功能：构建事件详情文本。
-# 说明：补充背景路径、route、policy、chain 状态与当前 world turn，便于核对推进时机。
+# 说明：展示事件背景、地点背景、最终背景、route、policy、chain 状态与当前 world turn，便于核对推进时机。
 func _build_event_detail_text(turn_result: Dictionary) -> String:
 	var choice: Dictionary = turn_result.get("choice", {})
 	var lines: Array[String] = []
-	lines.append("background_art=%s" % str(turn_result.get("background_art", "")))
+	lines.append("event_background_art=%s" % str(turn_result.get("event_background_art", "")))
+	lines.append("location_background_art=%s" % str(turn_result.get("location_background_art", "")))
+	lines.append("resolved_background_art=%s" % str(turn_result.get("resolved_background_art", "")))
 	lines.append("route=%s" % str(turn_result.get("route", "")))
 	lines.append("policy=%s" % str(turn_result.get("policy", "")))
 	lines.append("choice_point=%s" % str(choice.get("choice_point_id", "")))
@@ -243,7 +243,7 @@ func _append_turn_log(turn_result: Dictionary) -> void:
 		str(turn_result.get("title", "")),
 		str(turn_result.get("route", "")),
 		str(turn_result.get("policy", "")),
-		str(turn_result.get("background_art", ""))
+		str(turn_result.get("resolved_background_art", ""))
 	]
 	if turn_result.get("awaiting_choice", false):
 		line += " | 等待选择"
@@ -277,18 +277,16 @@ func _add_option_hint(text: String) -> void:
 
 
 # 功能：渲染当前事件背景图。
-# 说明：优先读取事件背景；若事件未配置或资源加载失败，则回退到当前地点背景。
+# 说明：只消费引擎已解析好的最终背景路径；Consumer 不再自行实现事件/地点 fallback 规则。
 func _render_event_background(background_art_path: String) -> void:
 	var normalized_path := background_art_path.strip_edges()
-	if not normalized_path.is_empty():
-		var resource := ResourceLoader.load(normalized_path)
-		if resource is Texture2D:
-			event_background_rect.texture = resource
-			return
+	if normalized_path.is_empty():
+		event_background_rect.texture = null
+		return
 
-	var current_location_id := str(_engine.world_state.get("currentLocationId", "")).strip_edges()
-	if _location_graph != null and not current_location_id.is_empty():
-		event_background_rect.texture = _location_graph.load_art_texture(current_location_id)
+	var resource := ResourceLoader.load(normalized_path)
+	if resource is Texture2D:
+		event_background_rect.texture = resource
 	else:
 		event_background_rect.texture = null
 
@@ -346,14 +344,13 @@ func _load_world_event_test_config(test_config: Dictionary) -> Dictionary:
 	if not load_result.get("ok", false):
 		return load_result
 
-	var context_result := runtime.build_context()
-	if context_result.get("ok", false):
-		_location_graph = context_result.get("graph", null)
-	else:
-		_location_graph = null
-
 	var world_event_data := runtime.get_world_event_data()
 	if world_event_data.is_empty():
 		return {"ok": false, "error": "world event config is empty in config runtime"}
 
-	return _engine.load_from_data(world_event_data)
+	var context_result := runtime.build_context()
+	var location_graph = null
+	if context_result.get("ok", false):
+		location_graph = context_result.get("graph", null)
+
+	return _engine.load_from_data(world_event_data, location_graph)

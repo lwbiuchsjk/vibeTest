@@ -1,13 +1,13 @@
-﻿extends RefCounted
+extends RefCounted
 class_name WorldEventEngine
 
 # 功能：世界与事件引擎（MVP）。
 # 说明：单一主循环推进，forcedNextEventId 优先级最高，链式通过 chainContext 塑形分布。
-
 const POLICY_RETURN := "ReturnToScheduler"
 const POLICY_CHAIN := "ChainContinue"
 const POLICY_CHAIN_FORCED := "ChainContinueWithForcedNext"
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
+const LocationGraph := preload("res://scripts/models/location_graph.gd")
 
 var world_state: Dictionary = {}
 var events: Array = []
@@ -16,6 +16,7 @@ var _event_map: Dictionary = {}
 var _choice_point_map: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
 var _pending_turn_context: Dictionary = {}
+var _location_graph: LocationGraph
 
 # 功能：初始化随机源。
 # 说明：seed=0 使用随机种子；指定 seed 可复现结果，便于测试回归。
@@ -49,19 +50,24 @@ func load_from_files(
 	return load_from_json_text(world_text, events_text, choice_points_text)
 
 # 功能：从 CSV 配置目录加载 world_state、events、choice_points。
-# 说明：统一通过 ConfigRuntime 管理配置加载/缓存，避免引擎层直接编译 CSV。
+# 说明：统一通过 ConfigRuntime 管理配置加载与缓存，避免引擎层直接编译 CSV。
 func load_from_csv_dir(csv_dir_path: String) -> Dictionary:
 	var runtime := ConfigRuntime.shared()
 	var load_result := runtime.ensure_loaded({"world_event_csv_dir": csv_dir_path})
 	if not load_result.get("ok", false):
 		return load_result
+	var context_result := runtime.build_context()
+	if context_result.get("ok", false):
+		_location_graph = context_result.get("graph", null)
+	else:
+		_location_graph = null
 	var world_event_data := runtime.get_world_event_data()
 	if world_event_data.is_empty():
 		return {"ok": false, "error": "world event config is empty in config runtime"}
-	return load_from_data(world_event_data)
+	return load_from_data(world_event_data, _location_graph)
 
 # 功能：从 JSON 文本加载数据。
-# 说明：适合测试/热重载，成功后会重建事件与选择点索引。
+# 说明：适合测试与热重载，成功后会重建事件与选择点索引。
 func load_from_json_text(
 	world_state_json: String,
 	events_json: String,
@@ -90,7 +96,7 @@ func load_from_json_text(
 
 # 功能：从内存对象加载数据。
 # 说明：用于承接 CSV 编译结果，避免二次 JSON 序列化产生歧义。
-func load_from_data(data: Dictionary) -> Dictionary:
+func load_from_data(data: Dictionary, location_graph: Variant = null) -> Dictionary:
 	if data.is_empty():
 		return {"ok": false, "error": "compiled data is empty"}
 	var raw_world: Variant = data.get("world_state", null)
@@ -107,6 +113,7 @@ func load_from_data(data: Dictionary) -> Dictionary:
 	world_state = (raw_world as Dictionary).duplicate(true)
 	events = (raw_events as Array).duplicate(true)
 	choice_points = (raw_choice_points as Array).duplicate(true)
+	_set_location_graph(location_graph)
 	_rebuild_event_map()
 	_rebuild_choice_point_map()
 	return {"ok": true}
@@ -145,7 +152,7 @@ func preview_next_turn() -> Dictionary:
 		choice_result["choice_point_id"] = choice_point_id
 		var choice_point_def: Dictionary = _choice_point_map.get(choice_point_id, {})
 		if choice_point_def.is_empty():
-			# 说明：选择点定义缺失时，仍允许界面先展示事件，再在确认时走事件默认 effects。
+			# 说明：选择点定义缺失时，仍允许界面先展示事件，并在确认时回退到事件默认 effects。
 			choice_result["resolved_by"] = "missing_choice_point_fallback_event_effects"
 		else:
 			var options_eval := _build_option_set(choice_point_def)
@@ -177,13 +184,13 @@ func confirm_pending_turn(selected_option_id: String = "") -> Dictionary:
 		return {"ok": false, "error": "no pending turn to confirm"}
 	return _resolve_pending_turn(selected_option_id)
 
-# 功能：执行一个回合（主循环单步）。
-# 说明：先判 forced，再走调度；命中事件后执行效果/选择结算并推进状态。
+# 功能：执行一个回合。
+# 说明：先处理 forced，再走调度；命中事件后执行效果或选项结算，并推进状态。
 func run_turn(selected_option_id: String = "") -> Dictionary:
 	if events.is_empty():
 		return {"ok": false, "error": "event pool is empty"}
 
-	# 说明：若上回合停在选择点，本回合只允许等待或消费外部传入选项。
+	# 说明：若上一回合停在选择点，本回合只允许继续完成该待处理事件。
 	if not _pending_turn_context.is_empty():
 		return _resolve_pending_turn(selected_option_id)
 
@@ -196,7 +203,7 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 	var route := str(next_event_result.get("route", "scheduler"))
 	var event_def: Dictionary = next_event_result.get("event_def", {})
 
-	# 说明：forced 路由只消费一次，执行前清空，避免重复锁死。
+	# 说明：forced 路由只消费一次，执行前清空，避免重复锁定。
 	world_state["forcedNextEventId"] = ""
 
 	var has_choice := false
@@ -208,7 +215,7 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 	}
 	var choice_point_id := str(event_def.get("choicePointId", "")).strip_edges()
 	if not choice_point_id.is_empty():
-		# 说明：事件声明 choicePointId 时，进入“构建选项 -> 选择 -> 结算”路径。
+		# 说明：事件声明了 choicePointId 时，进入“构建选项 -> 选择 -> 结算”路径。
 		has_choice = true
 		var choice_point_def: Dictionary = _choice_point_map.get(choice_point_id, {})
 		choice_result["choice_point_id"] = choice_point_id
@@ -225,12 +232,12 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 			if selected_option_id.strip_edges().is_empty():
 				selected = _select_first_selectable(options_eval)
 				if selected.is_empty():
-					# 说明：无可选项（全不可见/不可选）时，回退到事件默认效果。
+					# 说明：无可选项时，回退到事件默认效果。
 					choice_result["resolved_by"] = "no_selectable_option_fallback_event_effects"
 					_apply_event_effects(event_def)
 					_apply_continuation_policy(event_def)
 				else:
-					# 说明：存在可选项但未传入外部选择时，进入等待态，不推进回合。
+					# 说明：存在可选项但尚未提供外部选择时，进入等待态，不推进回合。
 					_pending_turn_context = {
 						"event_id": next_event_id,
 						"route": route,
@@ -247,7 +254,9 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 						"route": route,
 						"event_id": next_event_id,
 						"title": str(event_def.get("title", "")),
-						"background_art": str(event_def.get("backgroundArt", "")),
+						"event_background_art": str(event_def.get("backgroundArt", "")),
+						"location_background_art": _resolve_location_background_art(),
+						"resolved_background_art": _resolve_background_art(event_def),
 						"policy": str(event_def.get("continuationPolicy", POLICY_RETURN)),
 						"expected_forced": expected_forced,
 						"chain_active": not (world_state.get("chainContext", null) == null),
@@ -280,7 +289,9 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 		"route": route,
 		"event_id": next_event_id,
 		"title": str(event_def.get("title", "")),
-		"background_art": str(event_def.get("backgroundArt", "")),
+		"event_background_art": str(event_def.get("backgroundArt", "")),
+		"location_background_art": _resolve_location_background_art(),
+		"resolved_background_art": _resolve_background_art(event_def),
 		"policy": str(event_def.get("continuationPolicy", POLICY_RETURN)),
 		"expected_forced": expected_forced,
 		"chain_active": not (world_state.get("chainContext", null) == null),
@@ -339,13 +350,13 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 				"options": choice_result["options"]
 			}
 
-		# 说明：与 run_turn 保持一致，真正落地选择结果时才消费 forcedNextEventId。
+		# 说明：与 run_turn 保持一致，只有在真正落地选项结果时才消费 forcedNextEventId。
 		world_state["forcedNextEventId"] = ""
 		choice_result["selected_option_id"] = str(selected.get("id", ""))
 		choice_result["resolved_by"] = "option_resolution"
 		_apply_option_resolution(selected, event_def)
 	else:
-		# 说明：普通事件、缺失选择点、或无可选项事件都在这里统一按事件默认效果结算。
+		# 说明：普通事件、缺失选择点或无可选项事件，都在这里统一按事件默认效果结算。
 		world_state["forcedNextEventId"] = ""
 		_apply_event_effects(event_def)
 		_apply_continuation_policy(event_def)
@@ -445,7 +456,9 @@ func _build_result_payload(
 		"route": route,
 		"event_id": event_id,
 		"title": str(event_def.get("title", "")),
-		"background_art": str(event_def.get("backgroundArt", "")),
+		"event_background_art": str(event_def.get("backgroundArt", "")),
+		"location_background_art": _resolve_location_background_art(),
+		"resolved_background_art": _resolve_background_art(event_def),
 		"policy": str(event_def.get("continuationPolicy", POLICY_RETURN)),
 		"expected_forced": expected_forced,
 		"chain_active": not (world_state.get("chainContext", null) == null),
@@ -453,8 +466,34 @@ func _build_result_payload(
 		"choice": choice_result
 	}
 
+# 功能：设置引擎当前使用的地点图。
+# 说明：用于解析当前地点对应的默认背景路径，供事件背景缺失时兜底。
+func _set_location_graph(location_graph: Variant) -> void:
+	if location_graph is LocationGraph:
+		_location_graph = location_graph
+	else:
+		_location_graph = null
+
+# 功能：解析事件最终应展示的背景路径。
+# 说明：规则为“事件背景优先，地点背景兜底”；引擎统一产出，Consumer 不再自行判断。
+func _resolve_background_art(event_def: Dictionary) -> String:
+	var event_background_art := str(event_def.get("backgroundArt", "")).strip_edges()
+	if not event_background_art.is_empty():
+		return event_background_art
+	return _resolve_location_background_art()
+
+# 功能：解析当前地点的背景路径。
+# 说明：若地点图缺失或地点未配置背景，则返回空字符串。
+func _resolve_location_background_art() -> String:
+	if _location_graph == null:
+		return ""
+	var current_location_id := str(world_state.get("currentLocationId", "")).strip_edges()
+	if current_location_id.is_empty():
+		return ""
+	return _location_graph.get_art_path(current_location_id)
+
 # 功能：重建事件索引。
-# 说明：将 events 数组映射为 {event_id: event_def}，用于 O(1) 查找。
+# 说明：将 events 数组映射为 {event_id: event_def}，供 O(1) 查询。
 func _rebuild_event_map() -> void:
 	_event_map.clear()
 	for event_variant in events:
@@ -475,8 +514,8 @@ func _rebuild_choice_point_map() -> void:
 			continue
 		_choice_point_map[choice_id] = choice_def
 
-# 功能：生成候选事件集。
-# 说明：仅做可用性与权重计算，不做最终抽签。
+# 功能：生成候选事件集合。
+# 说明：这里只做可用性与权重计算，不做最终抽签。
 func _build_candidates() -> Array:
 	var out: Array = []
 	for event_variant in events:
@@ -546,7 +585,7 @@ func _compute_weight(event_def: Dictionary) -> int:
 		if _evaluate_condition(condition):
 			weight += int(rule.get("delta", 0))
 
-	# 说明：历史去重偏置，近期出现过的事件轻微降权。
+	# 说明：历史去重偏置，近期出现过的事件会轻微降权。
 	var history: Array = world_state.get("history", [])
 	if str(event_def.get("id", "")) in history:
 		weight -= 3
@@ -585,8 +624,8 @@ func _evaluate_condition(condition: String) -> bool:
 		return _compare_values(actual, op, expected)
 	return false
 
-# 功能：按点路径读取 world_state 值（如 flags.isWanted）。
-# 说明：任意层不存在时返回 null。
+# 功能：按点路径读取 world_state 值。
+# 说明：例如 flags.isWanted；任意层不存在时返回 null。
 func _resolve_path_value(path: String) -> Variant:
 	var segments := path.split(".", false)
 	if segments.is_empty():
@@ -604,7 +643,7 @@ func _resolve_path_value(path: String) -> Variant:
 	return cursor
 
 # 功能：将表达式右值文本解析为 GDScript 值。
-# 说明：支持 bool/int/双引号字符串，其他保持原文本。
+# 说明：支持 bool、int、双引号字符串，其他保持原文本。
 func _parse_literal(raw: String) -> Variant:
 	var text := raw.strip_edges()
 	var lowered := text.to_lower()
@@ -619,7 +658,7 @@ func _parse_literal(raw: String) -> Variant:
 	return text
 
 # 功能：统一比较函数。
-# 说明：大小比较会转为 float，再执行比较。
+# 说明：大小比较会先转为 float，再执行比较。
 func _compare_values(actual: Variant, op: String, expected: Variant) -> bool:
 	if actual == null:
 		return false
@@ -660,7 +699,7 @@ func _weighted_pick(candidates: Array) -> String:
 
 	return str((candidates[0] as Dictionary).get("id", ""))
 
-# 功能：兜底事件选择。
+# 功能：选择兜底事件。
 # 说明：优先 evt_idle，其次取事件池中第一个可用 id。
 func _fallback_event_id() -> String:
 	if _event_map.has("evt_idle"):
@@ -673,7 +712,7 @@ func _fallback_event_id() -> String:
 	return ""
 
 # 功能：将事件 effects 应用到 world_state。
-# 说明：支持 setFlags/addParams/setLocation/forcedNext/clearForced/endChain。
+# 说明：支持 setFlags、addParams、setLocation、forcedNext、clearForced、endChain。
 func _apply_event_effects(event_def: Dictionary) -> void:
 	var effects: Dictionary = event_def.get("effects", {})
 
@@ -707,7 +746,7 @@ func _apply_event_effects(event_def: Dictionary) -> void:
 		world_state["chainContext"] = null
 
 # 功能：按 continuationPolicy 推进链上下文。
-# 说明：forcedNextEventId 由 effects/resolution 驱动，不在此处判定。
+# 说明：forcedNextEventId 由 effects 或 resolution 驱动，不在这里判定。
 func _apply_continuation_policy(event_def: Dictionary, chain_patch_override: Dictionary = {}) -> void:
 	var policy := str(event_def.get("continuationPolicy", POLICY_RETURN))
 	var base_chain_patch: Dictionary = event_def.get("chainPatch", {})
@@ -716,7 +755,7 @@ func _apply_continuation_policy(event_def: Dictionary, chain_patch_override: Dic
 		POLICY_CHAIN, POLICY_CHAIN_FORCED:
 			_ensure_or_patch_chain_context(merged_chain_patch)
 		POLICY_RETURN:
-			# 说明：Return 不主动建链；若显式给出 patch，则按 patch 执行。
+			# 说明：ReturnToScheduler 不主动建链；若显式给出 patch，则按 patch 执行。
 			if not merged_chain_patch.is_empty():
 				_ensure_or_patch_chain_context(merged_chain_patch)
 		_:
@@ -774,14 +813,14 @@ func _array_has_any(left: Array, right: Array) -> bool:
 	return false
 
 # 功能：构建事件对应的选项集合。
-# 说明：为每个选项标记三态（invisible/disabled/selectable）。
+# 说明：为每个选项标记三态：invisible、disabled、selectable。
 func _build_option_set(choice_point_def: Dictionary) -> Array:
 	var out: Array = []
 	var options: Array = choice_point_def.get("options", [])
 	for option_variant in options:
 		var option_def: Dictionary = option_variant
 		var item := option_def.duplicate(true)
-		# 说明：选项三态为 invisible（不显示）/disabled（显示不可选）/selectable（可选）。
+		# 说明：选项三态分别表示不显示、显示但不可选、可选。
 		var state := "selectable"
 		if not _option_visible(option_def):
 			state = "invisible"
@@ -792,7 +831,7 @@ func _build_option_set(choice_point_def: Dictionary) -> Array:
 	return out
 
 # 功能：输出上层使用的选项简版结构。
-# 说明：仅返回 id/text/state，避免暴露内部结算细节。
+# 说明：仅返回 id、text、state，避免暴露内部结算细节。
 func _option_public_states(options_eval: Array) -> Array:
 	var out: Array = []
 	for option_variant in options_eval:
@@ -819,21 +858,21 @@ func _option_visible(option_def: Dictionary) -> bool:
 	return true
 
 # 功能：判定选项是否可选。
-# 说明：需同时通过 eligibility 与 cost 校验。
+# 说明：需要同时通过 eligibility 与 cost 校验。
 func _option_selectable(option_def: Dictionary) -> bool:
 	if not _is_option_eligibility_pass(_dict_or_empty(option_def.get("eligibility", {}))):
 		return false
 	return _can_pay_cost(_dict_or_empty(option_def.get("cost", {})))
 
 # 功能：逐条校验 eligibility 条件。
-# 说明：支持字面量比较与内联规则字符串（如 >=10）。
+# 说明：支持字面量比较与内联规则字符串，例如 >=10。
 func _is_option_eligibility_pass(eligibility: Dictionary) -> bool:
 	for key_variant in eligibility.keys():
 		var path := str(key_variant).strip_edges()
 		var clause: Variant = eligibility[key_variant]
 		var actual: Variant = _resolve_path_value(path)
 		if typeof(clause) == TYPE_STRING:
-			# 说明：规则示例 >=10、==true；左值来自 path 对应的 world_state 字段。
+			# 说明：规则示例：>=10、=true；左值来自 path 对应的 world_state 字段。
 			var rule := str(clause).strip_edges()
 			if rule.is_empty():
 				continue
@@ -845,7 +884,7 @@ func _is_option_eligibility_pass(eligibility: Dictionary) -> bool:
 	return true
 
 # 功能：解析并匹配内联规则。
-# 说明：规则示例 >=10、==true，左值为 actual。
+# 说明：规则示例：>=10、=true，左值为 actual。
 func _match_inline_rule(actual: Variant, rule: String) -> bool:
 	var operators := [">=", "<=", "==", "!=", ">", "<"]
 	for op_variant in operators:
@@ -905,11 +944,11 @@ func _select_first_selectable(options_eval: Array) -> Dictionary:
 	return {}
 
 # 功能：执行选项结算主流程。
-# 说明：流程为扣代价 -> 检定 -> 应用 resolution。
+# 说明：流程为扣代价、检定、应用 resolution。
 func _apply_option_resolution(selected_option: Dictionary, event_def: Dictionary) -> void:
 	var cost := _dict_or_empty(selected_option.get("cost", {}))
 	if not _can_pay_cost(cost):
-		# 说明：正常不应进入该分支，保留防御兜底。
+		# 说明：正常情况下不应进入该分支，这里保留为防御性兜底。
 		_apply_event_effects(event_def)
 		_apply_continuation_policy(event_def)
 		return
@@ -919,7 +958,7 @@ func _apply_option_resolution(selected_option: Dictionary, event_def: Dictionary
 	var resolution := _dict_or_empty(selected_option.get("resolution", {}))
 	var check := _dict_or_empty(selected_option.get("check", {}))
 	if not _is_check_pass(check):
-		# 说明：检定失败时可用 onFailResolution 覆盖默认 resolution。
+		# 说明：检定失败时，可用 onFailResolution 覆盖默认 resolution。
 		var fail_resolution := _dict_or_empty(check.get("onFailResolution", {}))
 		if not fail_resolution.is_empty():
 			resolution = fail_resolution
@@ -937,7 +976,7 @@ func _is_check_pass(check: Dictionary) -> bool:
 		return _rng.randf() <= rate
 	return true
 
-# 功能：应用 resolution 并衔接执行锁更新。
+# 功能：应用 resolution，并衔接执行锁更新。
 # 说明：统一处理 worldStatePatch、forcedNextEventId、chainContextPatch。
 func _apply_resolution(resolution: Dictionary, event_def: Dictionary) -> void:
 	# 说明：resolution 统一处理三类后果：worldStatePatch、forcedNextEventId、chainContextPatch。
@@ -952,7 +991,7 @@ func _apply_resolution(resolution: Dictionary, event_def: Dictionary) -> void:
 	_apply_continuation_policy(event_def, chain_patch)
 
 # 功能：应用 worldStatePatch 到 world_state。
-# 说明：params/player 为增量写入，flags 为覆盖写入。
+# 说明：params 与 player 为增量写入，flags 为覆盖写入。
 func _apply_world_state_patch(patch: Dictionary) -> void:
 	if patch.is_empty():
 		return
@@ -985,21 +1024,23 @@ func _apply_world_state_patch(patch: Dictionary) -> void:
 		world_state["currentLocationId"] = set_location
 
 # 功能：合并两个字典。
-# 说明：right 覆盖 left 同名键，返回新字典。
+# 说明：right 覆盖 left 的同名键，并返回新字典。
 func _merge_dict(left: Dictionary, right: Dictionary) -> Dictionary:
 	var merged := left.duplicate(true)
 	for key in right.keys():
 		merged[key] = right[key]
 	return merged
 
+# 功能：将任意值安全转换为 Dictionary。
+# 说明：JSON 允许 null；这里统一收敛为 {}，避免 Nil 到 Dictionary 的赋值错误。
 func _dict_or_empty(value: Variant) -> Dictionary:
-	# 说明：JSON 允许 null；统一收敛为 {}，避免 Nil -> Dictionary 赋值错误。
 	if typeof(value) == TYPE_DICTIONARY and value != null:
 		return value
 	return {}
 
+# 功能：将任意值安全转换为 Array。
+# 说明：与 _dict_or_empty 同理，用于兼容 visibilityWhen 等可选数组字段。
 func _array_or_empty(value: Variant) -> Array:
-	# 说明：与 _dict_or_empty 同理，用于兼容 visibilityWhen 等可选数组字段。
 	if typeof(value) == TYPE_ARRAY and value != null:
 		return value
 	return []
