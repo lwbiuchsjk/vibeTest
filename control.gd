@@ -1,4 +1,4 @@
-﻿extends Control
+extends Control
 
 const NetClientScript := preload("res://scripts/net_client.gd")
 const USE_MOCK_BACKEND := true

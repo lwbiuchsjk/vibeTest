@@ -1,4 +1,4 @@
-﻿extends Control
+extends Control
 
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 const EventCard := preload("res://scripts/ui/event_card.gd")

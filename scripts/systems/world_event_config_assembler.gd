@@ -1,4 +1,4 @@
-﻿extends RefCounted
+extends RefCounted
 class_name WorldEventConfigAssembler
 
 # 功能：将收束后的 6 张 CSV 配置组装为世界事件引擎可直接消费的数据结构。
