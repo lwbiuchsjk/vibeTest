@@ -1,4 +1,4 @@
-﻿event_id,branch,target,op,key,value
+event_id,branch,target,op,key,value
 evt_idle,default,params,add,danger,-1
 evt_study_001,default,params,add,prosperity,2
 evt_market_001,default,params,add,prosperity,1

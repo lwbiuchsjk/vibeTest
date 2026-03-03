@@ -1,4 +1,4 @@
-﻿event_id,condition_type,left,op,right,delta
+event_id,condition_type,left,op,right,delta
 evt_market_001,required_location,,,town_square,
 evt_market_001,required_location,,,market,
 evt_harbor_hint_001,required_location,,,town_square,

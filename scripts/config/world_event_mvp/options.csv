@@ -1,4 +1,4 @@
-﻿option_id,choice_point_id,text,display_order
+option_id,choice_point_id,text,display_order
 opt_study_focus_knowledge,cp_study_plan,Focus on knowledge (cost 1 energy),1
 opt_study_take_rest,cp_study_plan,Take a short break,2
 opt_study_secret_notes,cp_study_plan,Read secret notes,3

@@ -1,4 +1,4 @@
-﻿extends RefCounted
+extends RefCounted
 
 func login_or_create(
 	http_request: HTTPRequest,

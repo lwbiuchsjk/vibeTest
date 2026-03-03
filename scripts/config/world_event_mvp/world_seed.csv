@@ -1,4 +1,4 @@
-﻿section,scope_a,scope_b,key,value
+section,scope_a,scope_b,key,value
 core,,,turn,1
 core,,,current_location_id,town_square
 core,,,forced_next_event_id,

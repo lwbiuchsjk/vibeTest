@@ -1,4 +1,4 @@
-﻿option_id,rule_type,branch,target,left,op,right,key,value
+option_id,rule_type,branch,target,left,op,right,key,value
 opt_study_focus_knowledge,eligibility,default,,player.energy,>=,1,,
 opt_study_focus_knowledge,cost,default,,,,,energy,1
 opt_study_focus_knowledge,resolution,default,params,,add,,prosperity,1
