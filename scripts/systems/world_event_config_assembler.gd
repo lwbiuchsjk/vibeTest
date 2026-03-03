@@ -3,6 +3,9 @@ class_name WorldEventConfigAssembler
 
 # 功能：将收束后的 6 张 CSV 配置组装为世界事件引擎可直接消费的数据结构。
 const ConfigLoader = preload("res://scripts/systems/config_loader.gd")
+# 功能：事件背景美术固定资源目录。
+# 说明：配置表中只填写文件名，运行时统一在这里补全为资源路径。
+const EVENT_BACKGROUND_BASE_DIR := "res://assets/art/environments/backgrounds"
 
 
 # 功能：从 CSV 目录编译配置并输出运行时数据结构。
@@ -232,6 +235,7 @@ static func _assemble_choice_points(tables: Dictionary) -> Dictionary:
 
 
 # 功能：组装 events 数据并做 choice point 外键校验。
+# 说明：事件主表负责提供基础字段，条件表和后果表在后续步骤再增量回填。
 static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -> Dictionary:
 	var event_rows: Array = tables.get("events.csv", [])
 	var condition_rows: Array = tables.get("event_conditions.csv", [])
@@ -251,6 +255,7 @@ static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -
 		var event_def = {
 			"id": event_id,
 			"title": str(row.get("title", "")),
+			"backgroundArt": _build_background_art_path(str(row.get("background_art", ""))),
 			"baseWeight": _to_int(row.get("base_weight", "10"), 10),
 			"tags": _split_text_list(str(row.get("tags", "")), ";"),
 			"eligibility": {},
@@ -296,6 +301,7 @@ static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -
 
 
 # 功能：应用单行事件条件。
+# 说明：同一事件允许出现多行同类型条件，编译时会按类型聚合为 eligibility 或 weightRules。
 static func _apply_event_condition_row(event_def: Dictionary, row: Dictionary) -> void:
 	var condition_type := str(row.get("condition_type", "")).strip_edges()
 	var left := str(row.get("left", "")).strip_edges()
@@ -347,7 +353,6 @@ static func _apply_event_condition_row(event_def: Dictionary, row: Dictionary) -
 # 功能：应用单行事件后果。
 # 说明：branch 当前仅处理 default，其他分支预留给未来扩展。
 static func _apply_event_outcome_row(event_def: Dictionary, row: Dictionary) -> void:
-	# 说明：branch 当前仅在 resolution 下识别 fail；default 与其他非 fail 值都按默认结算处理。
 	var branch := str(row.get("branch", "default")).strip_edges()
 	if not branch.is_empty() and branch != "default":
 		return
@@ -369,6 +374,7 @@ static func _apply_event_outcome_row(event_def: Dictionary, row: Dictionary) -> 
 
 
 # 功能：应用单行选项规则。
+# 说明：branch 当前仅在 resolution 下识别 fail；空值与其他值都按默认结算处理。
 static func _apply_option_rule_row(row: Dictionary, cp_map: Dictionary, option_ref: Dictionary) -> void:
 	var option_id := str(row.get("option_id", "")).strip_edges()
 	var ref: Dictionary = option_ref[option_id]
@@ -384,7 +390,6 @@ static func _apply_option_rule_row(row: Dictionary, cp_map: Dictionary, option_r
 
 	var option: Dictionary = options[index]
 	var rule_type := str(row.get("rule_type", "")).strip_edges()
-	# 说明：branch 当前仅在 resolution 下识别 fail；空值与其他值都按默认结算处理。
 	var branch := str(row.get("branch", "")).strip_edges()
 	var left := str(row.get("left", "")).strip_edges()
 	var op := str(row.get("op", "")).strip_edges()
@@ -483,10 +488,7 @@ static func _apply_effect_or_resolution_action(container: Dictionary, target: St
 		return
 
 	if target == "world" and op == "set_forced_next":
-		if container.has("worldStatePatch"):
-			container["forcedNextEventId"] = value_text
-		else:
-			container["forcedNextEventId"] = value_text
+		container["forcedNextEventId"] = value_text
 		return
 
 	if target == "world" and op == "end_chain":
@@ -543,6 +545,7 @@ static func _apply_chain_patch_item(patch: Dictionary, key: String, value_text: 
 
 
 # 功能：从 world_seed 的 chain section 提取 chainContext。
+# 说明：当 chain_id 为空时返回 null，表示初始世界不进入链式上下文。
 static func _build_chain_context_from_seed(chain_seed: Dictionary) -> Variant:
 	var chain_id := str(chain_seed.get("chain_id", "")).strip_edges()
 	if chain_id.is_empty():
@@ -611,12 +614,25 @@ static func _split_text_list(text: String, sep: String) -> Array:
 	return out
 
 
+# 功能：将背景文件名转换为完整资源路径。
+# 说明：保持配置层只感知文件名，避免业务表硬编码完整路径。
+static func _build_background_art_path(file_name: String) -> String:
+	var normalized := file_name.strip_edges()
+	if normalized.is_empty():
+		return ""
+	return "%s/%s" % [EVENT_BACKGROUND_BASE_DIR, normalized]
+
+
+# 功能：拼接配置目录与文件名。
+# 说明：兼容传入目录结尾已带 / 或 \ 的情况。
 static func _join_path(base: String, file_name: String) -> String:
 	if base.ends_with("/") or base.ends_with("\\"):
 		return base + file_name
 	return base + "/" + file_name
 
 
+# 功能：将输入安全转换为 int。
+# 说明：空字符串或非法数字时回退到默认值。
 static func _to_int(value: Variant, default_value: int) -> int:
 	var text = str(value).strip_edges()
 	if text.is_empty():
@@ -626,6 +642,8 @@ static func _to_int(value: Variant, default_value: int) -> int:
 	return default_value
 
 
+# 功能：将输入安全转换为 float。
+# 说明：空字符串或非法数字时回退到默认值。
 static func _to_float(value: Variant, default_value: float) -> float:
 	var text = str(value).strip_edges()
 	if text.is_empty():
@@ -635,10 +653,14 @@ static func _to_float(value: Variant, default_value: float) -> float:
 	return default_value
 
 
+# 功能：将输入转换为 bool。
+# 说明：当前仅将文本 true 识别为 true，其余值统一视为 false。
 static func _to_bool(value: Variant) -> bool:
 	return str(value).strip_edges().to_lower() == "true"
 
 
+# 功能：将 CSV 字面量文本解析为运行时值。
+# 说明：支持 bool、int、float，其他内容保留为原始字符串。
 static func _parse_literal(value: String) -> Variant:
 	var text = value.strip_edges()
 	if text.is_empty():

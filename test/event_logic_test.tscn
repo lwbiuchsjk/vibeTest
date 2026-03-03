@@ -63,6 +63,13 @@ theme_override_constants/margin_bottom = 16
 layout_mode = 2
 theme_override_constants/separation = 10
 
+[node name="EventBackground" type="TextureRect" parent="Root/LeftPanel/LeftMargin/LeftContent"]
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+size_flags_horizontal = 3
+expand_mode = 1
+stretch_mode = 5
+
 [node name="EventTitle" type="Label" parent="Root/LeftPanel/LeftMargin/LeftContent"]
 layout_mode = 2
 text = "等待事件"

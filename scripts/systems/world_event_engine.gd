@@ -247,6 +247,7 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 						"route": route,
 						"event_id": next_event_id,
 						"title": str(event_def.get("title", "")),
+						"background_art": str(event_def.get("backgroundArt", "")),
 						"policy": str(event_def.get("continuationPolicy", POLICY_RETURN)),
 						"expected_forced": expected_forced,
 						"chain_active": not (world_state.get("chainContext", null) == null),
@@ -279,6 +280,7 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 		"route": route,
 		"event_id": next_event_id,
 		"title": str(event_def.get("title", "")),
+		"background_art": str(event_def.get("backgroundArt", "")),
 		"policy": str(event_def.get("continuationPolicy", POLICY_RETURN)),
 		"expected_forced": expected_forced,
 		"chain_active": not (world_state.get("chainContext", null) == null),
@@ -443,6 +445,7 @@ func _build_result_payload(
 		"route": route,
 		"event_id": event_id,
 		"title": str(event_def.get("title", "")),
+		"background_art": str(event_def.get("backgroundArt", "")),
 		"policy": str(event_def.get("continuationPolicy", POLICY_RETURN)),
 		"expected_forced": expected_forced,
 		"chain_active": not (world_state.get("chainContext", null) == null),
@@ -1000,3 +1003,4 @@ func _array_or_empty(value: Variant) -> Array:
 	if typeof(value) == TYPE_ARRAY and value != null:
 		return value
 	return []
+

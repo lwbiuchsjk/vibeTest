@@ -1,5 +1,4 @@
 location_id,display_name,neighbors,art_file
-town,Town,market;square,town.svg
-market,Market,town;dock,market.svg
-square,Square,town,square.svg
-dock,Dock,market,dock.svg
+town_square,Town Square,market,square.svg
+market,Market,town_square;harbor,market.svg
+harbor,Harbor,market,dock.svg

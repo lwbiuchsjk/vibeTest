@@ -1,6 +1,7 @@
 extends Control
 
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
+const LocationGraph := preload("res://scripts/models/location_graph.gd")
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 
 const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
@@ -8,8 +9,10 @@ const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
 var _engine: WorldEventEngine
 var _event_logs: Array[String] = []
 var _current_turn_result: Dictionary = {}
+var _location_graph: LocationGraph
 
 @onready var status_label: Label = $Root/Header/StatusLabel
+@onready var event_background_rect: TextureRect = $Root/LeftPanel/LeftMargin/LeftContent/EventBackground
 @onready var event_title_label: Label = $Root/LeftPanel/LeftMargin/LeftContent/EventTitle
 @onready var event_detail_label: Label = $Root/LeftPanel/LeftMargin/LeftContent/EventDetail
 @onready var continue_button: Button = $Root/LeftPanel/LeftMargin/LeftContent/ActionBar/ContinueButton
@@ -58,6 +61,7 @@ func _render_current_event(turn_result: Dictionary) -> void:
 	var options: Array = choice.get("options", [])
 	var awaiting_choice := bool(turn_result.get("awaiting_choice", false))
 
+	_render_event_background(str(turn_result.get("background_art", "")))
 	event_title_label.text = "%s | %s" % [
 		str(turn_result.get("event_id", "")),
 		str(turn_result.get("title", ""))
@@ -147,10 +151,11 @@ func _on_continue_button_pressed() -> void:
 
 
 # 功能：构建事件详情文本。
-# 说明：补充 route、policy、chain 状态与当前 world turn，便于核对推进时机。
+# 说明：补充背景路径、route、policy、chain 状态与当前 world turn，便于核对推进时机。
 func _build_event_detail_text(turn_result: Dictionary) -> String:
 	var choice: Dictionary = turn_result.get("choice", {})
 	var lines: Array[String] = []
+	lines.append("background_art=%s" % str(turn_result.get("background_art", "")))
 	lines.append("route=%s" % str(turn_result.get("route", "")))
 	lines.append("policy=%s" % str(turn_result.get("policy", "")))
 	lines.append("choice_point=%s" % str(choice.get("choice_point_id", "")))
@@ -232,12 +237,13 @@ func _update_side_panels() -> void:
 # 功能：记录每次事件预览日志。
 # 说明：将“等待选择”和“等待继续”显式写入日志，便于核对界面状态。
 func _append_turn_log(turn_result: Dictionary) -> void:
-	var line := "Turn %s | %s | %s | route=%s | policy=%s" % [
+	var line := "Turn %s | %s | %s | route=%s | policy=%s | background=%s" % [
 		str(_engine.world_state.get("turn", 0)),
 		str(turn_result.get("event_id", "")),
 		str(turn_result.get("title", "")),
 		str(turn_result.get("route", "")),
-		str(turn_result.get("policy", ""))
+		str(turn_result.get("policy", "")),
+		str(turn_result.get("background_art", ""))
 	]
 	if turn_result.get("awaiting_choice", false):
 		line += " | 等待选择"
@@ -270,6 +276,23 @@ func _add_option_hint(text: String) -> void:
 	option_list.add_child(hint_label)
 
 
+# 功能：渲染当前事件背景图。
+# 说明：优先读取事件背景；若事件未配置或资源加载失败，则回退到当前地点背景。
+func _render_event_background(background_art_path: String) -> void:
+	var normalized_path := background_art_path.strip_edges()
+	if not normalized_path.is_empty():
+		var resource := ResourceLoader.load(normalized_path)
+		if resource is Texture2D:
+			event_background_rect.texture = resource
+			return
+
+	var current_location_id := str(_engine.world_state.get("currentLocationId", "")).strip_edges()
+	if _location_graph != null and not current_location_id.is_empty():
+		event_background_rect.texture = _location_graph.load_art_texture(current_location_id)
+	else:
+		event_background_rect.texture = null
+
+
 # 功能：将历史事件数组转为字符串数组。
 # 说明：统一处理 Variant 数组，确保可安全拼接为文本。
 func _history_to_string_array(history: Array) -> Array[String]:
@@ -279,8 +302,8 @@ func _history_to_string_array(history: Array) -> Array[String]:
 	return result
 
 
-# 功能：读取测试场景的随机种子配置。
-# 说明：仅测试场景使用该配置；当配置缺失、格式错误或未填写正整数时，回退为 0 以启用随机种子。
+# 功能：读取测试场景的配置文件。
+# 说明：仅测试场景使用该配置；当配置缺失或格式异常时，回退为空配置。
 func _load_test_config() -> Dictionary:
 	if not FileAccess.file_exists(TEST_CONFIG_PATH):
 		return {}
@@ -297,7 +320,7 @@ func _load_test_config() -> Dictionary:
 
 
 # 功能：读取测试场景的随机种子配置。
-# 说明：当配置缺失、格式错误或未填写正整数时，回退为 0 以启用随机种子。
+# 说明：当配置缺失、格式错误或不是非负整数时，回退为 0 以启用随机种子。
 func _get_test_random_seed(test_config: Dictionary) -> int:
 	var raw_seed: Variant = test_config.get("random_seed", 0)
 	var seed_text := str(raw_seed).strip_edges()
@@ -322,6 +345,12 @@ func _load_world_event_test_config(test_config: Dictionary) -> Dictionary:
 	var load_result := runtime.ensure_loaded(override_paths)
 	if not load_result.get("ok", false):
 		return load_result
+
+	var context_result := runtime.build_context()
+	if context_result.get("ok", false):
+		_location_graph = context_result.get("graph", null)
+	else:
+		_location_graph = null
 
 	var world_event_data := runtime.get_world_event_data()
 	if world_event_data.is_empty():
