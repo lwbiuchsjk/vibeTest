@@ -67,14 +67,15 @@ func _render_current_event(turn_result: Dictionary) -> void:
 		str(turn_result.get("event_id", "")),
 		str(turn_result.get("title", ""))
 	]
-	event_detail_label.text = _build_event_detail_text(turn_result)
+	var detail_text := _build_event_detail_text(turn_result)
+	event_detail_label.text = detail_text
 	if phase == "presentation":
 		var speaker := str(presentation_item.get("speaker", "")).strip_edges()
 		var body := str(presentation_item.get("text", ""))
 		if speaker.is_empty():
-			event_detail_label.text += "\n\n%s" % body
+			event_detail_label.text = "%s\n\n%s" % [body, detail_text]
 		else:
-			event_detail_label.text += "\n\n%s：%s" % [speaker, body]
+			event_detail_label.text = "%s：%s\n\n%s" % [speaker, body, detail_text]
 
 	_clear_option_list()
 	continue_button.visible = false
