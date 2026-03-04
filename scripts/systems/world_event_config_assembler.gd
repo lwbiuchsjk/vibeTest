@@ -49,6 +49,7 @@ static func _load_tables(base: String) -> Dictionary:
 		"events.csv",
 		"event_conditions.csv",
 		"event_outcomes.csv",
+		"event_presentations.csv",
 		"options.csv",
 		"option_rules.csv"
 	]
@@ -240,6 +241,7 @@ static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -
 	var event_rows: Array = tables.get("events.csv", [])
 	var condition_rows: Array = tables.get("event_conditions.csv", [])
 	var outcome_rows: Array = tables.get("event_outcomes.csv", [])
+	var presentation_rows: Array = tables.get("event_presentations.csv", [])
 
 	var event_map: Dictionary = {}
 	var event_order: Array = []
@@ -261,7 +263,8 @@ static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -
 			"eligibility": {},
 			"weightRules": [],
 			"continuationPolicy": str(row.get("continuation_policy", "ReturnToScheduler")),
-			"effects": {}
+			"effects": {},
+			"presentation": []
 		}
 
 		var cp_id := str(row.get("choice_point_id", "")).strip_edges()
@@ -287,6 +290,10 @@ static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -
 			continue
 		_apply_event_outcome_row(event_map[event_id], row)
 
+	var presentation_result := _apply_event_presentations(event_map, presentation_rows)
+	if not presentation_result.get("ok", false):
+		return presentation_result
+
 	var events: Array = []
 	for event_id_variant in event_order:
 		var event_def: Dictionary = event_map[str(event_id_variant)]
@@ -295,6 +302,10 @@ static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -
 			var patch: Dictionary = event_def.get("chainPatch", {})
 			if patch.is_empty():
 				event_def.erase("chainPatch")
+		if event_def.has("presentation"):
+			var presentation: Array = event_def.get("presentation", [])
+			if presentation.is_empty():
+				event_def.erase("presentation")
 		events.append(event_def)
 
 	return {"ok": true, "events": events}
@@ -302,6 +313,52 @@ static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -
 
 # 功能：应用单行事件条件。
 # 说明：同一事件允许出现多行同类型条件，编译时会按类型聚合为 eligibility 或 weightRules。
+# 功能：将事件展示项编译到对应事件定义中。
+# 说明：当前 MVP 只支持 text 类型展示项，并在编译期完成基础校验和排序。
+static func _apply_event_presentations(event_map: Dictionary, rows: Array) -> Dictionary:
+	var used_presentation_ids: Dictionary = {}
+	for row_variant in rows:
+		var row: Dictionary = row_variant
+		var event_id := str(row.get("event_id", "")).strip_edges()
+		var presentation_id := str(row.get("presentation_id", "")).strip_edges()
+		var display_order_text := str(row.get("display_order", "")).strip_edges()
+		var item_type := str(row.get("item_type", "")).strip_edges()
+		var text := str(row.get("text", "")).strip_edges()
+		if event_id.is_empty() and presentation_id.is_empty() and display_order_text.is_empty() and item_type.is_empty() and text.is_empty():
+			continue
+		if event_id.is_empty():
+			return {"ok": false, "error": "event presentation row missing event_id"}
+		if not event_map.has(event_id):
+			return {"ok": false, "error": "event presentation references missing event: %s" % event_id}
+		if presentation_id.is_empty():
+			return {"ok": false, "error": "event presentation missing presentation_id: %s" % event_id}
+		if used_presentation_ids.has(presentation_id):
+			return {"ok": false, "error": "duplicate presentation id: %s" % presentation_id}
+		if display_order_text.is_empty() or not display_order_text.is_valid_int() or int(display_order_text) <= 0:
+			return {"ok": false, "error": "event presentation display_order must be positive int: %s" % presentation_id}
+		if item_type != "text":
+			return {"ok": false, "error": "unsupported presentation item_type: %s" % item_type}
+		if text.is_empty():
+			return {"ok": false, "error": "event presentation text is empty: %s" % presentation_id}
+
+		used_presentation_ids[presentation_id] = true
+		var event_def: Dictionary = event_map[event_id]
+		var presentation: Array = event_def.get("presentation", [])
+		presentation.append(
+			{
+				"id": presentation_id,
+				"order": int(display_order_text),
+				"type": item_type,
+				"speaker": str(row.get("speaker", "")).strip_edges(),
+				"text": text
+			}
+		)
+		_sort_presentation_items(presentation)
+		event_def["presentation"] = presentation
+		event_map[event_id] = event_def
+	return {"ok": true}
+
+
 static func _apply_event_condition_row(event_def: Dictionary, row: Dictionary) -> void:
 	var condition_type := str(row.get("condition_type", "")).strip_edges()
 	var left := str(row.get("left", "")).strip_edges()
@@ -590,6 +647,20 @@ static func _sort_options_by_display_order(options: Array) -> void:
 
 
 # 功能：按 seq 升序排序历史记录。
+static func _sort_presentation_items(items: Array) -> void:
+	for i in range(1, items.size()):
+		var current: Dictionary = items[i]
+		var current_order := int(current.get("order", 0))
+		var j := i - 1
+		while j >= 0:
+			var left: Dictionary = items[j]
+			if int(left.get("order", 0)) <= current_order:
+				break
+			items[j + 1] = items[j]
+			j -= 1
+		items[j + 1] = current
+
+
 static func _sort_history_pairs(history_pairs: Array) -> void:
 	for i in range(1, history_pairs.size()):
 		var current: Dictionary = history_pairs[i]

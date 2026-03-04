@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://b0y8dtmxpyatm"
+
+[deps]
+
+files=["res://scripts/config/world_event_mvp/event_presentations.presentation.translation", "res://scripts/config/world_event_mvp/event_presentations.display.translation", "res://scripts/config/world_event_mvp/event_presentations.item.translation", "res://scripts/config/world_event_mvp/event_presentations.speaker.translation", "res://scripts/config/world_event_mvp/event_presentations.text.translation"]
+
+source_file="res://scripts/config/world_event_mvp/event_presentations.csv"
+dest_files=["res://scripts/config/world_event_mvp/event_presentations.presentation.translation", "res://scripts/config/world_event_mvp/event_presentations.display.translation", "res://scripts/config/world_event_mvp/event_presentations.item.translation", "res://scripts/config/world_event_mvp/event_presentations.speaker.translation", "res://scripts/config/world_event_mvp/event_presentations.text.translation"]
+
+[params]
+
+compress=true
+delimiter=0

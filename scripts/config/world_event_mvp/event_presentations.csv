@@ -1,0 +1,12 @@
+event_id,presentation_id,display_order,item_type,speaker,text
+evt_study_001,pre_study_001,1,text,旁白,你摊开今天的学习计划，决定先把注意力收回来。
+evt_study_001,pre_study_002,2,text,旁白,窗外传来零散的人声，但你还是把视线落回了笔记。
+evt_market_001,pre_market_001,1,text,旁白,市场里充满了叫卖声，来往行人几乎把道路堵满。
+evt_market_001,pre_market_002,2,text,商贩,要不要看看今天的新货？
+evt_harbor_hint_001,pre_harbor_hint_001,1,text,旁白,有人悄悄把一张纸条塞进了你的手里。
+evt_harbor_hint_001,pre_harbor_hint_002,2,text,纸条,今晚去码头，会有人告诉你下一步该怎么做。
+evt_harbor_deal_001,pre_harbor_deal_001,1,text,旁白,你来到码头，潮湿的海风裹着咸味扑面而来。
+evt_harbor_deal_001,pre_harbor_deal_002,2,text,走私者,你终于来了，我还以为你不敢赴约。
+evt_harbor_deal_001,pre_harbor_deal_003,3,text,旁白,对方压低了帽檐，示意你靠近。
+evt_guard_chase_001,pre_guard_chase_001,1,text,旁白,沉重的脚步声从身后逼近，守卫已经发现了你的动静。
+evt_smuggle_escape_001,pre_escape_001,1,text,旁白,你终于甩开了追兵，夜色暂时替你遮住了身形。
