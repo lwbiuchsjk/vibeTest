@@ -135,6 +135,9 @@ func preview_next_turn() -> Dictionary:
 	var next_event_id := str(next_event_result.get("event_id", ""))
 	var route := str(next_event_result.get("route", "scheduler"))
 	var expected_forced := str(next_event_result.get("expected_forced", ""))
+	_pending_turn_context = _create_pending_turn_context(next_event_id, route, expected_forced, event_def)
+	return _build_pending_turn_response(_pending_turn_context)
+
 	var policy := str(event_def.get("continuationPolicy", POLICY_RETURN))
 	var has_choice := false
 	var awaiting_choice := false
@@ -202,6 +205,8 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 	var next_event_id := str(next_event_result.get("event_id", ""))
 	var route := str(next_event_result.get("route", "scheduler"))
 	var event_def: Dictionary = next_event_result.get("event_def", {})
+	_pending_turn_context = _create_pending_turn_context(next_event_id, route, expected_forced, event_def)
+	return _resolve_pending_turn(selected_option_id)
 
 	# 说明：forced 路由只消费一次，执行前清空，避免重复锁定。
 	world_state["forcedNextEventId"] = ""
@@ -305,6 +310,7 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 	var event_id := str(_pending_turn_context.get("event_id", ""))
 	var route := str(_pending_turn_context.get("route", "scheduler"))
 	var expected_forced := str(_pending_turn_context.get("expected_forced", ""))
+	var phase := str(_pending_turn_context.get("phase", "confirm"))
 	var resolution_mode := str(_pending_turn_context.get("resolution_mode", "event_effects"))
 	var pending_has_choice := bool(_pending_turn_context.get("has_choice", false))
 	var pending_choice: Dictionary = _dict_or_empty(_pending_turn_context.get("choice", {}))
@@ -312,6 +318,15 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 	if event_def.is_empty():
 		_pending_turn_context.clear()
 		return {"ok": false, "error": "pending event not found: %s" % event_id}
+
+	if phase == "presentation":
+		var presentation_items := _get_event_presentation(event_def)
+		var next_index := int(_pending_turn_context.get("presentation_index", 0)) + 1
+		if next_index < presentation_items.size():
+			_pending_turn_context["presentation_index"] = next_index
+		else:
+			_advance_pending_phase_after_presentation(event_def)
+		return _build_pending_turn_response(_pending_turn_context)
 
 	var choice_result := pending_choice.duplicate(true)
 	if resolution_mode == "choice_resolution":
@@ -407,6 +422,99 @@ func _select_next_event() -> Dictionary:
 		"event_def": event_def
 	}
 
+
+# 功能：创建事件待处理上下文。
+# 说明：统一收束展示阶段、选项阶段和确认阶段的初始化逻辑，避免多个入口重复拼装状态。
+func _create_pending_turn_context(
+	event_id: String,
+	route: String,
+	expected_forced: String,
+	event_def: Dictionary
+) -> Dictionary:
+	var choice_result := {
+		"choice_point_id": "",
+		"selected_option_id": "",
+		"resolved_by": "",
+		"options": []
+	}
+	var resolution_mode := "event_effects"
+	var has_choice := false
+	var phase := "confirm"
+	var choice_point_id := str(event_def.get("choicePointId", "")).strip_edges()
+	if not choice_point_id.is_empty():
+		has_choice = true
+		choice_result["choice_point_id"] = choice_point_id
+		var choice_point_def: Dictionary = _choice_point_map.get(choice_point_id, {})
+		if choice_point_def.is_empty():
+			choice_result["resolved_by"] = "missing_choice_point_fallback_event_effects"
+		else:
+			var options_eval := _build_option_set(choice_point_def)
+			choice_result["options"] = _option_public_states(options_eval)
+			var first_selectable := _select_first_selectable(options_eval)
+			if first_selectable.is_empty():
+				choice_result["resolved_by"] = "no_selectable_option_fallback_event_effects"
+			else:
+				resolution_mode = "choice_resolution"
+				choice_result["resolved_by"] = "pending_external_selection"
+				phase = "choice"
+
+	var presentation_items := _get_event_presentation(event_def)
+	if not presentation_items.is_empty():
+		phase = "presentation"
+
+	return {
+		"event_id": event_id,
+		"route": route,
+		"expected_forced": expected_forced,
+		"resolution_mode": resolution_mode,
+		"has_choice": has_choice,
+		"choice": choice_result,
+		"policy": str(event_def.get("continuationPolicy", POLICY_RETURN)),
+		"phase": phase,
+		"presentation_index": 0
+	}
+
+
+# 功能：在展示阶段结束后切换到下一个可交互阶段。
+# 说明：优先进入 choice；若没有可交互选项，则进入 confirm。
+func _advance_pending_phase_after_presentation(event_def: Dictionary) -> void:
+	var next_phase := "confirm"
+	if str(_pending_turn_context.get("resolution_mode", "event_effects")) == "choice_resolution":
+		next_phase = "choice"
+	var choice_result: Dictionary = _dict_or_empty(_pending_turn_context.get("choice", {}))
+	if next_phase == "choice" and choice_result.is_empty():
+		next_phase = "confirm"
+	_pending_turn_context["phase"] = next_phase
+	_pending_turn_context["presentation_index"] = 0
+
+
+# 功能：读取事件展示配置。
+# 说明：统一收束展示数据的空值处理，便于后续扩展更多展示类型。
+func _get_event_presentation(event_def: Dictionary) -> Array:
+	var presentation: Variant = event_def.get("presentation", [])
+	if typeof(presentation) == TYPE_ARRAY and presentation != null:
+		return presentation
+	return []
+
+
+# 功能：构建返回给 Consumer 的展示阶段状态。
+# 说明：Consumer 只消费当前展示项和索引信息，不直接解析事件定义原始结构。
+func _build_presentation_state(event_def: Dictionary, phase: String) -> Dictionary:
+	var presentation_items := _get_event_presentation(event_def)
+	var state := {
+		"active": false,
+		"index": -1,
+		"total": presentation_items.size(),
+		"current_item": {}
+	}
+	if phase != "presentation" or presentation_items.is_empty():
+		return state
+	var current_index := clampi(int(_pending_turn_context.get("presentation_index", 0)), 0, presentation_items.size() - 1)
+	state["active"] = true
+	state["index"] = current_index
+	state["current_item"] = presentation_items[current_index]
+	return state
+
 # 功能：构建待处理事件的统一返回结构。
 # 说明：预览态与待选择态都复用此函数，避免界面层依赖多套字段格式。
 func _build_pending_turn_response(pending_context: Dictionary) -> Dictionary:
@@ -415,12 +523,13 @@ func _build_pending_turn_response(pending_context: Dictionary) -> Dictionary:
 	var expected_forced := str(pending_context.get("expected_forced", ""))
 	var has_choice := bool(pending_context.get("has_choice", false))
 	var resolution_mode := str(pending_context.get("resolution_mode", "event_effects"))
+	var phase := str(pending_context.get("phase", "confirm"))
 	var event_def: Dictionary = _event_map.get(event_id, {})
 	if event_def.is_empty():
 		return {"ok": false, "error": "pending event not found: %s" % event_id}
 
 	var choice_result: Dictionary = _dict_or_empty(pending_context.get("choice", {})).duplicate(true)
-	var awaiting_choice := resolution_mode == "choice_resolution"
+	var awaiting_choice := phase == "choice" and resolution_mode == "choice_resolution"
 	if awaiting_choice and choice_result.is_empty():
 		choice_result = {
 			"choice_point_id": str(event_def.get("choicePointId", "")),
@@ -450,8 +559,15 @@ func _build_result_payload(
 	has_choice: bool,
 	choice_result: Dictionary
 ) -> Dictionary:
+	var phase := "resolved"
+	if not _pending_turn_context.is_empty() and str(_pending_turn_context.get("event_id", "")) == event_id:
+		phase = str(_pending_turn_context.get("phase", "confirm"))
+	elif awaiting_choice:
+		phase = "choice"
+	var presentation_state := _build_presentation_state(event_def, phase)
 	return {
 		"ok": true,
+		"phase": phase,
 		"awaiting_choice": awaiting_choice,
 		"route": route,
 		"event_id": event_id,
@@ -463,6 +579,7 @@ func _build_result_payload(
 		"expected_forced": expected_forced,
 		"chain_active": not (world_state.get("chainContext", null) == null),
 		"has_choice": has_choice,
+		"presentation": presentation_state,
 		"choice": choice_result
 	}
 

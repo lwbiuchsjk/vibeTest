@@ -57,7 +57,10 @@ func _preview_next_event() -> void:
 func _render_current_event(turn_result: Dictionary) -> void:
 	var choice: Dictionary = turn_result.get("choice", {})
 	var options: Array = choice.get("options", [])
-	var awaiting_choice := bool(turn_result.get("awaiting_choice", false))
+	var phase := str(turn_result.get("phase", "confirm"))
+	var presentation: Dictionary = turn_result.get("presentation", {})
+	var presentation_item: Dictionary = presentation.get("current_item", {})
+	var awaiting_choice := phase == "choice"
 
 	_render_event_background(str(turn_result.get("resolved_background_art", "")))
 	event_title_label.text = "%s | %s" % [
@@ -65,10 +68,22 @@ func _render_current_event(turn_result: Dictionary) -> void:
 		str(turn_result.get("title", ""))
 	]
 	event_detail_label.text = _build_event_detail_text(turn_result)
+	if phase == "presentation":
+		var speaker := str(presentation_item.get("speaker", "")).strip_edges()
+		var body := str(presentation_item.get("text", ""))
+		if speaker.is_empty():
+			event_detail_label.text += "\n\n%s" % body
+		else:
+			event_detail_label.text += "\n\n%s：%s" % [speaker, body]
 
 	_clear_option_list()
 	continue_button.visible = false
 	continue_button.disabled = true
+	if phase == "presentation":
+		status_label.text = "当前处于展示阶段，点击继续查看下一条文本。"
+		continue_button.visible = true
+		continue_button.disabled = false
+		return
 
 	if awaiting_choice:
 		status_label.text = "等待选择：点击下方任一可用选项。"
@@ -152,12 +167,20 @@ func _on_continue_button_pressed() -> void:
 # 说明：展示事件背景、地点背景、最终背景、route、policy、chain 状态与当前 world turn，便于核对推进时机。
 func _build_event_detail_text(turn_result: Dictionary) -> String:
 	var choice: Dictionary = turn_result.get("choice", {})
+	var presentation: Dictionary = turn_result.get("presentation", {})
 	var lines: Array[String] = []
 	lines.append("event_background_art=%s" % str(turn_result.get("event_background_art", "")))
 	lines.append("location_background_art=%s" % str(turn_result.get("location_background_art", "")))
 	lines.append("resolved_background_art=%s" % str(turn_result.get("resolved_background_art", "")))
 	lines.append("route=%s" % str(turn_result.get("route", "")))
 	lines.append("policy=%s" % str(turn_result.get("policy", "")))
+	lines.append("phase=%s" % str(turn_result.get("phase", "")))
+	lines.append(
+		"presentation=%s/%s" % [
+			str(int(presentation.get("index", -1)) + 1 if bool(presentation.get("active", false)) else 0),
+			str(presentation.get("total", 0))
+		]
+	)
 	lines.append("choice_point=%s" % str(choice.get("choice_point_id", "")))
 	lines.append("chain_active=%s" % str(turn_result.get("chain_active", false)))
 	lines.append("world_turn=%s" % str(_engine.world_state.get("turn", 0)))
