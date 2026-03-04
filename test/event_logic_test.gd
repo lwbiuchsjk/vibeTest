@@ -53,7 +53,7 @@ func _preview_next_event() -> void:
 
 
 # 功能：渲染当前事件。
-# 说明：若事件带可选项，则显示选项按钮；若事件待继续确认，则仅显示继续按钮。
+# 说明：根据 phase 分别处理展示、选择、确认三种界面状态，避免测试场景自行推断引擎内部流程。
 func _render_current_event(turn_result: Dictionary) -> void:
 	var choice: Dictionary = turn_result.get("choice", {})
 	var options: Array = choice.get("options", [])
@@ -138,12 +138,12 @@ func _on_option_pressed(option_id: String) -> void:
 
 
 # 功能：处理继续指令。
-# 说明：继续按钮用于确认当前待继续事件，然后再预览下一事件。
+# 说明：展示阶段点击继续只推进到下一条展示文本；确认阶段点击继续才会真正结算当前事件。
 func _on_continue_button_pressed() -> void:
 	if _current_turn_result.is_empty():
 		_preview_next_event()
 		return
-	if bool(_current_turn_result.get("awaiting_choice", false)):
+	if str(_current_turn_result.get("phase", "confirm")) == "choice":
 		status_label.text = "当前事件需要先完成选项选择。"
 		return
 
@@ -164,7 +164,7 @@ func _on_continue_button_pressed() -> void:
 
 
 # 功能：构建事件详情文本。
-# 说明：展示事件背景、地点背景、最终背景、route、policy、chain 状态与当前 world turn，便于核对推进时机。
+# 说明：展示背景、route、policy、phase、展示进度与当前 world turn，便于核对“展示后结算”的推进时机。
 func _build_event_detail_text(turn_result: Dictionary) -> String:
 	var choice: Dictionary = turn_result.get("choice", {})
 	var presentation: Dictionary = turn_result.get("presentation", {})
@@ -258,8 +258,9 @@ func _update_side_panels() -> void:
 
 
 # 功能：记录每次事件预览日志。
-# 说明：将“等待选择”和“等待继续”显式写入日志，便于核对界面状态。
+# 说明：将展示阶段、等待选择、等待确认显式写入日志，便于核对界面状态与引擎 phase 是否一致。
 func _append_turn_log(turn_result: Dictionary) -> void:
+	var phase := str(turn_result.get("phase", "confirm"))
 	var line := "Turn %s | %s | %s | route=%s | policy=%s | background=%s" % [
 		str(_engine.world_state.get("turn", 0)),
 		str(turn_result.get("event_id", "")),
@@ -268,10 +269,12 @@ func _append_turn_log(turn_result: Dictionary) -> void:
 		str(turn_result.get("policy", "")),
 		str(turn_result.get("resolved_background_art", ""))
 	]
-	if turn_result.get("awaiting_choice", false):
+	if phase == "presentation":
+		line += " | 展示阶段"
+	elif turn_result.get("awaiting_choice", false):
 		line += " | 等待选择"
 	else:
-		line += " | 等待继续"
+		line += " | 等待确认"
 	_append_log(line)
 
 

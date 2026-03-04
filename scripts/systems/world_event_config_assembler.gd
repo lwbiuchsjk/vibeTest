@@ -236,7 +236,7 @@ static func _assemble_choice_points(tables: Dictionary) -> Dictionary:
 
 
 # 功能：组装 events 数据并做 choice point 外键校验。
-# 说明：事件主表负责提供基础字段，条件表和后果表在后续步骤再增量回填。
+# 说明：事件主表负责提供基础字段，条件表、后果表与展示表会在后续步骤增量回填。
 static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -> Dictionary:
 	var event_rows: Array = tables.get("events.csv", [])
 	var condition_rows: Array = tables.get("event_conditions.csv", [])
@@ -297,7 +297,7 @@ static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -
 	var events: Array = []
 	for event_id_variant in event_order:
 		var event_def: Dictionary = event_map[str(event_id_variant)]
-		# 说明：若 chainPatch 为空则移除，保持输出结构简洁。
+		# 说明：空补丁和空展示数组都不写入最终产物，避免运行时额外做空值分支。
 		if event_def.has("chainPatch"):
 			var patch: Dictionary = event_def.get("chainPatch", {})
 			if patch.is_empty():
@@ -311,10 +311,8 @@ static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -
 	return {"ok": true, "events": events}
 
 
-# 功能：应用单行事件条件。
-# 说明：同一事件允许出现多行同类型条件，编译时会按类型聚合为 eligibility 或 weightRules。
 # 功能：将事件展示项编译到对应事件定义中。
-# 说明：当前 MVP 只支持 text 类型展示项，并在编译期完成基础校验和排序。
+# 说明：当前 MVP 只支持 text 类型展示项，并在编译期完成基础校验、去重与排序。
 static func _apply_event_presentations(event_map: Dictionary, rows: Array) -> Dictionary:
 	var used_presentation_ids: Dictionary = {}
 	for row_variant in rows:
@@ -359,6 +357,8 @@ static func _apply_event_presentations(event_map: Dictionary, rows: Array) -> Di
 	return {"ok": true}
 
 
+# 功能：应用单行事件条件。
+# 说明：同一事件允许出现多行同类型条件，编译时会按类型聚合为 eligibility 或 weightRules。
 static func _apply_event_condition_row(event_def: Dictionary, row: Dictionary) -> void:
 	var condition_type := str(row.get("condition_type", "")).strip_edges()
 	var left := str(row.get("left", "")).strip_edges()
@@ -646,7 +646,8 @@ static func _sort_options_by_display_order(options: Array) -> void:
 		options[j + 1] = current
 
 
-# 功能：按 seq 升序排序历史记录。
+# 功能：按展示顺序升序排序事件展示项。
+# 说明：这里复用插入排序，保持与选项、历史记录相同的稳定排序行为。
 static func _sort_presentation_items(items: Array) -> void:
 	for i in range(1, items.size()):
 		var current: Dictionary = items[i]
