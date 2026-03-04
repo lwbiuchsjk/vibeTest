@@ -16,7 +16,7 @@ grow_vertical = 2
 theme = SubResource("Theme_event_logic_test")
 script = ExtResource("1_script")
 
-[node name="Root" type="Control" parent="."]
+[node name="Root" type="MarginContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -28,140 +28,170 @@ offset_bottom = -24.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Header" type="VBoxContainer" parent="Root"]
-layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_bottom = 52.0
-grow_horizontal = 2
+[node name="RootContent" type="VBoxContainer" parent="Root"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 16
+
+[node name="Header" type="VBoxContainer" parent="Root/RootContent"]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
-[node name="TitleLabel" type="Label" parent="Root/Header"]
+[node name="TitleLabel" type="Label" parent="Root/RootContent/Header"]
 layout_mode = 2
 text = "Event Logic Test"
 horizontal_alignment = 1
 
-[node name="StatusLabel" type="Label" parent="Root/Header"]
+[node name="StatusLabel" type="Label" parent="Root/RootContent/Header"]
 layout_mode = 2
 text = "Loading..."
 horizontal_alignment = 1
 
-[node name="LeftPanel" type="PanelContainer" parent="Root"]
-layout_mode = 1
-offset_top = 68.0
-offset_right = 520.0
-offset_bottom = 598.0
+[node name="MainSplit" type="HSplitContainer" parent="Root/RootContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+split_offset = 180
 
-[node name="LeftMargin" type="MarginContainer" parent="Root/LeftPanel"]
+[node name="LeftPanel" type="PanelContainer" parent="Root/RootContent/MainSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="LeftMargin" type="MarginContainer" parent="Root/RootContent/MainSplit/LeftPanel"]
 layout_mode = 2
 theme_override_constants/margin_left = 16
 theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 16
 
-[node name="LeftContent" type="VBoxContainer" parent="Root/LeftPanel/LeftMargin"]
+[node name="LeftContent" type="VBoxContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin"]
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/separation = 10
 
-[node name="EventBackground" type="TextureRect" parent="Root/LeftPanel/LeftMargin/LeftContent"]
+[node name="EventInfoScroll" type="ScrollContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent"]
+custom_minimum_size = Vector2(0, 260)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="EventInfo" type="VBoxContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/EventInfoScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="EventBackground" type="TextureRect" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/EventInfoScroll/EventInfo"]
 custom_minimum_size = Vector2(0, 220)
 layout_mode = 2
 size_flags_horizontal = 3
 expand_mode = 1
 stretch_mode = 5
 
-[node name="EventTitle" type="Label" parent="Root/LeftPanel/LeftMargin/LeftContent"]
+[node name="EventTitle" type="Label" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/EventInfoScroll/EventInfo"]
 layout_mode = 2
 text = "等待事件"
 horizontal_alignment = 1
 
-[node name="EventDetail" type="Label" parent="Root/LeftPanel/LeftMargin/LeftContent"]
+[node name="EventDetail" type="Label" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/EventInfoScroll/EventInfo"]
 layout_mode = 2
 text = "事件详情将在这里显示。"
 autowrap_mode = 3
 
-[node name="OptionHeader" type="Label" parent="Root/LeftPanel/LeftMargin/LeftContent"]
+[node name="OptionSection" type="VBoxContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent"]
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="OptionHeader" type="Label" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/OptionSection"]
 layout_mode = 2
 text = "选项"
 
-[node name="ActionBar" type="HBoxContainer" parent="Root/LeftPanel/LeftMargin/LeftContent"]
+[node name="ActionBar" type="HBoxContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/OptionSection"]
 layout_mode = 2
 
-[node name="ContinueButton" type="Button" parent="Root/LeftPanel/LeftMargin/LeftContent/ActionBar"]
+[node name="ContinueButton" type="Button" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/OptionSection/ActionBar"]
 visible = false
 layout_mode = 2
 text = "继续"
 
-[node name="OptionScroll" type="ScrollContainer" parent="Root/LeftPanel/LeftMargin/LeftContent"]
+[node name="OptionScroll" type="ScrollContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/OptionSection"]
 layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
 
-[node name="OptionList" type="VBoxContainer" parent="Root/LeftPanel/LeftMargin/LeftContent/OptionScroll"]
+[node name="OptionList" type="VBoxContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/OptionSection/OptionScroll"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 10
 
-[node name="RightPanel" type="PanelContainer" parent="Root"]
-layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -554.0
-offset_top = 68.0
-offset_right = -4.0
-offset_bottom = 328.0
-grow_horizontal = 0
+[node name="RightColumn" type="VSplitContainer" parent="Root/RootContent/MainSplit"]
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+split_offset = 220
 
-[node name="RightMargin" type="MarginContainer" parent="Root/RightPanel"]
+[node name="RightPanel" type="PanelContainer" parent="Root/RootContent/MainSplit/RightColumn"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="RightMargin" type="MarginContainer" parent="Root/RootContent/MainSplit/RightColumn/RightPanel"]
 layout_mode = 2
 theme_override_constants/margin_left = 16
 theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 16
 
-[node name="RightContent" type="VBoxContainer" parent="Root/RightPanel/RightMargin"]
+[node name="RightContent" type="VBoxContainer" parent="Root/RootContent/MainSplit/RightColumn/RightPanel/RightMargin"]
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/separation = 10
 
-[node name="WorldStateHeader" type="Label" parent="Root/RightPanel/RightMargin/RightContent"]
+[node name="WorldStateHeader" type="Label" parent="Root/RootContent/MainSplit/RightColumn/RightPanel/RightMargin/RightContent"]
 layout_mode = 2
 text = "世界状态"
 
-[node name="WorldStateValue" type="RichTextLabel" parent="Root/RightPanel/RightMargin/RightContent"]
+[node name="WorldStateValue" type="RichTextLabel" parent="Root/RootContent/MainSplit/RightColumn/RightPanel/RightMargin/RightContent"]
 layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 3
 scroll_following = true
 
-[node name="BottomPanel" type="PanelContainer" parent="Root"]
-layout_mode = 1
-anchors_preset = 12
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 550.0
-offset_top = -250.0
-offset_right = -4.0
-grow_horizontal = 2
-grow_vertical = 0
+[node name="BottomPanel" type="PanelContainer" parent="Root/RootContent/MainSplit/RightColumn"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 
-[node name="BottomMargin" type="MarginContainer" parent="Root/BottomPanel"]
+[node name="BottomMargin" type="MarginContainer" parent="Root/RootContent/MainSplit/RightColumn/BottomPanel"]
 layout_mode = 2
 theme_override_constants/margin_left = 16
 theme_override_constants/margin_top = 12
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 12
 
-[node name="BottomContent" type="VBoxContainer" parent="Root/BottomPanel/BottomMargin"]
+[node name="BottomContent" type="VBoxContainer" parent="Root/RootContent/MainSplit/RightColumn/BottomPanel/BottomMargin"]
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/separation = 8
 
-[node name="LogHeader" type="Label" parent="Root/BottomPanel/BottomMargin/BottomContent"]
+[node name="LogHeader" type="Label" parent="Root/RootContent/MainSplit/RightColumn/BottomPanel/BottomMargin/BottomContent"]
 layout_mode = 2
 text = "推进日志"
 
-[node name="LogValue" type="RichTextLabel" parent="Root/BottomPanel/BottomMargin/BottomContent"]
-custom_minimum_size = Vector2(0, 180)
+[node name="LogValue" type="RichTextLabel" parent="Root/RootContent/MainSplit/RightColumn/BottomPanel/BottomMargin/BottomContent"]
+custom_minimum_size = Vector2(0, 140)
 layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 3
 scroll_following = true

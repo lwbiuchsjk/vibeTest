@@ -9,14 +9,14 @@ var _engine: WorldEventEngine
 var _event_logs: Array[String] = []
 var _current_turn_result: Dictionary = {}
 
-@onready var status_label: Label = $Root/Header/StatusLabel
-@onready var event_background_rect: TextureRect = $Root/LeftPanel/LeftMargin/LeftContent/EventBackground
-@onready var event_title_label: Label = $Root/LeftPanel/LeftMargin/LeftContent/EventTitle
-@onready var event_detail_label: Label = $Root/LeftPanel/LeftMargin/LeftContent/EventDetail
-@onready var continue_button: Button = $Root/LeftPanel/LeftMargin/LeftContent/ActionBar/ContinueButton
-@onready var option_list: VBoxContainer = $Root/LeftPanel/LeftMargin/LeftContent/OptionScroll/OptionList
-@onready var world_state_label: RichTextLabel = $Root/RightPanel/RightMargin/RightContent/WorldStateValue
-@onready var log_label: RichTextLabel = $Root/BottomPanel/BottomMargin/BottomContent/LogValue
+@onready var status_label: Label = $Root/RootContent/Header/StatusLabel
+@onready var event_background_rect: TextureRect = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/EventInfoScroll/EventInfo/EventBackground
+@onready var event_title_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/EventInfoScroll/EventInfo/EventTitle
+@onready var event_detail_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/EventInfoScroll/EventInfo/EventDetail
+@onready var continue_button: Button = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/OptionSection/ActionBar/ContinueButton
+@onready var option_list: VBoxContainer = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/OptionSection/OptionScroll/OptionList
+@onready var world_state_label: RichTextLabel = $Root/RootContent/MainSplit/RightColumn/RightPanel/RightMargin/RightContent/WorldStateValue
+@onready var log_label: RichTextLabel = $Root/RootContent/MainSplit/RightColumn/BottomPanel/BottomMargin/BottomContent/LogValue
 
 
 # 功能：初始化事件逻辑测试场景。
