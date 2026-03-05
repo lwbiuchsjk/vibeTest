@@ -6,6 +6,8 @@ class_name WorldEventEngine
 const POLICY_RETURN := "ReturnToScheduler"
 const POLICY_CHAIN := "ChainContinue"
 const POLICY_CHAIN_FORCED := "ChainContinueWithForcedNext"
+const TASK_BIAS_ADVANCE_DEFAULT := 6
+const TASK_BIAS_RISK_DEFAULT := -4
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 const LocationGraph := preload("res://scripts/models/location_graph.gd")
 
@@ -531,6 +533,24 @@ func _build_candidates() -> Array:
 			out.append({"id": str(event_def.get("id", "")), "weight": weight})
 	return out
 
+
+# 功能：导出当前候选事件权重快照。
+# 说明：仅用于调试/测试，不改变世界状态。
+func debug_get_candidate_weights() -> Dictionary:
+	var candidates := _build_candidates()
+	var weights: Dictionary = {}
+	for candidate_variant in candidates:
+		var candidate: Dictionary = candidate_variant
+		var event_id := str(candidate.get("id", "")).strip_edges()
+		if event_id.is_empty():
+			continue
+		weights[event_id] = int(candidate.get("weight", 1))
+	return {
+		"ok": true,
+		"weights": weights,
+		"candidates": candidates
+	}
+
 # 功能：执行事件硬约束过滤。
 # 说明：地点、地点状态、NPC 在场、链 allowedTags 任一不满足即排除。
 func _is_event_eligible(event_def: Dictionary) -> bool:
@@ -578,7 +598,7 @@ func _is_event_eligible(event_def: Dictionary) -> bool:
 	return true
 
 # 功能：计算单个事件当前权重。
-# 说明：综合 baseWeight、weightRules、历史惩罚与链式 tag 偏置。
+# 说明：综合 baseWeight、weightRules、历史惩罚、链式 tag 偏置与任务偏置。
 func _compute_weight(event_def: Dictionary) -> int:
 	var weight := int(event_def.get("baseWeight", 10))
 
@@ -607,9 +627,85 @@ func _compute_weight(event_def: Dictionary) -> int:
 			if tag_bias.has(tag):
 				weight += int(tag_bias[tag])
 
+	# 说明：任务偏置由 event.taskLinks 与 active tasks 共同决定，只影响软权重。
+	weight += _compute_task_bias(event_def)
+
 	if weight < 1:
 		return 1
 	return weight
+
+
+# 功能：计算任务偏置总和。
+# 说明：同一事件可命中多个 taskLinks，并与并行 active 任务叠加。
+func _compute_task_bias(event_def: Dictionary) -> int:
+	var links := _array_or_empty(event_def.get("taskLinks", []))
+	if links.is_empty():
+		return 0
+
+	var active_task_ids := _build_active_task_id_set()
+	if active_task_ids.is_empty():
+		return 0
+
+	var bias := 0
+	for link_variant in links:
+		var parsed := _parse_task_link(str(link_variant))
+		if parsed.is_empty():
+			continue
+		var task_id := str(parsed.get("taskId", ""))
+		var link_type := str(parsed.get("type", ""))
+		if task_id.is_empty() or link_type.is_empty():
+			continue
+		if not active_task_ids.has(task_id):
+			continue
+		bias += _get_task_bias_value(link_type)
+	return bias
+
+
+# 功能：构建 active 任务 ID 集合。
+# 说明：用于在权重阶段快速判断某 task_id 是否处于 active 状态。
+func _build_active_task_id_set() -> Dictionary:
+	var out: Dictionary = {}
+	var tasks_state := _dict_or_empty(world_state.get("tasks", {}))
+	var active := _array_or_empty(tasks_state.get("active", []))
+	for runtime_variant in active:
+		var task_runtime := _dict_or_empty(runtime_variant)
+		var task_id := str(task_runtime.get("taskId", "")).strip_edges()
+		if task_id.is_empty():
+			continue
+		out[task_id] = true
+	return out
+
+
+# 功能：解析 taskLinks 单项语义。
+# 说明：仅识别 advance:<task_id> 与 risk:<task_id>，其余值忽略。
+func _parse_task_link(raw_link: String) -> Dictionary:
+	var text := raw_link.strip_edges()
+	if text.is_empty():
+		return {}
+	var pair := text.split(":", false, 1)
+	if pair.size() != 2:
+		return {}
+	var link_type := str(pair[0]).strip_edges().to_lower()
+	var task_id := str(pair[1]).strip_edges()
+	if task_id.is_empty():
+		return {}
+	if link_type != "advance" and link_type != "risk":
+		return {}
+	return {
+		"type": link_type,
+		"taskId": task_id
+	}
+
+
+# 功能：返回单条任务链接的偏置值。
+# 说明：当前 MVP 先使用固定默认值；后续可按 weightBiasProfile 继续扩展。
+func _get_task_bias_value(link_type: String) -> int:
+	var normalized_type := link_type.strip_edges().to_lower()
+	if normalized_type == "advance":
+		return TASK_BIAS_ADVANCE_DEFAULT
+	if normalized_type == "risk":
+		return TASK_BIAS_RISK_DEFAULT
+	return 0
 
 # 功能：解析并执行简单条件表达式。
 # 说明：格式为 "<path> <op> <literal>"，支持 >= <= == != > <。

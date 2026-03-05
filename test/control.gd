@@ -1,6 +1,7 @@
 extends Control
 
 const MilestoneASmokeTest := preload("res://scripts/systems/milestone_a_smoke_test.gd")
+const MilestoneCSmokeTest := preload("res://scripts/systems/milestone_c_smoke_test.gd")
 const MvpWorldEventSmokeTest := preload("res://scripts/systems/mvp_world_event_smoke_test.gd")
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 
@@ -20,6 +21,8 @@ func _ready() -> void:
 
 	var milestone_result: Dictionary = MilestoneASmokeTest.run_with_context(context)
 	#print("[MilestoneA]", milestone_result)
+	var milestone_c_result: Dictionary = MilestoneCSmokeTest.run_from_csv()
+	print("[MilestoneC] %s" % JSON.stringify(milestone_c_result))
 
 	# MVP 世界与事件引擎回归输出。
 	var mvp_result: Dictionary = MvpWorldEventSmokeTest.run_from_csv()
