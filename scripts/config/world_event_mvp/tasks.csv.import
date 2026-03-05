@@ -6,10 +6,10 @@ uid="uid://c88dt21xtm7bl"
 
 [deps]
 
-files=["res://scripts/config/world_event_mvp/tasks.title.translation", "res://scripts/config/world_event_mvp/tasks.duration.translation", "res://scripts/config/world_event_mvp/tasks.on.translation", "res://scripts/config/world_event_mvp/tasks.weight.translation"]
+files=["res://scripts/config/world_event_mvp/tasks.title.translation", "res://scripts/config/world_event_mvp/tasks.duration.translation", "res://scripts/config/world_event_mvp/tasks.on.translation", "res://scripts/config/world_event_mvp/tasks.weight.translation", "res://scripts/config/world_event_mvp/tasks.complete.translation"]
 
 source_file="res://scripts/config/world_event_mvp/tasks.csv"
-dest_files=["res://scripts/config/world_event_mvp/tasks.title.translation", "res://scripts/config/world_event_mvp/tasks.duration.translation", "res://scripts/config/world_event_mvp/tasks.on.translation", "res://scripts/config/world_event_mvp/tasks.weight.translation"]
+dest_files=["res://scripts/config/world_event_mvp/tasks.title.translation", "res://scripts/config/world_event_mvp/tasks.duration.translation", "res://scripts/config/world_event_mvp/tasks.on.translation", "res://scripts/config/world_event_mvp/tasks.weight.translation", "res://scripts/config/world_event_mvp/tasks.complete.translation"]
 
 [params]
 
