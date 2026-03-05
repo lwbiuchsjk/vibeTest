@@ -1,10 +1,8 @@
-[gd_scene load_steps=4 format=3 uid="uid://ppkmkvydqbfv"]
+[gd_scene load_steps=3 format=3 uid="uid://ppkmkvydqbfv"]
 
 [ext_resource type="Script" uid="uid://cbx22u7e0gipa" path="res://test/event_logic_test.gd" id="1_script"]
-[ext_resource type="FontFile" uid="uid://dtc16cg0dah4y" path="res://font/QingNiaoHuaGuangJianMeiHei-2.ttf" id="2_font"]
 
 [sub_resource type="Theme" id="Theme_event_logic_test"]
-default_font = ExtResource("2_font")
 
 [node name="EventLogicTest" type="Control"]
 layout_mode = 3
