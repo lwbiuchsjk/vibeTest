@@ -13,6 +13,7 @@ evt_harbor_hint_001,default,chain_context,patch,weightBias.escape,10
 evt_harbor_hint_001,default,chain_context,patch,weightBias.force,8
 evt_harbor_deal_001,default,params,add,danger,1
 evt_harbor_deal_001,default,chain_context,patch,stageDelta,1
+evt_harbor_deal_001,default,task,advance_task,task_smuggle,deal:1
 evt_story_force_001,default,params,add,danger,3
 evt_story_force_001,default,world,set_forced_next,,evt_guard_chase_001
 evt_story_force_001,default,chain_context,patch,stageDelta,1
@@ -21,5 +22,6 @@ evt_guard_chase_001,default,chain_context,patch,stageDelta,1
 evt_smuggle_escape_001,default,world,set_location,,town_square
 evt_smuggle_escape_001,default,params,add,danger,-6
 evt_smuggle_escape_001,default,flags,set,isWanted,false
+evt_smuggle_escape_001,default,task,complete_task,task_smuggle,
 evt_smuggle_escape_001,default,world,end_chain,,true
 evt_smuggle_escape_001,default,world,clear_forced_next,,true

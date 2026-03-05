@@ -203,7 +203,9 @@ static func _assemble_task_defs(tables: Dictionary) -> Dictionary:
 				"title": str(row.get("title", "")),
 				"durationTurns": maxi(1, _to_int(row.get("duration_turns", "1"), 1)),
 				"onExpire": str(row.get("on_expire", "fail")).strip_edges(),
-				"weightBiasProfile": str(row.get("weight_bias_profile", "")).strip_edges()
+				"weightBiasProfile": str(row.get("weight_bias_profile", "")).strip_edges(),
+				# 说明：任务自动完成条件表达式，留空表示仅能通过显式 complete_task 完成。
+				"completeWhen": str(row.get("complete_when", "")).strip_edges()
 			}
 		)
 
@@ -611,6 +613,74 @@ static func _apply_effect_or_resolution_action(container: Dictionary, target: St
 		var chain_patch: Dictionary = container.get("chainContextPatch", {})
 		_apply_chain_patch_item(chain_patch, key, value_text)
 		container["chainContextPatch"] = chain_patch
+		return
+
+	if target == "task":
+		var task_action := _build_task_action(op, key, value_text)
+		if task_action.is_empty():
+			return
+		var task_actions: Array = container.get("taskActions", [])
+		task_actions.append(task_action)
+		container["taskActions"] = task_actions
+
+
+# 功能：构建任务动作编译结果。
+# 说明：统一将 CSV target=task 的一行映射为运行时可执行的动作对象。
+static func _build_task_action(op: String, key: String, value_text: String) -> Dictionary:
+	var normalized_op := op.strip_edges()
+	if normalized_op.is_empty():
+		return {}
+
+	var task_id := key.strip_edges()
+	if task_id.is_empty():
+		task_id = value_text.strip_edges()
+
+	match normalized_op:
+		"accept_task", "abandon_task", "complete_task":
+			if task_id.is_empty():
+				return {}
+			return {
+				"op": normalized_op,
+				"taskId": task_id
+			}
+		"advance_task":
+			if task_id.is_empty():
+				return {}
+			var payload := _parse_advance_task_payload(value_text)
+			return {
+				"op": normalized_op,
+				"taskId": task_id,
+				"progressKey": payload.get("progressKey", "progress"),
+				"delta": int(payload.get("delta", 1))
+			}
+		_:
+			return {}
+
+
+# 功能：解析 advance_task 的 value 文本。
+# 说明：支持 "key:delta"、"key,delta"、"delta" 三种写法。
+static func _parse_advance_task_payload(value_text: String) -> Dictionary:
+	var text := value_text.strip_edges()
+	if text.is_empty():
+		return {"progressKey": "progress", "delta": 1}
+
+	if text.is_valid_int():
+		return {"progressKey": "progress", "delta": _to_int(text, 1)}
+
+	var split_token := ":"
+	if text.find(":") == -1 and text.find(",") != -1:
+		split_token = ","
+	if text.find(split_token) != -1:
+		var parts := text.split(split_token, false, 1)
+		var progress_key := str(parts[0]).strip_edges()
+		var delta_text := ""
+		if parts.size() > 1:
+			delta_text = str(parts[1]).strip_edges()
+		if progress_key.is_empty():
+			progress_key = "progress"
+		return {"progressKey": progress_key, "delta": _to_int(delta_text, 1)}
+
+	return {"progressKey": text, "delta": 1}
 
 
 # 功能：应用 chain patch 单项。
