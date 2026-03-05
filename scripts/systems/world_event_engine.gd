@@ -12,8 +12,10 @@ const LocationGraph := preload("res://scripts/models/location_graph.gd")
 var world_state: Dictionary = {}
 var events: Array = []
 var choice_points: Array = []
+var task_defs: Array = []
 var _event_map: Dictionary = {}
 var _choice_point_map: Dictionary = {}
+var _task_def_map: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
 var _pending_turn_context: Dictionary = {}
 var _location_graph: LocationGraph
@@ -90,8 +92,11 @@ func load_from_json_text(
 	world_state = (parsed_world as Dictionary).duplicate(true)
 	events = (parsed_events as Array).duplicate(true)
 	choice_points = (parsed_choice_points as Array).duplicate(true)
+	task_defs = []
+	_ensure_task_runtime_state()
 	_rebuild_event_map()
 	_rebuild_choice_point_map()
+	_rebuild_task_def_map()
 	return {"ok": true}
 
 # 功能：从内存对象加载数据。
@@ -102,6 +107,7 @@ func load_from_data(data: Dictionary, location_graph: Variant = null) -> Diction
 	var raw_world: Variant = data.get("world_state", null)
 	var raw_events: Variant = data.get("events", null)
 	var raw_choice_points: Variant = data.get("choice_points", [])
+	var raw_task_defs: Variant = data.get("task_defs", [])
 
 	if typeof(raw_world) != TYPE_DICTIONARY:
 		return {"ok": false, "error": "compiled world_state is invalid"}
@@ -109,13 +115,18 @@ func load_from_data(data: Dictionary, location_graph: Variant = null) -> Diction
 		return {"ok": false, "error": "compiled events is invalid"}
 	if typeof(raw_choice_points) != TYPE_ARRAY:
 		return {"ok": false, "error": "compiled choice_points is invalid"}
+	if typeof(raw_task_defs) != TYPE_ARRAY:
+		return {"ok": false, "error": "compiled task_defs is invalid"}
 
 	world_state = (raw_world as Dictionary).duplicate(true)
 	events = (raw_events as Array).duplicate(true)
 	choice_points = (raw_choice_points as Array).duplicate(true)
+	task_defs = (raw_task_defs as Array).duplicate(true)
+	_ensure_task_runtime_state()
 	_set_location_graph(location_graph)
 	_rebuild_event_map()
 	_rebuild_choice_point_map()
+	_rebuild_task_def_map()
 	return {"ok": true}
 
 # 功能：预览下一回合事件，但不立即结算。
@@ -239,7 +250,10 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 		_apply_event_effects(event_def)
 		_apply_continuation_policy(event_def)
 
+	# 说明：任务自动完成判定必须发生在“本回合结算动作完成后、任务到期推进前”。
+	_eval_complete_when_after_settlement()
 	_record_history(event_id)
+	_tick_tasks_after_turn()
 	world_state["turn"] = int(world_state.get("turn", 0)) + 1
 	_pending_turn_context.clear()
 
@@ -494,6 +508,18 @@ func _rebuild_choice_point_map() -> void:
 			continue
 		_choice_point_map[choice_id] = choice_def
 
+
+# 功能：重建任务定义索引。
+# 说明：将 task_defs 映射为 {task_id: task_def}，供任务动作 O(1) 查询。
+func _rebuild_task_def_map() -> void:
+	_task_def_map.clear()
+	for task_variant in task_defs:
+		var task_def: Dictionary = task_variant
+		var task_id := str(task_def.get("id", "")).strip_edges()
+		if task_id.is_empty():
+			continue
+		_task_def_map[task_id] = task_def
+
 # 功能：生成候选事件集合。
 # 说明：这里只做可用性与权重计算，不做最终抽签。
 func _build_candidates() -> Array:
@@ -724,6 +750,9 @@ func _apply_event_effects(event_def: Dictionary) -> void:
 
 	if bool(effects.get("endChain", false)):
 		world_state["chainContext"] = null
+
+	var task_actions := _array_or_empty(effects.get("taskActions", []))
+	_apply_task_actions(task_actions)
 
 # 功能：按 continuationPolicy 推进链上下文。
 # 说明：forcedNextEventId 由 effects 或 resolution 驱动，不在这里判定。
@@ -969,6 +998,333 @@ func _apply_resolution(resolution: Dictionary, event_def: Dictionary) -> void:
 
 	var chain_patch := _dict_or_empty(resolution.get("chainContextPatch", {}))
 	_apply_continuation_policy(event_def, chain_patch)
+
+	var task_actions := _array_or_empty(resolution.get("taskActions", []))
+	_apply_task_actions(task_actions)
+
+
+# 功能：确保任务运行时结构完整。
+# 说明：兼容旧存档或缺省配置，保证任务系统逻辑始终有稳定结构可写。
+func _ensure_task_runtime_state() -> void:
+	var task_config := _dict_or_empty(world_state.get("taskConfig", {}))
+	task_config["maxActiveCount"] = maxi(1, int(task_config.get("maxActiveCount", 1)))
+	world_state["taskConfig"] = task_config
+
+	var tasks_state := _dict_or_empty(world_state.get("tasks", {}))
+	var active := _array_or_empty(tasks_state.get("active", []))
+	var completed := _array_or_empty(tasks_state.get("completed", []))
+	var failed := _array_or_empty(tasks_state.get("failed", []))
+	var abandoned := _array_or_empty(tasks_state.get("abandoned", []))
+	tasks_state["active"] = active
+	tasks_state["completed"] = completed
+	tasks_state["failed"] = failed
+	tasks_state["abandoned"] = abandoned
+	world_state["tasks"] = tasks_state
+
+
+# 功能：执行任务动作数组。
+# 说明：任务动作属于软失败链路，单条动作异常不会中断主循环。
+func _apply_task_actions(task_actions: Array) -> void:
+	if task_actions.is_empty():
+		return
+	_ensure_task_runtime_state()
+	for action_variant in task_actions:
+		if typeof(action_variant) != TYPE_DICTIONARY:
+			continue
+		var action: Dictionary = action_variant
+		_apply_task_action(action)
+
+
+# 功能：执行单条任务动作。
+# 说明：支持 accept_task、advance_task、abandon_task、complete_task 四类 MVP 动作。
+func _apply_task_action(action: Dictionary) -> void:
+	var op := str(action.get("op", "")).strip_edges()
+	var task_id := str(action.get("taskId", "")).strip_edges()
+	match op:
+		"accept_task":
+			_accept_task(task_id)
+		"advance_task":
+			var progress_key := str(action.get("progressKey", "progress")).strip_edges()
+			var delta := int(action.get("delta", 1))
+			_advance_task(task_id, progress_key, delta)
+		"abandon_task":
+			_abandon_task(task_id)
+		"complete_task":
+			_complete_task(task_id)
+		_:
+			pass
+
+
+# 功能：接取任务并写入 active 列表。
+# 说明：接取时会校验并行上限与任务定义存在性，重复接取同一 active 任务会被忽略。
+func _accept_task(task_id: String) -> bool:
+	var normalized_id := task_id.strip_edges()
+	if normalized_id.is_empty():
+		return false
+	if _find_active_task_index(normalized_id) >= 0:
+		return true
+
+	var task_def := _dict_or_empty(_task_def_map.get(normalized_id, {}))
+	if task_def.is_empty():
+		return false
+
+	var tasks_state := _dict_or_empty(world_state.get("tasks", {}))
+	var active := _array_or_empty(tasks_state.get("active", []))
+	var task_config := _dict_or_empty(world_state.get("taskConfig", {}))
+	var max_active_count := maxi(1, int(task_config.get("maxActiveCount", 1)))
+	if active.size() >= max_active_count:
+		return false
+
+	var current_turn := int(world_state.get("turn", 1))
+	var duration_turns := maxi(1, int(task_def.get("durationTurns", 1)))
+	active.append(
+		{
+			"taskId": normalized_id,
+			"acceptedTurn": current_turn,
+			"deadlineTurn": current_turn + duration_turns - 1,
+			"status": "active",
+			"progress": {}
+		}
+	)
+	tasks_state["active"] = active
+	_remove_task_id_from_archives(tasks_state, normalized_id)
+	world_state["tasks"] = tasks_state
+	return true
+
+
+# 功能：推进任务进度。
+# 说明：仅对 active 任务生效；progressKey 为空时回退到默认 progress。
+func _advance_task(task_id: String, progress_key: String, delta: int) -> bool:
+	var normalized_id := task_id.strip_edges()
+	if normalized_id.is_empty():
+		return false
+	var index := _find_active_task_index(normalized_id)
+	if index < 0:
+		return false
+
+	var tasks_state := _dict_or_empty(world_state.get("tasks", {}))
+	var active := _array_or_empty(tasks_state.get("active", []))
+	if index >= active.size():
+		return false
+
+	var task_runtime := _dict_or_empty(active[index])
+	var key := progress_key.strip_edges()
+	if key.is_empty():
+		key = "progress"
+	var progress := _dict_or_empty(task_runtime.get("progress", {}))
+	progress[key] = int(progress.get(key, 0)) + delta
+	task_runtime["progress"] = progress
+	active[index] = task_runtime
+	tasks_state["active"] = active
+	world_state["tasks"] = tasks_state
+	return true
+
+
+# 功能：放弃任务。
+# 说明：只对 active 任务生效，放弃后会归档到 abandoned 列表。
+func _abandon_task(task_id: String) -> bool:
+	return _finish_active_task(task_id, "abandoned")
+
+
+# 功能：完成任务。
+# 说明：只对 active 任务生效，完成后会归档到 completed 列表。
+func _complete_task(task_id: String) -> bool:
+	return _finish_active_task(task_id, "completed")
+
+
+# 功能：结束 active 任务并归档。
+# 说明：封装 completed/abandoned 两类共享迁移动作。
+func _finish_active_task(task_id: String, archive_key: String) -> bool:
+	var normalized_id := task_id.strip_edges()
+	if normalized_id.is_empty():
+		return false
+	var index := _find_active_task_index(normalized_id)
+	if index < 0:
+		return false
+
+	var tasks_state := _dict_or_empty(world_state.get("tasks", {}))
+	var active := _array_or_empty(tasks_state.get("active", []))
+	if index >= active.size():
+		return false
+	active.remove_at(index)
+	tasks_state["active"] = active
+	_archive_task_id(tasks_state, archive_key, normalized_id)
+	world_state["tasks"] = tasks_state
+	return true
+
+
+# 功能：回合结束后推进任务并处理到期状态。
+# 说明：任务到期后按 onExpire 归档，默认归档到 failed。
+func _tick_tasks_after_turn() -> void:
+	_ensure_task_runtime_state()
+	var tasks_state := _dict_or_empty(world_state.get("tasks", {}))
+	var active := _array_or_empty(tasks_state.get("active", []))
+	if active.is_empty():
+		return
+
+	var current_turn := int(world_state.get("turn", 1))
+	var keep_active: Array = []
+	for runtime_variant in active:
+		var task_runtime := _dict_or_empty(runtime_variant)
+		var task_id := str(task_runtime.get("taskId", "")).strip_edges()
+		var deadline_turn := int(task_runtime.get("deadlineTurn", 0))
+		if task_id.is_empty():
+			continue
+		if deadline_turn > 0 and current_turn >= deadline_turn:
+			var task_def := _dict_or_empty(_task_def_map.get(task_id, {}))
+			var on_expire := str(task_def.get("onExpire", "fail")).strip_edges().to_lower()
+			match on_expire:
+				"abandon", "abandoned":
+					_archive_task_id(tasks_state, "abandoned", task_id)
+				"complete", "completed", "success":
+					_archive_task_id(tasks_state, "completed", task_id)
+				_:
+					_archive_task_id(tasks_state, "failed", task_id)
+		else:
+			keep_active.append(task_runtime)
+
+	tasks_state["active"] = keep_active
+	world_state["tasks"] = tasks_state
+
+
+# 功能：在结算后评估并自动完成任务。
+# 说明：判定时机为“事件/选项动作全部落地后，任务回合推进前”，保证同回合达成不会被到期失败覆盖。
+func _eval_complete_when_after_settlement() -> void:
+	_ensure_task_runtime_state()
+	var tasks_state := _dict_or_empty(world_state.get("tasks", {}))
+	var active := _array_or_empty(tasks_state.get("active", []))
+	if active.is_empty():
+		return
+
+	var complete_ids: Array = []
+	for runtime_variant in active:
+		var task_runtime := _dict_or_empty(runtime_variant)
+		var task_id := str(task_runtime.get("taskId", "")).strip_edges()
+		if task_id.is_empty():
+			continue
+		var task_def := _dict_or_empty(_task_def_map.get(task_id, {}))
+		if task_def.is_empty():
+			continue
+		var complete_when := str(task_def.get("completeWhen", "")).strip_edges()
+		if complete_when.is_empty():
+			continue
+		if _is_task_complete_when_satisfied(task_runtime, complete_when):
+			complete_ids.append(task_id)
+
+	for task_id_variant in complete_ids:
+		_complete_task(str(task_id_variant))
+
+
+# 功能：判断任务 complete_when 是否命中。
+# 说明：表达式格式为 "<path> <op> <literal>"，支持路径来源 task/progress/world_state。
+func _is_task_complete_when_satisfied(task_runtime: Dictionary, condition: String) -> bool:
+	var operators := [">=", "<=", "==", "!=", ">", "<"]
+	for op_variant in operators:
+		var op := str(op_variant)
+		var token := " %s " % op
+		if condition.find(token) == -1:
+			continue
+		var parts := condition.split(token)
+		if parts.size() != 2:
+			return false
+		var left_text := str(parts[0]).strip_edges()
+		var right_text := str(parts[1]).strip_edges()
+		var actual: Variant = _resolve_task_condition_value(task_runtime, left_text)
+		var expected: Variant = _parse_literal(right_text)
+		return _compare_values(actual, op, expected)
+	return false
+
+
+# 功能：解析任务条件表达式左值。
+# 说明：支持 progress.*、task.*，其余按 world_state 路径读取。
+func _resolve_task_condition_value(task_runtime: Dictionary, path: String) -> Variant:
+	var normalized_path := path.strip_edges()
+	if normalized_path.is_empty():
+		return null
+
+	if normalized_path.begins_with("progress."):
+		var key_path := normalized_path.trim_prefix("progress.")
+		return _resolve_dict_path(_dict_or_empty(task_runtime.get("progress", {})), key_path)
+
+	if normalized_path == "progress":
+		return _dict_or_empty(task_runtime.get("progress", {}))
+
+	if normalized_path.begins_with("task."):
+		var task_path := normalized_path.trim_prefix("task.")
+		return _resolve_dict_path(task_runtime, task_path)
+
+	return _resolve_path_value(normalized_path)
+
+
+# 功能：按点路径读取字典值。
+# 说明：任意层级缺失时返回 null。
+func _resolve_dict_path(source: Dictionary, path: String) -> Variant:
+	var normalized_path := path.strip_edges()
+	if normalized_path.is_empty():
+		return null
+	var segments := normalized_path.split(".", false)
+	if segments.is_empty():
+		return null
+
+	var cursor: Variant = source
+	for segment_variant in segments:
+		var segment := str(segment_variant).strip_edges()
+		if segment.is_empty():
+			return null
+		if typeof(cursor) != TYPE_DICTIONARY:
+			return null
+		var dict_cursor: Dictionary = cursor
+		if not dict_cursor.has(segment):
+			return null
+		cursor = dict_cursor[segment]
+	return cursor
+
+
+# 功能：查找 active 任务下标。
+# 说明：未找到时返回 -1。
+func _find_active_task_index(task_id: String) -> int:
+	var normalized_id := task_id.strip_edges()
+	if normalized_id.is_empty():
+		return -1
+	var tasks_state := _dict_or_empty(world_state.get("tasks", {}))
+	var active := _array_or_empty(tasks_state.get("active", []))
+	for idx in range(active.size()):
+		var task_runtime := _dict_or_empty(active[idx])
+		if str(task_runtime.get("taskId", "")).strip_edges() == normalized_id:
+			return idx
+	return -1
+
+
+# 功能：归档任务 ID。
+# 说明：同一归档列表内会做去重，避免重复写入。
+func _archive_task_id(tasks_state: Dictionary, archive_key: String, task_id: String) -> void:
+	var normalized_id := task_id.strip_edges()
+	if normalized_id.is_empty():
+		return
+	var archive := _array_or_empty(tasks_state.get(archive_key, []))
+	for item_variant in archive:
+		if str(item_variant).strip_edges() == normalized_id:
+			tasks_state[archive_key] = archive
+			return
+	archive.append(normalized_id)
+	tasks_state[archive_key] = archive
+
+
+# 功能：从所有归档列表移除任务 ID。
+# 说明：接取任务时执行此操作，保证任务只存在于 active 或单一归档槽位。
+func _remove_task_id_from_archives(tasks_state: Dictionary, task_id: String) -> void:
+	var normalized_id := task_id.strip_edges()
+	if normalized_id.is_empty():
+		return
+	var archive_keys := ["completed", "failed", "abandoned"]
+	for key_variant in archive_keys:
+		var key := str(key_variant)
+		var source := _array_or_empty(tasks_state.get(key, []))
+		var filtered: Array = []
+		for item_variant in source:
+			if str(item_variant).strip_edges() != normalized_id:
+				filtered.append(item_variant)
+		tasks_state[key] = filtered
 
 # 功能：应用 worldStatePatch 到 world_state。
 # 说明：params 与 player 为增量写入，flags 为覆盖写入。

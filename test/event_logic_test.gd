@@ -211,6 +211,8 @@ func _update_side_panels() -> void:
 	var flags: Dictionary = world_state.get("flags", {})
 	var chain_context: Variant = world_state.get("chainContext", null)
 	var history: Array = world_state.get("history", [])
+	var task_config: Dictionary = world_state.get("taskConfig", {})
+	var tasks_state: Dictionary = world_state.get("tasks", {})
 
 	var lines: Array[String] = []
 	lines.append("回合：%s" % str(world_state.get("turn", 0)))
@@ -248,6 +250,10 @@ func _update_side_panels() -> void:
 		lines.append(JSON.stringify(chain_context))
 	else:
 		lines.append("null")
+	lines.append("")
+	lines.append("任务状态")
+	lines.append("maxActiveCount=%s" % str(task_config.get("maxActiveCount", 1)))
+	lines.append(JSON.stringify(tasks_state))
 	lines.append("")
 	lines.append("最近历史")
 	lines.append(", ".join(_history_to_string_array(history)))
