@@ -2,6 +2,7 @@ section,scope_a,scope_b,key,value
 core,,,turn,1
 core,,,current_location_id,town_square
 core,,,forced_next_event_id,
+task_config,,,max_active_count,3
 flag,,,isWanted,false
 param,,,danger,10
 param,,,prosperity,20
