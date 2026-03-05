@@ -24,6 +24,10 @@ static func compile_from_csv_dir(csv_dir_path: String) -> Dictionary:
 	if not world_result.get("ok", false):
 		return world_result
 
+	var task_defs_result = _assemble_task_defs(tables)
+	if not task_defs_result.get("ok", false):
+		return task_defs_result
+
 	var choice_result = _assemble_choice_points(tables)
 	if not choice_result.get("ok", false):
 		return choice_result
@@ -37,7 +41,8 @@ static func compile_from_csv_dir(csv_dir_path: String) -> Dictionary:
 		"data": {
 			"world_state": world_result["world_state"],
 			"events": events_result["events"],
-			"choice_points": choice_result["choice_points"]
+			"choice_points": choice_result["choice_points"],
+			"task_defs": task_defs_result["task_defs"]
 		}
 	}
 
@@ -46,6 +51,7 @@ static func compile_from_csv_dir(csv_dir_path: String) -> Dictionary:
 static func _load_tables(base: String) -> Dictionary:
 	var required_files: Array = [
 		"world_seed.csv",
+		"tasks.csv",
 		"events.csv",
 		"event_conditions.csv",
 		"event_outcomes.csv",
@@ -79,6 +85,15 @@ static func _assemble_world_state(tables: Dictionary) -> Dictionary:
 		"locationState": {},
 		"npcPresence": {},
 		"player": {},
+		"taskConfig": {
+			"maxActiveCount": 1
+		},
+		"tasks": {
+			"active": [],
+			"completed": [],
+			"failed": [],
+			"abandoned": []
+		},
 		"history": [],
 		"chainContext": null,
 		"forcedNextEventId": ""
@@ -117,6 +132,12 @@ static func _assemble_world_state(tables: Dictionary) -> Dictionary:
 				var player: Dictionary = world_state.get("player", {})
 				player[key] = _parse_literal(value_text)
 				world_state["player"] = player
+			"task_config":
+				# 说明：任务并行上限属于 world_state 初始化配置，默认至少为 1。
+				var task_config: Dictionary = world_state.get("taskConfig", {})
+				if key == "max_active_count":
+					task_config["maxActiveCount"] = maxi(1, _to_int(value_text, 1))
+				world_state["taskConfig"] = task_config
 			"location_state":
 				if scope_a.is_empty():
 					continue
@@ -158,6 +179,35 @@ static func _assemble_world_state(tables: Dictionary) -> Dictionary:
 
 	world_state["chainContext"] = _build_chain_context_from_seed(chain_seed)
 	return {"ok": true, "world_state": world_state}
+
+
+# 功能：组装任务定义 task_defs。
+# 说明：里程碑 A 仅完成配置编译与透传，不在此处处理任务运行时逻辑。
+static func _assemble_task_defs(tables: Dictionary) -> Dictionary:
+	var rows: Array = tables.get("tasks.csv", [])
+	var out: Array = []
+	var id_guard: Dictionary = {}
+
+	for row_variant in rows:
+		var row: Dictionary = row_variant
+		var task_id := str(row.get("task_id", "")).strip_edges()
+		if task_id.is_empty():
+			continue
+		if id_guard.has(task_id):
+			return {"ok": false, "error": "duplicate task id: %s" % task_id}
+		id_guard[task_id] = true
+
+		out.append(
+			{
+				"id": task_id,
+				"title": str(row.get("title", "")),
+				"durationTurns": maxi(1, _to_int(row.get("duration_turns", "1"), 1)),
+				"onExpire": str(row.get("on_expire", "fail")).strip_edges(),
+				"weightBiasProfile": str(row.get("weight_bias_profile", "")).strip_edges()
+			}
+		)
+
+	return {"ok": true, "task_defs": out}
 
 
 # 功能：组装 choice_points 与 options 数据。
@@ -260,6 +310,7 @@ static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -
 			"backgroundArt": _build_background_art_path(str(row.get("background_art", ""))),
 			"baseWeight": _to_int(row.get("base_weight", "10"), 10),
 			"tags": _split_text_list(str(row.get("tags", "")), ";"),
+			"taskLinks": _split_text_list(str(row.get("task_links", "")), ";"),
 			"eligibility": {},
 			"weightRules": [],
 			"continuationPolicy": str(row.get("continuation_policy", "ReturnToScheduler")),

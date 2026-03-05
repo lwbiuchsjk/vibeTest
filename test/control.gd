@@ -10,6 +10,8 @@ func _ready() -> void:
 	if not load_result.get("ok", false):
 		push_error("Config load failed: %s" % load_result.get("error", "unknown"))
 		return
+	var world_event_data := runtime.get_world_event_data()
+	_print_milestone_a_acceptance(world_event_data)
 
 	var context := runtime.build_context()
 	if not context.get("ok", false):
@@ -58,3 +60,29 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	pass
+
+
+# 功能：打印里程碑 A 的关键验收数据。
+# 说明：该输出仅用于本地验收，不参与任何业务逻辑分支。
+func _print_milestone_a_acceptance(world_event_data: Dictionary) -> void:
+	var world_state: Dictionary = world_event_data.get("world_state", {})
+	var task_config: Dictionary = world_state.get("taskConfig", {})
+	var tasks_state: Dictionary = world_state.get("tasks", {})
+	var task_defs: Array = world_event_data.get("task_defs", [])
+	var events: Array = world_event_data.get("events", [])
+
+	print("[MilestoneA] world_state.taskConfig = %s" % JSON.stringify(task_config))
+	print("[MilestoneA] world_state.tasks = %s" % JSON.stringify(tasks_state))
+	print("[MilestoneA] task_defs.count = %d" % task_defs.size())
+	print("[MilestoneA] task_defs = %s" % JSON.stringify(task_defs))
+
+	var event_links: Array = []
+	for event_variant in events:
+		var event_def: Dictionary = event_variant
+		event_links.append(
+			{
+				"id": str(event_def.get("id", "")),
+				"taskLinks": event_def.get("taskLinks", [])
+			}
+		)
+	print("[MilestoneA] events.taskLinks = %s" % JSON.stringify(event_links))

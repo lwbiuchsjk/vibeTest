@@ -1,0 +1,4 @@
+task_id,title,duration_turns,on_expire,weight_bias_profile
+task_exam,考试冲刺,6,fail,exam_default
+task_part_time,生活补贴,8,fail,job_default
+task_smuggle,码头暗线,5,fail,smuggle_default
