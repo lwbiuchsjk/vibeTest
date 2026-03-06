@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://b36jj5q25683o"
+
+[deps]
+
+files=["res://scripts/config/world_event_mvp/task_eval_indicators.indicator.translation", "res://scripts/config/world_event_mvp/task_eval_indicators.left.translation", "res://scripts/config/world_event_mvp/task_eval_indicators.op.translation", "res://scripts/config/world_event_mvp/task_eval_indicators.right.translation", "res://scripts/config/world_event_mvp/task_eval_indicators.pass.translation", "res://scripts/config/world_event_mvp/task_eval_indicators.fail.translation"]
+
+source_file="res://scripts/config/world_event_mvp/task_eval_indicators.csv"
+dest_files=["res://scripts/config/world_event_mvp/task_eval_indicators.indicator.translation", "res://scripts/config/world_event_mvp/task_eval_indicators.left.translation", "res://scripts/config/world_event_mvp/task_eval_indicators.op.translation", "res://scripts/config/world_event_mvp/task_eval_indicators.right.translation", "res://scripts/config/world_event_mvp/task_eval_indicators.pass.translation", "res://scripts/config/world_event_mvp/task_eval_indicators.fail.translation"]
+
+[params]
+
+compress=true
+delimiter=0

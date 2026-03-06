@@ -1,0 +1,7 @@
+task_id,indicator_id,left,op,right,pass_score,fail_score
+task_exam,study_target,progress.study,>=,51,2,0
+task_exam,morale_keep,params.morale,>=,45,1,0
+task_exam,danger_control,params.danger,<=,20,1,0
+task_smuggle,intel_ready,flags.gotHarborIntel,==,true,1,0
+task_smuggle,chase_passed,progress.chase,>=,1,1,0
+task_smuggle,wanted_cleared,flags.isWanted,==,false,2,0
