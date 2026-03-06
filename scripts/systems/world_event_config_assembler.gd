@@ -121,7 +121,8 @@ static func _assemble_world_state(tables: Dictionary) -> Dictionary:
 			"active": [],
 			"completed": [],
 			"failed": [],
-			"abandoned": []
+			"abandoned": [],
+			"resultRecords": []
 		},
 		"history": [],
 		"chainContext": null,

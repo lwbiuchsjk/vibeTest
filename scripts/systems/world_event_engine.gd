@@ -15,9 +15,11 @@ var world_state: Dictionary = {}
 var events: Array = []
 var choice_points: Array = []
 var task_defs: Array = []
+var task_evaluation: Dictionary = {}
 var _event_map: Dictionary = {}
 var _choice_point_map: Dictionary = {}
 var _task_def_map: Dictionary = {}
+var _task_eval_index_by_task: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
 var _pending_turn_context: Dictionary = {}
 var _location_graph: LocationGraph
@@ -95,10 +97,12 @@ func load_from_json_text(
 	events = (parsed_events as Array).duplicate(true)
 	choice_points = (parsed_choice_points as Array).duplicate(true)
 	task_defs = []
+	task_evaluation = {}
 	_ensure_task_runtime_state()
 	_rebuild_event_map()
 	_rebuild_choice_point_map()
 	_rebuild_task_def_map()
+	_rebuild_task_evaluation_index()
 	return {"ok": true}
 
 # 功能：从内存对象加载数据。
@@ -110,6 +114,7 @@ func load_from_data(data: Dictionary, location_graph: Variant = null) -> Diction
 	var raw_events: Variant = data.get("events", null)
 	var raw_choice_points: Variant = data.get("choice_points", [])
 	var raw_task_defs: Variant = data.get("task_defs", [])
+	var raw_task_evaluation: Variant = data.get("task_evaluation", {})
 
 	if typeof(raw_world) != TYPE_DICTIONARY:
 		return {"ok": false, "error": "compiled world_state is invalid"}
@@ -119,16 +124,20 @@ func load_from_data(data: Dictionary, location_graph: Variant = null) -> Diction
 		return {"ok": false, "error": "compiled choice_points is invalid"}
 	if typeof(raw_task_defs) != TYPE_ARRAY:
 		return {"ok": false, "error": "compiled task_defs is invalid"}
+	if typeof(raw_task_evaluation) != TYPE_DICTIONARY:
+		return {"ok": false, "error": "compiled task_evaluation is invalid"}
 
 	world_state = (raw_world as Dictionary).duplicate(true)
 	events = (raw_events as Array).duplicate(true)
 	choice_points = (raw_choice_points as Array).duplicate(true)
 	task_defs = (raw_task_defs as Array).duplicate(true)
+	task_evaluation = (raw_task_evaluation as Dictionary).duplicate(true)
 	_ensure_task_runtime_state()
 	_set_location_graph(location_graph)
 	_rebuild_event_map()
 	_rebuild_choice_point_map()
 	_rebuild_task_def_map()
+	_rebuild_task_evaluation_index()
 	return {"ok": true}
 
 # 功能：预览下一回合事件，但不立即结算。
@@ -521,6 +530,116 @@ func _rebuild_task_def_map() -> void:
 		if task_id.is_empty():
 			continue
 		_task_def_map[task_id] = task_def
+
+
+# 功能：按 task_id 构建任务评价配置索引。
+# 说明：将 grades/indicators/overrides/effects 预分组，降低结算阶段的遍历开销。
+func _rebuild_task_evaluation_index() -> void:
+	_task_eval_index_by_task.clear()
+	var grades: Array = _array_or_empty(task_evaluation.get("grades", []))
+	var indicators: Array = _array_or_empty(task_evaluation.get("indicators", []))
+	var grade_overrides: Array = _array_or_empty(task_evaluation.get("gradeOverrides", []))
+	var effects: Array = _array_or_empty(task_evaluation.get("effects", []))
+
+	for grade_variant in grades:
+		var grade: Dictionary = _dict_or_empty(grade_variant)
+		var task_id := str(grade.get("taskId", "")).strip_edges()
+		if task_id.is_empty():
+			continue
+		var bucket := _ensure_task_eval_bucket(task_id)
+		var grade_rows: Array = _array_or_empty(bucket.get("grades", []))
+		grade_rows.append(grade)
+		bucket["grades"] = grade_rows
+		var mode := str(grade.get("gradeMode", "")).strip_edges().to_lower()
+		if mode == "score_band":
+			var score_bands: Array = _array_or_empty(bucket.get("scoreBands", []))
+			score_bands.append(grade)
+			_sort_grade_score_bands_by_min(score_bands)
+			bucket["scoreBands"] = score_bands
+		_task_eval_index_by_task[task_id] = bucket
+
+	for indicator_variant in indicators:
+		var indicator: Dictionary = _dict_or_empty(indicator_variant)
+		var task_id := str(indicator.get("taskId", "")).strip_edges()
+		if task_id.is_empty():
+			continue
+		var bucket := _ensure_task_eval_bucket(task_id)
+		var indicator_rows: Array = _array_or_empty(bucket.get("indicators", []))
+		indicator_rows.append(indicator)
+		bucket["indicators"] = indicator_rows
+		_task_eval_index_by_task[task_id] = bucket
+
+	for override_variant in grade_overrides:
+		var override_row: Dictionary = _dict_or_empty(override_variant)
+		var task_id := str(override_row.get("taskId", "")).strip_edges()
+		if task_id.is_empty():
+			continue
+		var bucket := _ensure_task_eval_bucket(task_id)
+		var override_rows: Array = _array_or_empty(bucket.get("gradeOverrides", []))
+		override_rows.append(override_row)
+		_sort_grade_overrides_by_priority_desc(override_rows)
+		bucket["gradeOverrides"] = override_rows
+		_task_eval_index_by_task[task_id] = bucket
+
+	for effect_variant in effects:
+		var effect: Dictionary = _dict_or_empty(effect_variant)
+		var task_id := str(effect.get("taskId", "")).strip_edges()
+		if task_id.is_empty():
+			continue
+		var bucket := _ensure_task_eval_bucket(task_id)
+		var effect_rows: Array = _array_or_empty(bucket.get("effects", []))
+		effect_rows.append(effect)
+		bucket["effects"] = effect_rows
+		_task_eval_index_by_task[task_id] = bucket
+
+
+# 功能：确保 task 评价索引桶存在并返回副本。
+# 说明：桶结构固定，避免后续结算阶段频繁判空分支。
+func _ensure_task_eval_bucket(task_id: String) -> Dictionary:
+	var normalized_id := task_id.strip_edges()
+	if normalized_id.is_empty():
+		return {}
+	if _task_eval_index_by_task.has(normalized_id):
+		return _dict_or_empty(_task_eval_index_by_task.get(normalized_id, {}))
+	return {
+		"grades": [],
+		"scoreBands": [],
+		"indicators": [],
+		"gradeOverrides": [],
+		"effects": []
+	}
+
+
+# 功能：按 minScore 升序排序 score_band 档位。
+# 说明：后续基础档位映射按区间顺序匹配，排序可减少比较歧义。
+func _sort_grade_score_bands_by_min(score_bands: Array) -> void:
+	for i in range(1, score_bands.size()):
+		var current: Dictionary = _dict_or_empty(score_bands[i])
+		var current_min := float(current.get("minScore", 0.0))
+		var j := i - 1
+		while j >= 0:
+			var left: Dictionary = _dict_or_empty(score_bands[j])
+			if float(left.get("minScore", 0.0)) <= current_min:
+				break
+			score_bands[j + 1] = score_bands[j]
+			j -= 1
+		score_bands[j + 1] = current
+
+
+# 功能：按 priority 降序排序档位分流规则。
+# 说明：运行时遇到首个命中规则即终止，需保证高优先级在前。
+func _sort_grade_overrides_by_priority_desc(grade_overrides: Array) -> void:
+	for i in range(1, grade_overrides.size()):
+		var current: Dictionary = _dict_or_empty(grade_overrides[i])
+		var current_priority := int(current.get("priority", 0))
+		var j := i - 1
+		while j >= 0:
+			var left: Dictionary = _dict_or_empty(grade_overrides[j])
+			if int(left.get("priority", 0)) >= current_priority:
+				break
+			grade_overrides[j + 1] = grade_overrides[j]
+			j -= 1
+		grade_overrides[j + 1] = current
 
 # 功能：生成候选事件集合。
 # 说明：这里只做可用性与权重计算，不做最终抽签。
@@ -1111,10 +1230,12 @@ func _ensure_task_runtime_state() -> void:
 	var completed := _array_or_empty(tasks_state.get("completed", []))
 	var failed := _array_or_empty(tasks_state.get("failed", []))
 	var abandoned := _array_or_empty(tasks_state.get("abandoned", []))
+	var result_records := _array_or_empty(tasks_state.get("resultRecords", []))
 	tasks_state["active"] = active
 	tasks_state["completed"] = completed
 	tasks_state["failed"] = failed
 	tasks_state["abandoned"] = abandoned
+	tasks_state["resultRecords"] = result_records
 	world_state["tasks"] = tasks_state
 
 
@@ -1219,21 +1340,27 @@ func _advance_task(task_id: String, progress_key: String, delta: int) -> bool:
 # 功能：放弃任务。
 # 说明：只对 active 任务生效，放弃后会归档到 abandoned 列表。
 func _abandon_task(task_id: String) -> bool:
-	return _finish_active_task(task_id, "abandoned")
+	return _finalize_task(task_id, "abandoned", "manual")
 
 
 # 功能：完成任务。
 # 说明：只对 active 任务生效，完成后会归档到 completed 列表。
 func _complete_task(task_id: String) -> bool:
-	return _finish_active_task(task_id, "completed")
+	return _finalize_task(task_id, "completed", "manual")
 
 
 # 功能：结束 active 任务并归档。
 # 说明：封装 completed/abandoned 两类共享迁移动作。
-func _finish_active_task(task_id: String, archive_key: String) -> bool:
+# 功能：统一处理任务终态结算。
+# 说明：里程碑 3 在同一入口串联状态归档、完成档位计算、评价后果应用和结果记录。
+func _finalize_task(task_id: String, status: String, reason: String = "") -> bool:
 	var normalized_id := task_id.strip_edges()
 	if normalized_id.is_empty():
 		return false
+	var normalized_status := status.strip_edges().to_lower()
+	if normalized_status != "completed" and normalized_status != "failed" and normalized_status != "abandoned":
+		return false
+
 	var index := _find_active_task_index(normalized_id)
 	if index < 0:
 		return false
@@ -1242,9 +1369,22 @@ func _finish_active_task(task_id: String, archive_key: String) -> bool:
 	var active := _array_or_empty(tasks_state.get("active", []))
 	if index >= active.size():
 		return false
+	var task_runtime := _dict_or_empty(active[index]).duplicate(true)
 	active.remove_at(index)
 	tasks_state["active"] = active
-	_archive_task_id(tasks_state, archive_key, normalized_id)
+
+	var score: Variant = null
+	var grade_id := ""
+	if normalized_status == "completed":
+		var task_def := _dict_or_empty(_task_def_map.get(normalized_id, {}))
+		var grade_eval := _evaluate_task_grade(task_runtime, task_def)
+		score = grade_eval.get("score", null)
+		var base_grade_id := str(grade_eval.get("baseGradeId", "")).strip_edges()
+		grade_id = _apply_grade_overrides(task_runtime, task_def, base_grade_id)
+
+	_apply_task_evaluation_effects(normalized_id, normalized_status, grade_id)
+	_archive_task_id(tasks_state, normalized_status, normalized_id)
+	_append_task_result_record(tasks_state, task_runtime, normalized_status, grade_id, score, reason)
 	world_state["tasks"] = tasks_state
 	return true
 
@@ -1259,7 +1399,7 @@ func _tick_tasks_after_turn() -> void:
 		return
 
 	var current_turn := int(world_state.get("turn", 1))
-	var keep_active: Array = []
+	var expire_actions: Array = []
 	for runtime_variant in active:
 		var task_runtime := _dict_or_empty(runtime_variant)
 		var task_id := str(task_runtime.get("taskId", "")).strip_edges()
@@ -1269,18 +1409,200 @@ func _tick_tasks_after_turn() -> void:
 		if deadline_turn > 0 and current_turn >= deadline_turn:
 			var task_def := _dict_or_empty(_task_def_map.get(task_id, {}))
 			var on_expire := str(task_def.get("onExpire", "fail")).strip_edges().to_lower()
+			var final_status := "failed"
 			match on_expire:
 				"abandon", "abandoned":
-					_archive_task_id(tasks_state, "abandoned", task_id)
+					final_status = "abandoned"
 				"complete", "completed", "success":
-					_archive_task_id(tasks_state, "completed", task_id)
-				_:
-					_archive_task_id(tasks_state, "failed", task_id)
-		else:
-			keep_active.append(task_runtime)
+					final_status = "completed"
+			expire_actions.append({"taskId": task_id, "status": final_status, "reason": "expired"})
 
-	tasks_state["active"] = keep_active
-	world_state["tasks"] = tasks_state
+	for action_variant in expire_actions:
+		var action := _dict_or_empty(action_variant)
+		var task_id := str(action.get("taskId", "")).strip_edges()
+		var status := str(action.get("status", "failed")).strip_edges()
+		var reason := str(action.get("reason", "expired")).strip_edges()
+		_finalize_task(task_id, status, reason)
+
+# 功能：计算任务完成时的基础档位。
+# 说明：按指标累计 score，再映射 score_band 得到 baseGradeId。
+func _evaluate_task_grade(task_runtime: Dictionary, task_def: Dictionary) -> Dictionary:
+	var task_id := str(task_runtime.get("taskId", task_def.get("id", ""))).strip_edges()
+	if task_id.is_empty():
+		return {"score": 0, "baseGradeId": ""}
+	var eval_bucket := _dict_or_empty(_task_eval_index_by_task.get(task_id, {}))
+	if eval_bucket.is_empty():
+		return {"score": 0, "baseGradeId": ""}
+
+	var indicators: Array = _array_or_empty(eval_bucket.get("indicators", []))
+	var score := 0
+	for indicator_variant in indicators:
+		var indicator := _dict_or_empty(indicator_variant)
+		var left := str(indicator.get("left", "")).strip_edges()
+		var op := str(indicator.get("op", "")).strip_edges()
+		var right := str(indicator.get("right", "")).strip_edges()
+		if left.is_empty() or op.is_empty() or right.is_empty():
+			score += int(indicator.get("failScore", 0))
+			continue
+		var actual: Variant = _resolve_task_condition_value(task_runtime, left)
+		var expected: Variant = _parse_literal(right)
+		if _compare_values(actual, op, expected):
+			score += int(indicator.get("passScore", 0))
+		else:
+			score += int(indicator.get("failScore", 0))
+
+	var base_grade_id := ""
+	var score_bands: Array = _array_or_empty(eval_bucket.get("scoreBands", []))
+	for grade_variant in score_bands:
+		var grade := _dict_or_empty(grade_variant)
+		var min_score := float(grade.get("minScore", 0.0))
+		var max_score := float(grade.get("maxScore", 0.0))
+		if float(score) >= min_score and float(score) <= max_score:
+			base_grade_id = str(grade.get("gradeId", "")).strip_edges()
+			break
+
+	return {"score": score, "baseGradeId": base_grade_id}
+
+
+# 功能：应用任务档位分流规则。
+# 说明：按 priority 降序匹配，命中首条即返回最终档位。
+func _apply_grade_overrides(task_runtime: Dictionary, task_def: Dictionary, base_grade: String) -> String:
+	var task_id := str(task_runtime.get("taskId", task_def.get("id", ""))).strip_edges()
+	if task_id.is_empty():
+		return base_grade
+	var eval_bucket := _dict_or_empty(_task_eval_index_by_task.get(task_id, {}))
+	if eval_bucket.is_empty():
+		return base_grade
+
+	var final_grade := base_grade
+	var grade_overrides: Array = _array_or_empty(eval_bucket.get("gradeOverrides", []))
+	for override_variant in grade_overrides:
+		var override_row := _dict_or_empty(override_variant)
+		var from_grade_id := str(override_row.get("fromGradeId", "")).strip_edges()
+		if not from_grade_id.is_empty() and from_grade_id != final_grade:
+			continue
+		var when_condition := str(override_row.get("when", "")).strip_edges()
+		if not when_condition.is_empty() and not _is_task_complete_when_satisfied(task_runtime, when_condition):
+			continue
+		var to_grade_id := str(override_row.get("toGradeId", "")).strip_edges()
+		if to_grade_id.is_empty():
+			continue
+		final_grade = to_grade_id
+		break
+	return final_grade
+
+
+# 功能：按 task/status/grade 应用任务评价后果。
+# 说明：优先精确命中 gradeId，若无精确项则回退到 gradeId 为空的通配项。
+func _apply_task_evaluation_effects(task_id: String, status: String, grade_id: String) -> void:
+	var normalized_task_id := task_id.strip_edges()
+	var normalized_status := status.strip_edges().to_lower()
+	if normalized_task_id.is_empty() or normalized_status.is_empty():
+		return
+	var eval_bucket := _dict_or_empty(_task_eval_index_by_task.get(normalized_task_id, {}))
+	if eval_bucket.is_empty():
+		return
+
+	var effect_rows: Array = _array_or_empty(eval_bucket.get("effects", []))
+	if effect_rows.is_empty():
+		return
+
+	var exact_effects: Array = []
+	var fallback_effects: Array = []
+	for effect_variant in effect_rows:
+		var effect := _dict_or_empty(effect_variant)
+		var row_status := str(effect.get("status", "")).strip_edges().to_lower()
+		if row_status != normalized_status:
+			continue
+		var row_grade_id := str(effect.get("gradeId", "")).strip_edges()
+		if not row_grade_id.is_empty() and row_grade_id == grade_id:
+			exact_effects.append(effect)
+		elif row_grade_id.is_empty():
+			fallback_effects.append(effect)
+
+	var matched_effects: Array = exact_effects if not exact_effects.is_empty() else fallback_effects
+	for effect_variant in matched_effects:
+		_apply_task_evaluation_effect_action(_dict_or_empty(effect_variant))
+
+
+# 功能：执行单条任务评价效果动作。
+# 说明：动作语义与配置侧 option_rules/event_outcomes 保持一致。
+func _apply_task_evaluation_effect_action(effect: Dictionary) -> void:
+	var target := str(effect.get("target", "")).strip_edges()
+	var op := str(effect.get("op", "")).strip_edges()
+	var key := str(effect.get("key", "")).strip_edges()
+	var value_text := str(effect.get("value", "")).strip_edges()
+
+	if target == "params" and op == "add":
+		if key.is_empty():
+			return
+		_apply_world_state_patch({"params": {key: int(_parse_literal(value_text))}})
+		return
+
+	if target == "flags" and op == "set":
+		if key.is_empty():
+			return
+		_apply_world_state_patch({"flags": {key: _parse_literal(value_text)}})
+		return
+
+	if target == "player" and op == "add":
+		if key.is_empty():
+			return
+		_apply_world_state_patch({"player": {key: int(_parse_literal(value_text))}})
+		return
+
+	if target == "world" and op == "set_location":
+		_apply_world_state_patch({"currentLocationId": value_text})
+		return
+
+	if target == "world" and op == "set_forced_next":
+		world_state["forcedNextEventId"] = value_text
+		return
+
+	if target == "world" and op == "clear_forced_next":
+		if _to_bool_text(value_text):
+			world_state["forcedNextEventId"] = ""
+		return
+
+	if target == "world" and op == "end_chain":
+		if _to_bool_text(value_text):
+			world_state["chainContext"] = null
+		return
+
+
+# 功能：写入任务终态记录。
+# 说明：用于验收和后续 UI 展示，保留任务完成时快照信息。
+func _append_task_result_record(
+	tasks_state: Dictionary,
+	task_runtime: Dictionary,
+	status: String,
+	grade_id: String,
+	score: Variant,
+	reason: String
+) -> void:
+	var task_id := str(task_runtime.get("taskId", "")).strip_edges()
+	if task_id.is_empty():
+		return
+	var result_records := _array_or_empty(tasks_state.get("resultRecords", []))
+	result_records.append(
+		{
+			"taskId": task_id,
+			"status": status,
+			"gradeId": grade_id,
+			"score": score,
+			"acceptedTurn": int(task_runtime.get("acceptedTurn", 0)),
+			"finishedTurn": int(world_state.get("turn", 0)),
+			"reason": reason,
+			"progress": _dict_or_empty(task_runtime.get("progress", {})).duplicate(true)
+		}
+	)
+	tasks_state["resultRecords"] = result_records
+
+
+# 功能：将文本转换为 bool。
+# 说明：仅文本 true 视为 true，其余一律 false。
+func _to_bool_text(raw: String) -> bool:
+	return raw.strip_edges().to_lower() == "true"
 
 
 # 功能：在结算后评估并自动完成任务。
