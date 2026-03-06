@@ -31,6 +31,12 @@ static func compile_from_csv_dir(csv_dir_path: String) -> Dictionary:
 	var task_eval_result = _assemble_task_evaluation_tables(tables)
 	if not task_eval_result.get("ok", false):
 		return task_eval_result
+	var task_eval_validate_result = _validate_task_evaluation_tables(
+		task_defs_result.get("task_defs", []),
+		task_eval_result.get("task_evaluation", {})
+	)
+	if not task_eval_validate_result.get("ok", false):
+		return task_eval_validate_result
 
 	var choice_result = _assemble_choice_points(tables)
 	if not choice_result.get("ok", false):
@@ -327,6 +333,127 @@ static func _assemble_task_evaluation_tables(tables: Dictionary) -> Dictionary:
 			"effects": effects
 		}
 	}
+
+
+# 功能：校验任务评价配置的编译期约束。
+# 说明：该校验属于里程碑 2，非法配置会在加载期阻断，避免进入运行时。
+static func _validate_task_evaluation_tables(task_defs: Array, task_evaluation: Dictionary) -> Dictionary:
+	var task_id_set: Dictionary = {}
+	for task_variant in task_defs:
+		var task_def: Dictionary = task_variant
+		var task_id := str(task_def.get("id", "")).strip_edges()
+		if task_id.is_empty():
+			continue
+		task_id_set[task_id] = true
+
+	var grades: Array = task_evaluation.get("grades", [])
+	var indicators: Array = task_evaluation.get("indicators", [])
+	var grade_overrides: Array = task_evaluation.get("gradeOverrides", [])
+	var effects: Array = task_evaluation.get("effects", [])
+
+	var grade_key_guard: Dictionary = {}
+	var grade_ids_by_task: Dictionary = {}
+	var score_ranges_by_task: Dictionary = {}
+
+	# 说明：先完成 grades 主校验，并构建后续引用校验所需的索引。
+	for grade_variant in grades:
+		var grade: Dictionary = grade_variant
+		var task_id := str(grade.get("taskId", "")).strip_edges()
+		var grade_id := str(grade.get("gradeId", "")).strip_edges()
+		var grade_mode := str(grade.get("gradeMode", "")).strip_edges().to_lower()
+		var min_score: Variant = grade.get("minScore", null)
+		var max_score: Variant = grade.get("maxScore", null)
+
+		if task_id.is_empty() or grade_id.is_empty():
+			return {"ok": false, "error": "task_eval_grades has empty task_id or grade_id"}
+		if not task_id_set.has(task_id):
+			return {"ok": false, "error": "task_eval_grades references missing task_id: %s" % task_id}
+		if grade_mode != "score_band" and grade_mode != "branch_only":
+			return {"ok": false, "error": "task_eval_grades invalid grade_mode: %s/%s -> %s" % [task_id, grade_id, grade_mode]}
+
+		var grade_key := "%s::%s" % [task_id, grade_id]
+		if grade_key_guard.has(grade_key):
+			return {"ok": false, "error": "task_eval_grades duplicate (task_id, grade_id): %s" % grade_key}
+		grade_key_guard[grade_key] = true
+
+		var grade_ids: Dictionary = grade_ids_by_task.get(task_id, {})
+		grade_ids[grade_id] = true
+		grade_ids_by_task[task_id] = grade_ids
+
+		if grade_mode == "score_band":
+			if min_score == null or max_score == null:
+				return {"ok": false, "error": "task_eval_grades score_band requires min_score/max_score: %s/%s" % [task_id, grade_id]}
+			if float(min_score) > float(max_score):
+				return {"ok": false, "error": "task_eval_grades min_score > max_score: %s/%s" % [task_id, grade_id]}
+			var ranges: Array = score_ranges_by_task.get(task_id, [])
+			ranges.append({"gradeId": grade_id, "min": float(min_score), "max": float(max_score)})
+			score_ranges_by_task[task_id] = ranges
+
+	# 说明：按任务检查 score_band 区间是否重叠（闭区间）。
+	for task_id_variant in score_ranges_by_task.keys():
+		var task_id := str(task_id_variant)
+		var ranges: Array = score_ranges_by_task.get(task_id, [])
+		_sort_score_ranges_by_min(ranges)
+		for idx in range(1, ranges.size()):
+			var left: Dictionary = ranges[idx - 1]
+			var right: Dictionary = ranges[idx]
+			if float(right.get("min", 0.0)) <= float(left.get("max", 0.0)):
+				return {
+					"ok": false,
+					"error": "task_eval_grades score_band overlap: %s/%s and %s" % [
+						task_id,
+						str(left.get("gradeId", "")),
+						str(right.get("gradeId", ""))
+					]
+				}
+
+	# 说明：校验指标表 task_id 存在性。
+	for indicator_variant in indicators:
+		var indicator: Dictionary = indicator_variant
+		var task_id := str(indicator.get("taskId", "")).strip_edges()
+		if task_id.is_empty():
+			return {"ok": false, "error": "task_eval_indicators has empty task_id"}
+		if not task_id_set.has(task_id):
+			return {"ok": false, "error": "task_eval_indicators references missing task_id: %s" % task_id}
+
+	# 说明：校验 override 的 task_id 和 grade 引用合法性。
+	for override_variant in grade_overrides:
+		var override_row: Dictionary = override_variant
+		var task_id := str(override_row.get("taskId", "")).strip_edges()
+		var rule_id := str(override_row.get("ruleId", "")).strip_edges()
+		var from_grade_id := str(override_row.get("fromGradeId", "")).strip_edges()
+		var to_grade_id := str(override_row.get("toGradeId", "")).strip_edges()
+		if task_id.is_empty():
+			return {"ok": false, "error": "task_eval_grade_overrides has empty task_id"}
+		if not task_id_set.has(task_id):
+			return {"ok": false, "error": "task_eval_grade_overrides references missing task_id: %s" % task_id}
+		if to_grade_id.is_empty():
+			return {"ok": false, "error": "task_eval_grade_overrides to_grade_id is empty: %s/%s" % [task_id, rule_id]}
+		var task_grade_ids: Dictionary = grade_ids_by_task.get(task_id, {})
+		if not task_grade_ids.has(to_grade_id):
+			return {"ok": false, "error": "task_eval_grade_overrides to_grade_id not found: %s/%s -> %s" % [task_id, rule_id, to_grade_id]}
+		if not from_grade_id.is_empty() and not task_grade_ids.has(from_grade_id):
+			return {"ok": false, "error": "task_eval_grade_overrides from_grade_id not found: %s/%s -> %s" % [task_id, rule_id, from_grade_id]}
+
+	# 说明：校验 effects 的 task_id、status 取值与 grade 引用。
+	var allowed_status := {"completed": true, "failed": true, "abandoned": true}
+	for effect_variant in effects:
+		var effect: Dictionary = effect_variant
+		var task_id := str(effect.get("taskId", "")).strip_edges()
+		var status := str(effect.get("status", "")).strip_edges().to_lower()
+		var grade_id := str(effect.get("gradeId", "")).strip_edges()
+		if task_id.is_empty():
+			return {"ok": false, "error": "task_eval_effects has empty task_id"}
+		if not task_id_set.has(task_id):
+			return {"ok": false, "error": "task_eval_effects references missing task_id: %s" % task_id}
+		if not allowed_status.has(status):
+			return {"ok": false, "error": "task_eval_effects invalid status: %s/%s" % [task_id, status]}
+		if not grade_id.is_empty():
+			var task_grade_ids: Dictionary = grade_ids_by_task.get(task_id, {})
+			if not task_grade_ids.has(grade_id):
+				return {"ok": false, "error": "task_eval_effects grade_id not found: %s -> %s" % [task_id, grade_id]}
+
+	return {"ok": true}
 
 
 # 功能：组装 choice_points 与 options 数据。
@@ -912,6 +1039,22 @@ static func _sort_history_pairs(history_pairs: Array) -> void:
 			history_pairs[j + 1] = history_pairs[j]
 			j -= 1
 		history_pairs[j + 1] = current
+
+
+# 功能：按 score range 的 min 字段升序排序。
+# 说明：用于区间重叠校验，保证相邻比较即可覆盖全部冲突。
+static func _sort_score_ranges_by_min(ranges: Array) -> void:
+	for i in range(1, ranges.size()):
+		var current: Dictionary = ranges[i]
+		var current_min := float(current.get("min", 0.0))
+		var j := i - 1
+		while j >= 0:
+			var left: Dictionary = ranges[j]
+			if float(left.get("min", 0.0)) <= current_min:
+				break
+			ranges[j + 1] = ranges[j]
+			j -= 1
+		ranges[j + 1] = current
 
 
 # 功能：按分隔符拆分文本数组，并去除空项。
