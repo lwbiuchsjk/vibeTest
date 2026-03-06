@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://c03g0nxeoxphw"
+
+[deps]
+
+files=["res://scripts/config/world_event_mvp/task_eval_grade_overrides.rule.translation", "res://scripts/config/world_event_mvp/task_eval_grade_overrides.priority.translation", "res://scripts/config/world_event_mvp/task_eval_grade_overrides.from.translation", "res://scripts/config/world_event_mvp/task_eval_grade_overrides.when.translation", "res://scripts/config/world_event_mvp/task_eval_grade_overrides.to.translation"]
+
+source_file="res://scripts/config/world_event_mvp/task_eval_grade_overrides.csv"
+dest_files=["res://scripts/config/world_event_mvp/task_eval_grade_overrides.rule.translation", "res://scripts/config/world_event_mvp/task_eval_grade_overrides.priority.translation", "res://scripts/config/world_event_mvp/task_eval_grade_overrides.from.translation", "res://scripts/config/world_event_mvp/task_eval_grade_overrides.when.translation", "res://scripts/config/world_event_mvp/task_eval_grade_overrides.to.translation"]
+
+[params]
+
+compress=true
+delimiter=0

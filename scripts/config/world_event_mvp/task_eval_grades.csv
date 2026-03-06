@@ -1,0 +1,8 @@
+task_id,grade_id,grade_mode,min_score,max_score,display_order,label
+task_exam,g_pass,score_band,0,1,10,达标通过
+task_exam,g_good,score_band,2,3,20,优良通过
+task_exam,g_perfect,score_band,4,999,30,高分通过
+task_exam,g_risky,branch_only,,,40,高危通关
+task_smuggle,g_low,score_band,0,1,10,勉强收尾
+task_smuggle,g_high,score_band,2,999,20,高效收尾
+task_smuggle,g_clean,branch_only,,,30,干净脱身

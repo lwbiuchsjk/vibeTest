@@ -1,0 +1,14 @@
+task_id,status,grade_id,target,op,key,value
+task_exam,completed,g_pass,params,add,morale,1
+task_exam,completed,g_good,params,add,morale,3
+task_exam,completed,g_perfect,params,add,morale,5
+task_exam,completed,g_risky,params,add,danger,2
+task_exam,failed,,params,add,morale,-2
+task_exam,abandoned,,params,add,morale,-3
+task_smuggle,completed,g_low,params,add,prosperity,1
+task_smuggle,completed,g_high,params,add,prosperity,3
+task_smuggle,completed,g_clean,flags,set,isWanted,false
+task_smuggle,failed,,params,add,danger,2
+task_smuggle,abandoned,,params,add,morale,-2
+task_part_time,completed,,params,add,prosperity,1
+task_part_time,failed,,params,add,morale,-1

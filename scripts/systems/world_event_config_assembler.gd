@@ -28,6 +28,10 @@ static func compile_from_csv_dir(csv_dir_path: String) -> Dictionary:
 	if not task_defs_result.get("ok", false):
 		return task_defs_result
 
+	var task_eval_result = _assemble_task_evaluation_tables(tables)
+	if not task_eval_result.get("ok", false):
+		return task_eval_result
+
 	var choice_result = _assemble_choice_points(tables)
 	if not choice_result.get("ok", false):
 		return choice_result
@@ -42,7 +46,8 @@ static func compile_from_csv_dir(csv_dir_path: String) -> Dictionary:
 			"world_state": world_result["world_state"],
 			"events": events_result["events"],
 			"choice_points": choice_result["choice_points"],
-			"task_defs": task_defs_result["task_defs"]
+			"task_defs": task_defs_result["task_defs"],
+			"task_evaluation": task_eval_result["task_evaluation"]
 		}
 	}
 
@@ -59,11 +64,29 @@ static func _load_tables(base: String) -> Dictionary:
 		"options.csv",
 		"option_rules.csv"
 	]
+	var optional_files: Array = [
+		"task_eval_grades.csv",
+		"task_eval_indicators.csv",
+		"task_eval_grade_overrides.csv",
+		"task_eval_effects.csv"
+	]
 
 	var tables: Dictionary = {}
 	for file_variant in required_files:
 		var file_name = str(file_variant)
 		var path = _join_path(base, file_name)
+		var table_result = ConfigLoader.load_csv_table(path)
+		if not table_result.get("ok", false):
+			return {"ok": false, "error": str(table_result.get("error", "load csv failed"))}
+		tables[file_name] = table_result.get("rows", [])
+
+	# 说明：任务评价表在里程碑 1 作为可选配置接入，不影响旧配置目录继续编译。
+	for file_variant in optional_files:
+		var file_name = str(file_variant)
+		var path = _join_path(base, file_name)
+		if not FileAccess.file_exists(path):
+			tables[file_name] = []
+			continue
 		var table_result = ConfigLoader.load_csv_table(path)
 		if not table_result.get("ok", false):
 			return {"ok": false, "error": str(table_result.get("error", "load csv failed"))}
@@ -210,6 +233,100 @@ static func _assemble_task_defs(tables: Dictionary) -> Dictionary:
 		)
 
 	return {"ok": true, "task_defs": out}
+
+
+# 功能：编译任务评价相关配置表。
+# 说明：里程碑 1 先完成 CSV 到运行时结构的透传，不在这里做完整业务校验。
+static func _assemble_task_evaluation_tables(tables: Dictionary) -> Dictionary:
+	var grades_rows: Array = tables.get("task_eval_grades.csv", [])
+	var indicator_rows: Array = tables.get("task_eval_indicators.csv", [])
+	var override_rows: Array = tables.get("task_eval_grade_overrides.csv", [])
+	var effects_rows: Array = tables.get("task_eval_effects.csv", [])
+
+	var grades: Array = []
+	for row_variant in grades_rows:
+		var row: Dictionary = row_variant
+		var task_id := str(row.get("task_id", "")).strip_edges()
+		var grade_id := str(row.get("grade_id", "")).strip_edges()
+		if task_id.is_empty() or grade_id.is_empty():
+			continue
+		grades.append(
+			{
+				"taskId": task_id,
+				"gradeId": grade_id,
+				"gradeMode": str(row.get("grade_mode", "")).strip_edges(),
+				"minScore": _parse_optional_number(row.get("min_score", "")),
+				"maxScore": _parse_optional_number(row.get("max_score", "")),
+				"displayOrder": _to_int(row.get("display_order", "0"), 0),
+				"label": str(row.get("label", "")).strip_edges()
+			}
+		)
+
+	var indicators: Array = []
+	for row_variant in indicator_rows:
+		var row: Dictionary = row_variant
+		var task_id := str(row.get("task_id", "")).strip_edges()
+		var indicator_id := str(row.get("indicator_id", "")).strip_edges()
+		if task_id.is_empty() or indicator_id.is_empty():
+			continue
+		indicators.append(
+			{
+				"taskId": task_id,
+				"indicatorId": indicator_id,
+				"left": str(row.get("left", "")).strip_edges(),
+				"op": str(row.get("op", "")).strip_edges(),
+				"right": str(row.get("right", "")).strip_edges(),
+				"passScore": _to_int(row.get("pass_score", "0"), 0),
+				"failScore": _to_int(row.get("fail_score", "0"), 0)
+			}
+		)
+
+	var grade_overrides: Array = []
+	for row_variant in override_rows:
+		var row: Dictionary = row_variant
+		var task_id := str(row.get("task_id", "")).strip_edges()
+		var rule_id := str(row.get("rule_id", "")).strip_edges()
+		if task_id.is_empty() or rule_id.is_empty():
+			continue
+		grade_overrides.append(
+			{
+				"taskId": task_id,
+				"ruleId": rule_id,
+				"priority": _to_int(row.get("priority", "0"), 0),
+				"fromGradeId": str(row.get("from_grade_id", "")).strip_edges(),
+				"when": str(row.get("when", "")).strip_edges(),
+				"toGradeId": str(row.get("to_grade_id", "")).strip_edges()
+			}
+		)
+
+	var effects: Array = []
+	for row_variant in effects_rows:
+		var row: Dictionary = row_variant
+		var task_id := str(row.get("task_id", "")).strip_edges()
+		var status := str(row.get("status", "")).strip_edges()
+		if task_id.is_empty() or status.is_empty():
+			continue
+		effects.append(
+			{
+				"taskId": task_id,
+				"status": status,
+				"gradeId": str(row.get("grade_id", "")).strip_edges(),
+				"target": str(row.get("target", "")).strip_edges(),
+				"op": str(row.get("op", "")).strip_edges(),
+				"key": str(row.get("key", "")).strip_edges(),
+				"value": str(row.get("value", "")).strip_edges()
+			}
+		)
+
+	return {
+		"ok": true,
+		"task_evaluation": {
+			"grades": grades,
+			"indicators": indicators,
+			"gradeOverrides": grade_overrides,
+			"effects": effects
+		}
+	}
 
 
 # 功能：组装 choice_points 与 options 数据。
@@ -844,6 +961,19 @@ static func _to_float(value: Variant, default_value: float) -> float:
 	if text.is_valid_float():
 		return float(text)
 	return default_value
+
+
+# 功能：将输入安全转换为可选数值。
+# 说明：空字符串返回 null，用于支持 branch_only 档位空区间语义。
+static func _parse_optional_number(value: Variant) -> Variant:
+	var text := str(value).strip_edges()
+	if text.is_empty():
+		return null
+	if text.is_valid_int():
+		return int(text)
+	if text.is_valid_float():
+		return float(text)
+	return null
 
 
 # 功能：将输入转换为 bool。
