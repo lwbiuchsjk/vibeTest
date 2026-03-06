@@ -2,6 +2,7 @@ extends Control
 
 const MilestoneASmokeTest := preload("res://scripts/systems/milestone_a_smoke_test.gd")
 const MilestoneCSmokeTest := preload("res://scripts/systems/milestone_c_smoke_test.gd")
+const Milestone3SmokeTest := preload("res://scripts/systems/milestone_3_smoke_test.gd")
 const MvpWorldEventSmokeTest := preload("res://scripts/systems/mvp_world_event_smoke_test.gd")
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 
@@ -36,6 +37,8 @@ func _ready() -> void:
 	#print("[MilestoneA]", milestone_result)
 	var milestone_c_result: Dictionary = MilestoneCSmokeTest.run_from_csv()
 	print("[MilestoneC] %s" % JSON.stringify(milestone_c_result))
+	var milestone_3_result: Dictionary = Milestone3SmokeTest.run_from_csv()
+	print("[Milestone3] %s" % JSON.stringify(milestone_3_result))
 
 	# 说明：执行 MVP 世界事件回归测试并输出摘要。
 	var mvp_result: Dictionary = MvpWorldEventSmokeTest.run_from_csv()
