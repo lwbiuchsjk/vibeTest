@@ -1298,7 +1298,8 @@ func _accept_task(task_id: String) -> bool:
 		{
 			"taskId": normalized_id,
 			"acceptedTurn": current_turn,
-			"deadlineTurn": current_turn + duration_turns - 1,
+			# 说明：duration_turns 不包含接取任务的当回合，而是从下一回合开始计算。
+			"deadlineTurn": current_turn + duration_turns,
 			"status": "active",
 			"progress": {}
 		}

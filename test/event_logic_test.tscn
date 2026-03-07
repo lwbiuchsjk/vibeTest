@@ -1,6 +1,7 @@
 [gd_scene load_steps=3 format=3 uid="uid://ppkmkvydqbfv"]
 
 [ext_resource type="Script" uid="uid://cbx22u7e0gipa" path="res://test/event_logic_test.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://scripts/ui/task_summary_card.tscn" id="2_task_summary_card"]
 
 [sub_resource type="Theme" id="Theme_event_logic_test"]
 
@@ -100,33 +101,8 @@ layout_mode = 2
 text = "事件详情将在这里显示。"
 autowrap_mode = 3
 
-[node name="TaskSection" type="PanelContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent"]
-custom_minimum_size = Vector2(0, 180)
+[node name="TaskSummaryCard" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent" instance=ExtResource("2_task_summary_card")]
 layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="TaskMargin" type="MarginContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/TaskSection"]
-layout_mode = 2
-theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 12
-theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 12
-
-[node name="TaskContent" type="VBoxContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/TaskSection/TaskMargin"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 8
-
-[node name="TaskHeader" type="Label" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/TaskSection/TaskMargin/TaskContent"]
-layout_mode = 2
-text = "当前任务"
-
-[node name="TaskInfo" type="RichTextLabel" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/TaskSection/TaskMargin/TaskContent"]
-custom_minimum_size = Vector2(0, 120)
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-scroll_following = true
 
 [node name="OptionSection" type="VBoxContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent"]
 custom_minimum_size = Vector2(0, 220)

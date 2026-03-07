@@ -1,6 +1,7 @@
 ﻿extends Control
 
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
+const TaskSummaryCard := preload("res://scripts/ui/task_summary_card.gd")
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 
 const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
@@ -13,7 +14,7 @@ var _current_turn_result: Dictionary = {}
 @onready var event_background_rect: TextureRect = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/EventInfoScroll/EventInfo/EventBackground
 @onready var event_title_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/EventInfoScroll/EventInfo/EventTitle
 @onready var event_detail_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/EventInfoScroll/EventInfo/EventDetail
-@onready var task_info_label: RichTextLabel = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/TaskSection/TaskMargin/TaskContent/TaskInfo
+@onready var task_summary_card: TaskSummaryCard = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/TaskSummaryCard
 @onready var continue_button: Button = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/OptionSection/ActionBar/ContinueButton
 @onready var option_list: VBoxContainer = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/OptionSection/OptionScroll/OptionList
 @onready var world_state_label: RichTextLabel = $Root/RootContent/MainSplit/RightColumn/RightPanel/RightMargin/RightContent/WorldStateValue
@@ -205,76 +206,21 @@ func _build_option_button_text(option_def: Dictionary) -> String:
 	]
 
 
-# 功能：刷新右侧世界状态与底部日志。
-# 说明：集中展示玩家数据、世界参数、链上下文、任务信息和历史事件，便于验证结算结果。
 # 功能：刷新左侧任务摘要面板。
-# 说明：将当前事件关联任务、进行中任务和最近结算结果集中显示在左侧，方便把任务目标与当前事件放在同一视线区域内观察。
+# 说明：将进行中的任务和当前事件关联任务交给独立 UI 组件渲染，测试场景只负责准备数据。
 func _update_left_task_panel(turn_result: Dictionary) -> void:
-	task_info_label.text = _build_left_task_panel_text(turn_result)
-	task_info_label.call_deferred("scroll_to_line", 0)
-
-
-# 功能：构建左侧任务摘要文本。
-# 说明：左侧仅展示与当前决策最相关的任务信息，避免把右侧完整调试面板的所有细节重复塞到左侧。
-func _build_left_task_panel_text(turn_result: Dictionary) -> String:
 	var world_state := _engine.world_state
 	var tasks_state: Dictionary = world_state.get("tasks", {})
 	var active: Array = tasks_state.get("active", [])
-	var result_records: Array = tasks_state.get("resultRecords", [])
 	var current_turn := int(world_state.get("turn", 0))
-	var lines: Array[String] = []
-
-	lines.append("进行中任务")
-	if active.is_empty():
-		lines.append("无")
-	else:
-		for task_variant in active:
-			var task: Dictionary = task_variant
-			var deadline_turn := int(task.get("deadlineTurn", 0))
-			var turns_left: int = max(0, deadline_turn - current_turn)
-			lines.append(
-				"- %s | 剩余%s回合" % [
-					str(task.get("taskId", "")),
-					str(turns_left)
-				]
-			)
-			lines.append("  progress=%s" % JSON.stringify(task.get("progress", {})))
-
-	lines.append("")
-	lines.append("当前事件关联")
 	var event_id := str(turn_result.get("event_id", "")).strip_edges()
 	var event_def: Dictionary = _engine._event_map.get(event_id, {})
 	var task_links: Array = event_def.get("taskLinks", [])
-	if task_links.is_empty():
-		lines.append("无")
-	else:
-		for link_variant in task_links:
-			lines.append("- %s" % str(link_variant))
-
-	lines.append("")
-	lines.append("最近结算")
-	if result_records.is_empty():
-		lines.append("无")
-	else:
-		var latest_record: Dictionary = result_records[result_records.size() - 1]
-		lines.append(
-			"%s | %s | grade=%s | score=%s" % [
-				str(latest_record.get("taskId", "")),
-				str(latest_record.get("status", "")),
-				str(latest_record.get("gradeId", "")),
-				str(latest_record.get("score", null))
-			]
-		)
-		lines.append(
-			"reason=%s | progress=%s" % [
-				str(latest_record.get("reason", "")),
-				JSON.stringify(latest_record.get("progress", {}))
-			]
-		)
-
-	return "\n".join(lines)
+	task_summary_card.bind_data(active, task_links, current_turn)
 
 
+# 功能：刷新右侧世界状态与底部日志。
+# 说明：集中展示玩家数据、世界参数、链上下文、任务信息和历史事件，便于验证结算结果。
 func _update_side_panels() -> void:
 	var world_state := _engine.world_state
 	var player: Dictionary = world_state.get("player", {})
