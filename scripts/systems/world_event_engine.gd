@@ -98,6 +98,7 @@ func load_from_json_text(
 	choice_points = (parsed_choice_points as Array).duplicate(true)
 	task_defs = []
 	task_evaluation = {}
+	_ensure_run_state()
 	_ensure_task_runtime_state()
 	_rebuild_event_map()
 	_rebuild_choice_point_map()
@@ -132,6 +133,7 @@ func load_from_data(data: Dictionary, location_graph: Variant = null) -> Diction
 	choice_points = (raw_choice_points as Array).duplicate(true)
 	task_defs = (raw_task_defs as Array).duplicate(true)
 	task_evaluation = (raw_task_evaluation as Dictionary).duplicate(true)
+	_ensure_run_state()
 	_ensure_task_runtime_state()
 	_set_location_graph(location_graph)
 	_rebuild_event_map()
@@ -145,6 +147,8 @@ func load_from_data(data: Dictionary, location_graph: Variant = null) -> Diction
 func preview_next_turn() -> Dictionary:
 	if events.is_empty():
 		return {"ok": false, "error": "event pool is empty"}
+	if _is_world_ended():
+		return _build_world_ended_response()
 
 	if not _pending_turn_context.is_empty():
 		return _build_pending_turn_response(_pending_turn_context)
@@ -163,6 +167,8 @@ func preview_next_turn() -> Dictionary:
 # 功能：确认并结算当前待处理事件。
 # 说明：无选项事件传空字符串即可；有选项事件必须传入可选 option_id。
 func confirm_pending_turn(selected_option_id: String = "") -> Dictionary:
+	if _is_world_ended():
+		return _build_world_ended_response()
 	if _pending_turn_context.is_empty():
 		return {"ok": false, "error": "no pending turn to confirm"}
 	return _resolve_pending_turn(selected_option_id)
@@ -176,6 +182,8 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 	# 说明：若上一回合停在选择点，本回合只允许继续完成该待处理事件。
 	if not _pending_turn_context.is_empty():
 		return _resolve_pending_turn(selected_option_id)
+	if _is_world_ended():
+		return _build_world_ended_response()
 
 	var next_event_result := _select_next_event()
 	if not next_event_result.get("ok", false):
@@ -265,8 +273,13 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 	_eval_complete_when_after_settlement()
 	_record_history(event_id)
 	_tick_tasks_after_turn()
-	world_state["turn"] = int(world_state.get("turn", 0)) + 1
-	_pending_turn_context.clear()
+	var ended_this_turn := false
+	if bool(event_def.get("isEndingEvent", false)):
+		_finalize_world(event_id)
+		ended_this_turn = true
+	if not ended_this_turn:
+		world_state["turn"] = int(world_state.get("turn", 0)) + 1
+		_pending_turn_context.clear()
 
 	return _build_result_payload(
 		route,
@@ -447,6 +460,8 @@ func _build_result_payload(
 	has_choice: bool,
 	choice_result: Dictionary
 ) -> Dictionary:
+	_ensure_run_state()
+	var run_state_payload := _build_run_state_payload()
 	var phase := "resolved"
 	if not _pending_turn_context.is_empty() and str(_pending_turn_context.get("event_id", "")) == event_id:
 		phase = str(_pending_turn_context.get("phase", "confirm"))
@@ -468,8 +483,98 @@ func _build_result_payload(
 		"chain_active": not (world_state.get("chainContext", null) == null),
 		"has_choice": has_choice,
 		"presentation": presentation_state,
-		"choice": choice_result
+		"choice": choice_result,
+		"world_ended": bool(run_state_payload.get("world_ended", false)),
+		"run_status": str(run_state_payload.get("run_status", "running")),
+		"ending_event_id": str(run_state_payload.get("ending_event_id", "")),
+		"finished_turn": int(run_state_payload.get("finished_turn", 0))
 	}
+
+# 功能：确保世界运行态结构完整。
+# 说明：兼容旧存档、旧测试数据与未包含 runState 的输入，统一补齐 ended 所需字段。
+func _ensure_run_state() -> void:
+	var run_state := _dict_or_empty(world_state.get("runState", {}))
+	var status := str(run_state.get("status", "running")).strip_edges()
+	if status.is_empty():
+		status = "running"
+	run_state["status"] = status
+	run_state["endingEventId"] = str(run_state.get("endingEventId", "")).strip_edges()
+	run_state["finishedTurn"] = maxi(0, int(run_state.get("finishedTurn", 0)))
+	world_state["runState"] = run_state
+
+
+# 功能：将当前世界标记为结束态。
+# 说明：ending event 完成最终结算后调用，负责写入 ended 状态并清理执行锁与待处理上下文。
+func _finalize_world(ending_event_id: String) -> void:
+	_ensure_run_state()
+	var run_state := _dict_or_empty(world_state.get("runState", {}))
+	run_state["status"] = "ended"
+	run_state["endingEventId"] = ending_event_id.strip_edges()
+	run_state["finishedTurn"] = int(world_state.get("turn", 0))
+	world_state["runState"] = run_state
+	world_state["forcedNextEventId"] = ""
+	world_state["chainContext"] = null
+	_pending_turn_context.clear()
+
+
+# 功能：判断当前世界是否已进入结束态。
+# 说明：所有对外入口统一通过这里读取 runState.status，避免重复拼接 ended 判定。
+func _is_world_ended() -> bool:
+	_ensure_run_state()
+	var run_state := _dict_or_empty(world_state.get("runState", {}))
+	return str(run_state.get("status", "running")).strip_edges() == "ended"
+
+
+# 功能：构建对外暴露的最小结束态字段。
+# 说明：统一 world ended 的公开字段名，避免 payload 与 ended 短路返回之间出现结构漂移。
+func _build_run_state_payload() -> Dictionary:
+	_ensure_run_state()
+	var run_state := _dict_or_empty(world_state.get("runState", {}))
+	var status := str(run_state.get("status", "running")).strip_edges()
+	return {
+		"world_ended": status == "ended",
+		"run_status": status,
+		"ending_event_id": str(run_state.get("endingEventId", "")).strip_edges(),
+		"finished_turn": maxi(0, int(run_state.get("finishedTurn", 0)))
+	}
+
+
+# 功能：在世界已结束时返回稳定结果。
+# 说明：结束不是异常；后续入口统一返回 ended 状态，方便外部流程直接消费而不是走报错分支。
+func _build_world_ended_response() -> Dictionary:
+	var run_state_payload := _build_run_state_payload()
+	return {
+		"ok": true,
+		"phase": "ended",
+		"awaiting_choice": false,
+		"route": "ended",
+		"event_id": "",
+		"title": "",
+		"event_background_art": "",
+		"location_background_art": _resolve_location_background_art(),
+		"resolved_background_art": "",
+		"policy": "",
+		"expected_forced": "",
+		"chain_active": false,
+		"has_choice": false,
+		"presentation": {
+			"active": false,
+			"index": -1,
+			"total": 0,
+			"current_item": {}
+		},
+		"choice": {
+			"choice_point_id": "",
+			"selected_option_id": "",
+			"resolved_by": "world_ended",
+			"options": []
+		},
+		"world_ended": bool(run_state_payload.get("world_ended", true)),
+		"run_status": str(run_state_payload.get("run_status", "ended")),
+		"ending_event_id": str(run_state_payload.get("ending_event_id", "")),
+		"finished_turn": int(run_state_payload.get("finished_turn", 0))
+	}
+
 
 # 功能：设置引擎当前使用的地点图。
 # 说明：用于解析当前地点对应的默认背景路径，供事件背景缺失时兜底。
