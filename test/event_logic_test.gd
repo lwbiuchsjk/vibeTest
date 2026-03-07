@@ -52,6 +52,12 @@ func _preview_next_event() -> void:
 		_update_side_panels()
 		return
 
+	_handle_preview_turn_result(turn_result)
+
+
+# 功能：统一处理预览结果。
+# 说明：预览结果只负责记录日志、刷新当前缓存并渲染界面，不参与结算后的分流逻辑。
+func _handle_preview_turn_result(turn_result: Dictionary) -> void:
 	_current_turn_result = (turn_result as Dictionary).duplicate(true)
 	_append_turn_log(turn_result)
 	_render_current_event(turn_result)
@@ -127,7 +133,7 @@ func _render_current_event(turn_result: Dictionary) -> void:
 
 
 # 功能：处理玩家点击选项。
-# 说明：先结算当前待处理事件，再预览下一个事件，保证界面总是停在“未结算事件”上。
+# 说明：先结算当前待处理事件，再统一走结果分流入口，避免结束态判断散落在多个回调里。
 func _on_option_pressed(option_id: String) -> void:
 	if _current_turn_result.is_empty():
 		status_label.text = "当前没有待处理的事件选择。"
@@ -140,21 +146,12 @@ func _on_option_pressed(option_id: String) -> void:
 		return
 
 	var choice: Dictionary = turn_result.get("choice", {})
-	_append_log(
-		"已选择 %s -> %s | %s" % [
-			str(choice.get("selected_option_id", "")),
-			str(turn_result.get("event_id", "")),
-			str(turn_result.get("title", ""))
-		]
-	)
-	if _is_world_ended_result(turn_result):
-		_current_turn_result = (turn_result as Dictionary).duplicate(true)
-		_append_end_log(turn_result)
-		_render_current_event(turn_result)
-		_update_side_panels()
-		return
-	_update_side_panels()
-	_preview_next_event()
+	var resolved_log := "已选择 %s -> %s | %s" % [
+		str(choice.get("selected_option_id", "")),
+		str(turn_result.get("event_id", "")),
+		str(turn_result.get("title", ""))
+	]
+	_handle_resolved_turn_result(turn_result, resolved_log)
 
 
 # 功能：处理继续指令。
@@ -173,18 +170,24 @@ func _on_continue_button_pressed() -> void:
 		_update_side_panels()
 		return
 
-	_append_log(
-		"已确认继续 -> %s | %s" % [
-			str(turn_result.get("event_id", "")),
-			str(turn_result.get("title", ""))
-		]
-	)
+	var resolved_log := "已确认继续 -> %s | %s" % [
+		str(turn_result.get("event_id", "")),
+		str(turn_result.get("title", ""))
+	]
+	_handle_resolved_turn_result(turn_result, resolved_log)
+
+
+# 功能：统一处理已结算的回合结果。
+# 说明：将日志、结束态分流、侧栏刷新和下一次预览收口到一个入口，避免流程散落在多个按钮回调中。
+func _handle_resolved_turn_result(turn_result: Dictionary, resolved_log: String) -> void:
+	_append_log(resolved_log)
+	_current_turn_result = (turn_result as Dictionary).duplicate(true)
 	if _is_world_ended_result(turn_result):
-		_current_turn_result = (turn_result as Dictionary).duplicate(true)
 		_append_end_log(turn_result)
 		_render_current_event(turn_result)
 		_update_side_panels()
 		return
+
 	_update_side_panels()
 	_preview_next_event()
 
