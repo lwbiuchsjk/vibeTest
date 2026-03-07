@@ -31,6 +31,11 @@ corner_radius_top_right = 16
 corner_radius_bottom_right = 16
 corner_radius_bottom_left = 16
 
+[sub_resource type="StyleBoxLine" id="StyleBoxLine_end_divider"]
+color = Color(0.654902, 0.486275, 0.266667, 0.35)
+thickness = 2
+vertical = false
+
 [node name="WorldEndScreen" type="PanelContainer"]
 visible = false
 layout_mode = 2
@@ -77,14 +82,17 @@ theme_override_colors/font_color = Color(0.654902, 0.352941, 0.145098, 1)
 [node name="EndTitle" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent"]
 layout_mode = 2
 text = "本轮已结束"
+theme_override_colors/font_color = Color(0.141176, 0.109804, 0.0823529, 1)
 
 [node name="EndSubtitle" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent"]
 layout_mode = 2
 text = "结束信息将在这里显示。"
 autowrap_mode = 3
+theme_override_colors/font_color = Color(0.333333, 0.266667, 0.203922, 0.92)
 
 [node name="EndDivider" type="HSeparator" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent"]
 layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_end_divider")
 
 [node name="EndStats" type="HBoxContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent"]
 layout_mode = 2
@@ -115,6 +123,7 @@ theme_override_colors/font_color = Color(0.396078, 0.278431, 0.160784, 1)
 layout_mode = 2
 text = "-"
 autowrap_mode = 3
+theme_override_colors/font_color = Color(0.129412, 0.105882, 0.0862745, 1)
 
 [node name="TurnStat" type="PanelContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats"]
 layout_mode = 2
@@ -139,6 +148,7 @@ theme_override_colors/font_color = Color(0.396078, 0.278431, 0.160784, 1)
 [node name="TurnStatValue" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/TurnStat/TurnStatMargin/TurnStatContent"]
 layout_mode = 2
 text = "-"
+theme_override_colors/font_color = Color(0.129412, 0.105882, 0.0862745, 1)
 
 [node name="TaskStat" type="PanelContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats"]
 layout_mode = 2
@@ -164,6 +174,7 @@ theme_override_colors/font_color = Color(0.396078, 0.278431, 0.160784, 1)
 layout_mode = 2
 text = "-"
 autowrap_mode = 3
+theme_override_colors/font_color = Color(0.129412, 0.105882, 0.0862745, 1)
 
 [node name="StateStat" type="PanelContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats"]
 layout_mode = 2
@@ -189,6 +200,7 @@ theme_override_colors/font_color = Color(0.396078, 0.278431, 0.160784, 1)
 layout_mode = 2
 text = "-"
 autowrap_mode = 3
+theme_override_colors/font_color = Color(0.129412, 0.105882, 0.0862745, 1)
 
 [node name="EndSummary" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent"]
 layout_mode = 2
@@ -196,6 +208,7 @@ size_flags_vertical = 3
 text = "结果摘要将在这里显示。"
 autowrap_mode = 3
 vertical_alignment = 1
+theme_override_colors/font_color = Color(0.215686, 0.176471, 0.137255, 0.96)
 
 [node name="EndActionHeader" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent"]
 layout_mode = 2
@@ -211,3 +224,4 @@ theme_override_constants/separation = 8
 layout_mode = 2
 text = "当前版本暂未接入后续流程选项。"
 autowrap_mode = 3
+theme_override_colors/font_color = Color(0.309804, 0.25098, 0.188235, 0.88)
