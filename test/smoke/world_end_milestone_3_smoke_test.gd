@@ -1,5 +1,4 @@
 extends RefCounted
-class_name WorldEndMilestone3SmokeTest
 
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 

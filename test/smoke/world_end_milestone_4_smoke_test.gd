@@ -1,10 +1,9 @@
 extends RefCounted
-class_name WorldEndMilestone4SmokeTest
 
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
-const WorldEndMilestone1SmokeTest := preload("res://scripts/systems/world_end_milestone_1_smoke_test.gd")
-const WorldEndMilestone2SmokeTest := preload("res://scripts/systems/world_end_milestone_2_smoke_test.gd")
-const WorldEndMilestone3SmokeTest := preload("res://scripts/systems/world_end_milestone_3_smoke_test.gd")
+const WorldEndMilestone1SmokeTest := preload("res://test/smoke/world_end_milestone_1_smoke_test.gd")
+const WorldEndMilestone2SmokeTest := preload("res://test/smoke/world_end_milestone_2_smoke_test.gd")
+const WorldEndMilestone3SmokeTest := preload("res://test/smoke/world_end_milestone_3_smoke_test.gd")
 
 
 # 功能：汇总验证世界结束功能的回归与 smoke test。

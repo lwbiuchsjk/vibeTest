@@ -1,5 +1,4 @@
 extends RefCounted
-class_name WorldEndMilestone1SmokeTest
 
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 const WorldEventConfigAssembler := preload("res://scripts/systems/world_event_config_assembler.gd")
