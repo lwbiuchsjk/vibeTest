@@ -1,5 +1,4 @@
 extends RefCounted
-class_name MilestoneASmokeTest
 
 const RoleState := preload("res://scripts/models/role_state.gd")
 const AffinityMap := preload("res://scripts/models/affinity_map.gd")

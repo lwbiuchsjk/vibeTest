@@ -1,13 +1,13 @@
 extends Control
 
-const MilestoneASmokeTest := preload("res://scripts/systems/milestone_a_smoke_test.gd")
-const MilestoneCSmokeTest := preload("res://scripts/systems/milestone_c_smoke_test.gd")
-const Milestone3SmokeTest := preload("res://scripts/systems/milestone_3_smoke_test.gd")
-const MvpWorldEventSmokeTest := preload("res://scripts/systems/mvp_world_event_smoke_test.gd")
-const WorldEndMilestone1SmokeTest := preload("res://scripts/systems/world_end_milestone_1_smoke_test.gd")
-const WorldEndMilestone2SmokeTest := preload("res://scripts/systems/world_end_milestone_2_smoke_test.gd")
-const WorldEndMilestone3SmokeTest := preload("res://scripts/systems/world_end_milestone_3_smoke_test.gd")
-const WorldEndMilestone4SmokeTest := preload("res://scripts/systems/world_end_milestone_4_smoke_test.gd")
+const MilestoneASmokeTest := preload("res://test/smoke/milestone_a_smoke_test.gd")
+const MilestoneCSmokeTest := preload("res://test/smoke/milestone_c_smoke_test.gd")
+const Milestone3SmokeTest := preload("res://test/smoke/milestone_3_smoke_test.gd")
+const MvpWorldEventSmokeTest := preload("res://test/smoke/mvp_world_event_smoke_test.gd")
+const WorldEndMilestone1SmokeTest := preload("res://test/smoke/world_end_milestone_1_smoke_test.gd")
+const WorldEndMilestone2SmokeTest := preload("res://test/smoke/world_end_milestone_2_smoke_test.gd")
+const WorldEndMilestone3SmokeTest := preload("res://test/smoke/world_end_milestone_3_smoke_test.gd")
+const WorldEndMilestone4SmokeTest := preload("res://test/smoke/world_end_milestone_4_smoke_test.gd")
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 
 
