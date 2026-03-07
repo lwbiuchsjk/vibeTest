@@ -1,0 +1,52 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/task_summary_card.gd" id="1_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_task_section"]
+bg_color = Color(0.968627, 0.956863, 0.92549, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.815686, 0.764706, 0.65098, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+shadow_color = Color(0, 0, 0, 0.06)
+shadow_size = 4
+shadow_offset = Vector2(0, 2)
+
+[node name="TaskSummaryCard" type="PanelContainer"]
+custom_minimum_size = Vector2(0, 156)
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_task_section")
+script = ExtResource("1_script")
+
+[node name="TaskMargin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="TaskContent" type="VBoxContainer" parent="TaskMargin"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="TaskHeader" type="Label" parent="TaskMargin/TaskContent"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.121569, 0.160784, 0.215686, 1)
+text = "任务简报"
+
+[node name="TaskInfo" type="RichTextLabel" parent="TaskMargin/TaskContent"]
+custom_minimum_size = Vector2(0, 98)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+scroll_following = true
