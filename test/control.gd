@@ -4,6 +4,7 @@ const MilestoneASmokeTest := preload("res://scripts/systems/milestone_a_smoke_te
 const MilestoneCSmokeTest := preload("res://scripts/systems/milestone_c_smoke_test.gd")
 const Milestone3SmokeTest := preload("res://scripts/systems/milestone_3_smoke_test.gd")
 const MvpWorldEventSmokeTest := preload("res://scripts/systems/mvp_world_event_smoke_test.gd")
+const WorldEndMilestone1SmokeTest := preload("res://scripts/systems/world_end_milestone_1_smoke_test.gd")
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 
 
@@ -39,6 +40,10 @@ func _ready() -> void:
 	print("[MilestoneC] %s" % JSON.stringify(milestone_c_result))
 	var milestone_3_result: Dictionary = Milestone3SmokeTest.run_from_csv()
 	print("[Milestone3] %s" % JSON.stringify(milestone_3_result))
+	# 功能：输出世界结束里程碑 1 的配置层验收结果。
+	# 说明：这里只验证 ending 标记编译与 ending 事件强约束，不涉及运行时结束流程。
+	var world_end_m1_result: Dictionary = WorldEndMilestone1SmokeTest.run_from_csv()
+	print("[WorldEnd-M1] %s" % JSON.stringify(world_end_m1_result))
 
 	# 说明：执行 MVP 世界事件回归测试并输出摘要。
 	var mvp_result: Dictionary = MvpWorldEventSmokeTest.run_from_csv()
