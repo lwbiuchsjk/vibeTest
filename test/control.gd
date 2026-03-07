@@ -5,6 +5,9 @@ const MilestoneCSmokeTest := preload("res://scripts/systems/milestone_c_smoke_te
 const Milestone3SmokeTest := preload("res://scripts/systems/milestone_3_smoke_test.gd")
 const MvpWorldEventSmokeTest := preload("res://scripts/systems/mvp_world_event_smoke_test.gd")
 const WorldEndMilestone1SmokeTest := preload("res://scripts/systems/world_end_milestone_1_smoke_test.gd")
+const WorldEndMilestone2SmokeTest := preload("res://scripts/systems/world_end_milestone_2_smoke_test.gd")
+const WorldEndMilestone3SmokeTest := preload("res://scripts/systems/world_end_milestone_3_smoke_test.gd")
+const WorldEndMilestone4SmokeTest := preload("res://scripts/systems/world_end_milestone_4_smoke_test.gd")
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 
 
@@ -44,6 +47,18 @@ func _ready() -> void:
 	# 说明：这里只验证 ending 标记编译与 ending 事件强约束，不涉及运行时结束流程。
 	var world_end_m1_result: Dictionary = WorldEndMilestone1SmokeTest.run_from_csv()
 	print("[WorldEnd-M1] %s" % JSON.stringify(world_end_m1_result))
+	# 功能：输出世界结束里程碑 2 的运行态验收结果。
+	# 说明：这里验证 ending event 结算后 runState 写入与执行锁清理是否正确。
+	var world_end_m2_result: Dictionary = WorldEndMilestone2SmokeTest.run()
+	print("[WorldEnd-M2] %s" % JSON.stringify(world_end_m2_result))
+	# 功能：输出世界结束里程碑 3 的接口封口验收结果。
+	# 说明：这里验证 ending event 当次 payload 已带 ended 字段，且 ended 后的 preview/run/confirm 都会稳定短路。
+	var world_end_m3_result: Dictionary = WorldEndMilestone3SmokeTest.run()
+	print("[WorldEnd-M3] %s" % JSON.stringify(world_end_m3_result))
+	# 功能：输出世界结束里程碑 4 的汇总回归结果。
+	# 说明：这里汇总非法配置阻断、ending 正常结束、ended 封口与非 ending 兼容回归，便于一次性验收。
+	var world_end_m4_result: Dictionary = WorldEndMilestone4SmokeTest.run()
+	print("[WorldEnd-M4] %s" % JSON.stringify(world_end_m4_result))
 
 	# 说明：执行 MVP 世界事件回归测试并输出摘要。
 	var mvp_result: Dictionary = MvpWorldEventSmokeTest.run_from_csv()

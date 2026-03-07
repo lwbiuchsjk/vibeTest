@@ -126,7 +126,12 @@ static func _assemble_world_state(tables: Dictionary) -> Dictionary:
 		},
 		"history": [],
 		"chainContext": null,
-		"forcedNextEventId": ""
+		"forcedNextEventId": "",
+		"runState": {
+			"status": "running",
+			"endingEventId": "",
+			"finishedTurn": 0
+		}
 	}
 
 	var history_pairs: Array = []
