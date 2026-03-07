@@ -20,7 +20,7 @@ var _current_turn_result: Dictionary = {}
 
 
 # 功能：初始化事件逻辑测试场景。
-# 说明：加载配置后先预览首个事件，不在进入场景时立即推进 world turn。
+# 说明：加载配置后先预览首个事件，不在进入场景时立刻推进 world turn。
 func _ready() -> void:
 	continue_button.pressed.connect(_on_continue_button_pressed)
 	var test_config := _load_test_config()
@@ -28,21 +28,21 @@ func _ready() -> void:
 
 	var load_result := _load_world_event_test_config(test_config)
 	if not load_result.get("ok", false):
-		status_label.text = "加载失败：%s" % str(load_result.get("error", "unknown"))
+		status_label.text = "加载失败: %s" % str(load_result.get("error", "unknown"))
 		return
 
 	_append_log("测试环境启动，开始预览第一个事件。")
 	_preview_next_event()
 
 
-# 功能：预览下一事件并停留在当前界面。
+# 功能：预览下一个事件并停留在当前界面。
 # 说明：预览阶段只展示事件内容，不执行结算，也不增加 world turn。
 func _preview_next_event() -> void:
 	_current_turn_result.clear()
 
 	var turn_result := _engine.preview_next_turn()
 	if not turn_result.get("ok", false):
-		status_label.text = "事件预览失败：%s" % str(turn_result.get("error", "unknown"))
+		status_label.text = "事件预览失败: %s" % str(turn_result.get("error", "unknown"))
 		_update_side_panels()
 		return
 
@@ -67,6 +67,7 @@ func _render_current_event(turn_result: Dictionary) -> void:
 		str(turn_result.get("event_id", "")),
 		str(turn_result.get("title", ""))
 	]
+
 	var detail_text := _build_event_detail_text(turn_result)
 	event_detail_label.text = detail_text
 	if phase == "presentation":
@@ -75,7 +76,7 @@ func _render_current_event(turn_result: Dictionary) -> void:
 		if speaker.is_empty():
 			event_detail_label.text = "%s\n\n%s" % [body, detail_text]
 		else:
-			event_detail_label.text = "%s：%s\n\n%s" % [speaker, body, detail_text]
+			event_detail_label.text = "%s: %s\n\n%s" % [speaker, body, detail_text]
 
 	_clear_option_list()
 	continue_button.visible = false
@@ -114,7 +115,7 @@ func _render_current_event(turn_result: Dictionary) -> void:
 
 
 # 功能：处理玩家点击选项。
-# 说明：先结算当前待处理事件，再预览下一事件，保证界面总是停在“未结算事件”上。
+# 说明：先结算当前待处理事件，再预览下一个事件，保证界面总是停在“未结算事件”上。
 func _on_option_pressed(option_id: String) -> void:
 	if _current_turn_result.is_empty():
 		status_label.text = "当前没有待处理的事件选择。"
@@ -122,7 +123,7 @@ func _on_option_pressed(option_id: String) -> void:
 
 	var turn_result := _engine.confirm_pending_turn(option_id)
 	if not turn_result.get("ok", false):
-		status_label.text = "选项结算失败：%s" % str(turn_result.get("error", "unknown"))
+		status_label.text = "选项结算失败: %s" % str(turn_result.get("error", "unknown"))
 		_update_side_panels()
 		return
 
@@ -150,7 +151,7 @@ func _on_continue_button_pressed() -> void:
 
 	var turn_result := _engine.confirm_pending_turn()
 	if not turn_result.get("ok", false):
-		status_label.text = "事件结算失败：%s" % str(turn_result.get("error", "unknown"))
+		status_label.text = "事件结算失败: %s" % str(turn_result.get("error", "unknown"))
 		_update_side_panels()
 		return
 
@@ -203,7 +204,7 @@ func _build_option_button_text(option_def: Dictionary) -> String:
 
 
 # 功能：刷新右侧世界状态与底部日志。
-# 说明：集中展示玩家数据、世界参数、链上下文和历史事件，便于验证结算结果。
+# 说明：集中展示玩家数据、世界参数、链上下文、任务信息和历史事件，便于验证结算结果。
 func _update_side_panels() -> void:
 	var world_state := _engine.world_state
 	var player: Dictionary = world_state.get("player", {})
@@ -215,9 +216,9 @@ func _update_side_panels() -> void:
 	var tasks_state: Dictionary = world_state.get("tasks", {})
 
 	var lines: Array[String] = []
-	lines.append("回合：%s" % str(world_state.get("turn", 0)))
-	lines.append("地点：%s" % str(world_state.get("currentLocationId", "")))
-	lines.append("强制下一事件：%s" % str(world_state.get("forcedNextEventId", "")))
+	lines.append("回合: %s" % str(world_state.get("turn", 0)))
+	lines.append("地点: %s" % str(world_state.get("currentLocationId", "")))
+	lines.append("强制下一事件: %s" % str(world_state.get("forcedNextEventId", "")))
 	lines.append("")
 	lines.append("玩家")
 	lines.append(
@@ -251,9 +252,7 @@ func _update_side_panels() -> void:
 	else:
 		lines.append("null")
 	lines.append("")
-	lines.append("任务状态")
-	lines.append("maxActiveCount=%s" % str(task_config.get("maxActiveCount", 1)))
-	lines.append(JSON.stringify(tasks_state))
+	lines.append(_build_task_debug_text(task_config, tasks_state))
 	lines.append("")
 	lines.append("最近历史")
 	lines.append(", ".join(_history_to_string_array(history)))
@@ -262,6 +261,62 @@ func _update_side_panels() -> void:
 	# 说明：文本刷新后延迟一帧再复位滚动，避免 RichTextLabel 重排后覆盖滚动位置。
 	world_state_label.call_deferred("scroll_to_line", 0)
 	log_label.text = "\n".join(_event_logs)
+
+
+# 功能：构建任务调试信息文本。
+# 说明：将任务配置、进行中任务、归档结果和最近结算记录整理成多行文本，便于在测试场景中直接观察任务推进。
+func _build_task_debug_text(task_config: Dictionary, tasks_state: Dictionary) -> String:
+	var lines: Array[String] = []
+	var active: Array = tasks_state.get("active", [])
+	var completed: Array = tasks_state.get("completed", [])
+	var failed: Array = tasks_state.get("failed", [])
+	var abandoned: Array = tasks_state.get("abandoned", [])
+	var result_records: Array = tasks_state.get("resultRecords", [])
+
+	lines.append("任务状态")
+	lines.append("maxActiveCount=%s" % str(task_config.get("maxActiveCount", 1)))
+	lines.append("active_count=%s" % str(active.size()))
+	lines.append("completed=%s" % JSON.stringify(completed))
+	lines.append("failed=%s" % JSON.stringify(failed))
+	lines.append("abandoned=%s" % JSON.stringify(abandoned))
+	lines.append("")
+
+	lines.append("进行中任务")
+	if active.is_empty():
+		lines.append("无")
+	else:
+		for task_variant in active:
+			var task: Dictionary = task_variant
+			lines.append(
+				"- %s | accepted=%s | deadline=%s | progress=%s" % [
+					str(task.get("taskId", "")),
+					str(task.get("acceptedTurn", 0)),
+					str(task.get("deadlineTurn", 0)),
+					JSON.stringify(task.get("progress", {}))
+				]
+			)
+
+	lines.append("")
+	lines.append("最近任务结算")
+	if result_records.is_empty():
+		lines.append("无")
+	else:
+		# 说明：仅展示最近 5 条结算记录，避免右侧调试面板被历史数据完全占满。
+		for idx in range(maxi(0, result_records.size() - 5), result_records.size()):
+			var record: Dictionary = result_records[idx]
+			lines.append(
+				"- %s | status=%s | grade=%s | score=%s | finished=%s | reason=%s | progress=%s" % [
+					str(record.get("taskId", "")),
+					str(record.get("status", "")),
+					str(record.get("gradeId", "")),
+					str(record.get("score", null)),
+					str(record.get("finishedTurn", 0)),
+					str(record.get("reason", "")),
+					JSON.stringify(record.get("progress", {}))
+				]
+			)
+
+	return "\n".join(lines)
 
 
 # 功能：记录每次事件预览日志。
