@@ -8,6 +8,7 @@ evt_story_force_001,required_location,,,harbor,
 evt_guard_chase_001,required_location,,,harbor,
 evt_smuggle_escape_001,required_location,,,harbor,
 evt_harbor_deal_001,required_npc,,,npc_smuggler,
+evt_smuggle_end_001,required_location,,,harbor,
 evt_harbor_deal_001,required_location_flag,security,<=,40,
 evt_study_001,weight_rule,params.danger,<,20,10
 evt_harbor_hint_001,weight_rule,params.danger,>=,12,12
