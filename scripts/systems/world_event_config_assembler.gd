@@ -558,6 +558,9 @@ static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -
 			"baseWeight": _to_int(row.get("base_weight", "10"), 10),
 			"tags": _split_text_list(str(row.get("tags", "")), ";"),
 			"taskLinks": _split_text_list(str(row.get("task_links", "")), ";"),
+			# 功能：标记当前事件是否为世界结束事件。
+			# 说明：MVP 阶段由事件主表直接声明，避免为 ending event 额外拆表。
+			"isEndingEvent": _to_bool(row.get("is_ending_event", "")),
 			"eligibility": {},
 			"weightRules": [],
 			"continuationPolicy": str(row.get("continuation_policy", "ReturnToScheduler")),
@@ -573,6 +576,10 @@ static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -
 
 		event_map[event_id] = event_def
 		event_order.append(event_id)
+
+	var ending_validate_result := _validate_ending_event_constraints(event_map)
+	if not ending_validate_result.get("ok", false):
+		return ending_validate_result
 
 	for row_variant in condition_rows:
 		var row: Dictionary = row_variant
@@ -607,6 +614,23 @@ static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -
 		events.append(event_def)
 
 	return {"ok": true, "events": events}
+
+
+# 功能：校验 ending event 的编译期约束。
+# 说明：当前 MVP 阶段结束事件禁止绑定 choice point，避免终局流程产生选项分叉。
+static func _validate_ending_event_constraints(event_map: Dictionary) -> Dictionary:
+	for event_id_variant in event_map.keys():
+		var event_id := str(event_id_variant).strip_edges()
+		var event_def: Dictionary = event_map[event_id]
+		if not bool(event_def.get("isEndingEvent", false)):
+			continue
+		var choice_point_id := str(event_def.get("choicePointId", "")).strip_edges()
+		if not choice_point_id.is_empty():
+			return {
+				"ok": false,
+				"error": "ending event must not reference choice point: %s -> %s" % [event_id, choice_point_id]
+			}
+	return {"ok": true}
 
 
 # 功能：将事件展示项编译到对应事件定义中。
