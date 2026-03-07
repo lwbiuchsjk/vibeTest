@@ -7,3 +7,4 @@ evt_harbor_deal_001,码头交易,,12,ChainContinue,cp_harbor_deal,smuggle,advanc
 evt_story_force_001,剧情急转,town.svg,8,ChainContinueWithForcedNext,,force;smuggle,risk:task_smuggle,FALSE
 evt_guard_chase_001,守卫追捕,,14,ChainContinue,,escape,risk:task_smuggle,FALSE
 evt_smuggle_escape_001,脱离追踪,dock.svg,10,ReturnToScheduler,,escape;smuggle,advance:task_smuggle,FALSE
+evt_smuggle_end_001,取舍时刻,town.svg,1,ReturnToScheduler,,ending;smuggle,,TRUE

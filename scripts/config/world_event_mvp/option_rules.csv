@@ -39,8 +39,9 @@ opt_run,resolution,default,params,,add,,morale,-2
 opt_run,resolution,default,world,,set_forced_next,,,evt_guard_chase_001
 opt_run,resolution,default,chain_context,,patch,,stageDelta,1
 opt_run,resolution,default,task,,advance_task,,task_smuggle,chase:1
-opt_bribe_guard,eligibility,default,,player.gold,>=,50,,
-opt_bribe_guard,cost,default,,,,,gold,50
+opt_bribe_guard,eligibility,default,,player.gold,>=,30,,
+opt_bribe_guard,cost,default,,,,,gold,30
 opt_bribe_guard,resolution,default,params,,add,,danger,-4
 opt_bribe_guard,resolution,default,flags,,set,,isWanted,FALSE
+opt_bribe_guard,resolution,default,world,,set_forced_next,,,evt_smuggle_end_001
 opt_bribe_guard,resolution,default,task,,abandon_task,,task_smuggle,
