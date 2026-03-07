@@ -1,8 +1,9 @@
-﻿extends Control
+extends Control
 
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 const TaskSummaryCard := preload("res://scripts/ui/task_summary_card.gd")
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
+const WorldEndScreen := preload("res://test/ui/world_end_screen.gd")
 
 const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
 
@@ -15,6 +16,8 @@ var _current_turn_result: Dictionary = {}
 @onready var event_title_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/EventInfoScroll/EventInfo/EventTitle
 @onready var event_detail_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/EventInfoScroll/EventInfo/EventDetail
 @onready var task_summary_card: TaskSummaryCard = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/TaskSummaryCard
+@onready var main_split: HSplitContainer = $Root/RootContent/MainSplit
+@onready var end_root: WorldEndScreen = $Root/RootContent/EndRoot
 @onready var continue_button: Button = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/OptionSection/ActionBar/ContinueButton
 @onready var option_list: VBoxContainer = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/OptionSection/OptionScroll/OptionList
 @onready var world_state_label: RichTextLabel = $Root/RootContent/MainSplit/RightColumn/RightPanel/RightMargin/RightContent/WorldStateValue
@@ -25,6 +28,7 @@ var _current_turn_result: Dictionary = {}
 # 说明：加载配置后先预览首个事件，不在进入场景时立刻推进 world turn。
 func _ready() -> void:
 	continue_button.pressed.connect(_on_continue_button_pressed)
+	end_root.action_requested.connect(_on_end_action_requested)
 	var test_config := _load_test_config()
 	_engine = WorldEventEngine.new(_get_test_random_seed(test_config))
 
@@ -57,6 +61,10 @@ func _preview_next_event() -> void:
 # 功能：渲染当前事件。
 # 说明：根据 phase 分别处理展示、选择、确认三种界面状态，避免测试场景自行推断引擎内部流程。
 func _render_current_event(turn_result: Dictionary) -> void:
+	if _is_world_ended_result(turn_result):
+		_render_end_screen(turn_result)
+		return
+
 	var choice: Dictionary = turn_result.get("choice", {})
 	var options: Array = choice.get("options", [])
 	var phase := str(turn_result.get("phase", "confirm"))
@@ -72,6 +80,7 @@ func _render_current_event(turn_result: Dictionary) -> void:
 
 	var detail_text := _build_event_detail_text(turn_result)
 	event_detail_label.text = detail_text
+	_set_end_screen_visible(false)
 	_update_left_task_panel(turn_result)
 	if phase == "presentation":
 		var speaker := str(presentation_item.get("speaker", "")).strip_edges()
@@ -138,6 +147,12 @@ func _on_option_pressed(option_id: String) -> void:
 			str(turn_result.get("title", ""))
 		]
 	)
+	if _is_world_ended_result(turn_result):
+		_current_turn_result = (turn_result as Dictionary).duplicate(true)
+		_append_end_log(turn_result)
+		_render_current_event(turn_result)
+		_update_side_panels()
+		return
 	_update_side_panels()
 	_preview_next_event()
 
@@ -164,6 +179,12 @@ func _on_continue_button_pressed() -> void:
 			str(turn_result.get("title", ""))
 		]
 	)
+	if _is_world_ended_result(turn_result):
+		_current_turn_result = (turn_result as Dictionary).duplicate(true)
+		_append_end_log(turn_result)
+		_render_current_event(turn_result)
+		_update_side_panels()
+		return
 	_update_side_panels()
 	_preview_next_event()
 
@@ -189,6 +210,10 @@ func _build_event_detail_text(turn_result: Dictionary) -> String:
 	lines.append("choice_point=%s" % str(choice.get("choice_point_id", "")))
 	lines.append("chain_active=%s" % str(turn_result.get("chain_active", false)))
 	lines.append("world_turn=%s" % str(_engine.world_state.get("turn", 0)))
+	lines.append("run_status=%s" % str(turn_result.get("run_status", "")))
+	lines.append("world_ended=%s" % str(turn_result.get("world_ended", false)))
+	lines.append("ending_event_id=%s" % str(turn_result.get("ending_event_id", "")))
+	lines.append("finished_turn=%s" % str(turn_result.get("finished_turn", 0)))
 	return "\n".join(lines)
 
 
@@ -226,6 +251,7 @@ func _update_side_panels() -> void:
 	var player: Dictionary = world_state.get("player", {})
 	var params: Dictionary = world_state.get("params", {})
 	var flags: Dictionary = world_state.get("flags", {})
+	var run_state: Dictionary = world_state.get("runState", {})
 	var chain_context: Variant = world_state.get("chainContext", null)
 	var history: Array = world_state.get("history", [])
 	var task_config: Dictionary = world_state.get("taskConfig", {})
@@ -235,6 +261,13 @@ func _update_side_panels() -> void:
 	lines.append("回合: %s" % str(world_state.get("turn", 0)))
 	lines.append("地点: %s" % str(world_state.get("currentLocationId", "")))
 	lines.append("强制下一事件: %s" % str(world_state.get("forcedNextEventId", "")))
+	lines.append(
+		"运行态: status=%s  ending=%s  finished_turn=%s" % [
+			str(run_state.get("status", "")),
+			str(run_state.get("endingEventId", "")),
+			str(run_state.get("finishedTurn", 0))
+		]
+	)
 	lines.append("")
 	lines.append("玩家")
 	lines.append(
@@ -277,6 +310,141 @@ func _update_side_panels() -> void:
 	# 说明：文本刷新后延迟一帧再复位滚动，避免 RichTextLabel 重排后覆盖滚动位置。
 	world_state_label.call_deferred("scroll_to_line", 0)
 	log_label.text = "\n".join(_event_logs)
+
+
+# 功能：判断当前返回结果是否代表世界结束。
+# 说明：统一消费引擎公开字段，避免界面层自行依赖内部 world_state 细节推断 ended。
+func _is_world_ended_result(turn_result: Dictionary) -> bool:
+	return bool(turn_result.get("world_ended", false)) \
+		or str(turn_result.get("run_status", "")).strip_edges() == "ended" \
+		or str(turn_result.get("phase", "")).strip_edges() == "ended"
+
+
+# 功能：渲染世界结束界面。
+# 说明：结束后切换到独立页面，隐藏事件交互区，保留终局事件与结束态摘要供手动验收。
+func _render_end_screen(turn_result: Dictionary) -> void:
+	_set_end_screen_visible(true)
+	var ending_model := _build_end_screen_model(turn_result)
+	end_root.render_model(ending_model)
+	status_label.text = "本轮已结束，当前显示终局结果页。"
+
+
+# 功能：切换结束界面的显示状态。
+# 说明：非结束态时恢复原事件测试界面，避免结束页与事件页同时可见。
+func _set_end_screen_visible(visible: bool) -> void:
+	end_root.visible = visible
+	main_split.visible = not visible
+
+
+# 功能：构建结束界面的展示文本。
+# 说明：聚合终局事件返回、world_state.runState 与关键世界摘要，便于人工核对结束封口是否正确。
+func _build_end_summary_text(turn_result: Dictionary, ending_title: String) -> String:
+	var world_state := _engine.world_state
+	var params: Dictionary = world_state.get("params", {})
+	var flags: Dictionary = world_state.get("flags", {})
+	var lines: Array[String] = []
+	lines.append("你在第 %s 回合迎来了“%s”。" % [
+		str(turn_result.get("finished_turn", 0)),
+		ending_title
+	])
+	lines.append("")
+	lines.append(
+		"最终数值：danger=%s  prosperity=%s  morale=%s" % [
+			str(params.get("danger", 0)),
+			str(params.get("prosperity", 0)),
+			str(params.get("morale", 0))
+		]
+	)
+	lines.append(
+		"关键标记：isWanted=%s  gotHarborIntel=%s" % [
+			str(flags.get("isWanted", false)),
+			str(flags.get("gotHarborIntel", false))
+		]
+	)
+	lines.append("")
+	lines.append("如需继续验证，请重新进入场景开始下一轮。")
+	return "\n".join(lines)
+
+
+# 功能：构建结束界面的视图模型。
+# 说明：将终局页需要的数据先收束成稳定结构，后续挂接流程按钮或切换数据源时只扩展 model，不直接改渲染主链。
+func _build_end_screen_model(turn_result: Dictionary) -> Dictionary:
+	var ending_event_id := _resolve_end_event_id(turn_result)
+	var ending_title := _resolve_end_event_title(turn_result, ending_event_id)
+	return {
+		"title": ending_title,
+		"subtitle": "本轮流程已正式结束。以下是本次测试最关键的结果摘要。",
+		"endingEventId": ending_event_id,
+		"finishedTurn": int(turn_result.get("finished_turn", 0)),
+		"taskSummary": _build_end_task_summary(),
+		"stateSummary": _build_end_state_summary(),
+		"summaryText": _build_end_summary_text(turn_result, ending_title),
+		"actions": []
+	}
+
+
+# 功能：响应终局页动作请求。
+# 说明：当前先记录占位日志，后续若接入重开、切配置或进入下一流程，可在这里统一分发。
+func _on_end_action_requested(action_id: String) -> void:
+	_append_log("终局页动作触发: %s" % action_id)
+
+
+# 功能：记录世界结束日志。
+# 说明：结束态单独加一条高优先级日志，便于从底部日志快速确认终局已经命中。
+func _append_end_log(turn_result: Dictionary) -> void:
+	_append_log(
+		"世界结束 | ending_event=%s | finished_turn=%s" % [
+			str(turn_result.get("ending_event_id", "")),
+			str(turn_result.get("finished_turn", 0))
+		]
+	)
+
+
+# 功能：解析终局事件 id。
+# 说明：优先使用引擎返回字段；若 ended 短路返回未携带 event_id，则回退读取 world_state.runState。
+func _resolve_end_event_id(turn_result: Dictionary) -> String:
+	var ending_event_id := str(turn_result.get("ending_event_id", "")).strip_edges()
+	if not ending_event_id.is_empty():
+		return ending_event_id
+	var run_state: Dictionary = _engine.world_state.get("runState", {})
+	return str(run_state.get("endingEventId", "")).strip_edges()
+
+
+# 功能：解析终局事件标题。
+# 说明：resolved 结果通常自带 title；若当前是 ended 短路返回，则通过 event_id 回查事件定义。
+func _resolve_end_event_title(turn_result: Dictionary, ending_event_id: String) -> String:
+	var title := str(turn_result.get("title", "")).strip_edges()
+	if not title.is_empty():
+		return title
+	var event_def: Dictionary = _engine._event_map.get(ending_event_id, {})
+	title = str(event_def.get("title", "")).strip_edges()
+	if not title.is_empty():
+		return title
+	return "本轮已结束"
+
+
+# 功能：构建任务结果摘要。
+# 说明：终局页只显示必要统计，不再展开完整任务调试明细。
+func _build_end_task_summary() -> String:
+	var tasks_state: Dictionary = _engine.world_state.get("tasks", {})
+	return "完成 %s / 失败 %s / 放弃 %s" % [
+		str((tasks_state.get("completed", []) as Array).size()),
+		str((tasks_state.get("failed", []) as Array).size()),
+		str((tasks_state.get("abandoned", []) as Array).size())
+	]
+
+
+# 功能：构建最终状态摘要卡片。
+# 说明：将最影响结果理解的状态压缩成一行，避免终局界面退化成调试面板。
+func _build_end_state_summary() -> String:
+	var world_state := _engine.world_state
+	var params: Dictionary = world_state.get("params", {})
+	var flags: Dictionary = world_state.get("flags", {})
+	return "danger=%s | morale=%s | wanted=%s" % [
+		str(params.get("danger", 0)),
+		str(params.get("morale", 0)),
+		str(flags.get("isWanted", false))
+	]
 
 
 # 功能：构建任务调试信息文本。

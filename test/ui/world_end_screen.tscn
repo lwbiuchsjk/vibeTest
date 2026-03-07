@@ -1,0 +1,213 @@
+[gd_scene load_steps=5 format=3 uid="uid://cgv3i7k4wqm83"]
+
+[ext_resource type="Script" path="res://test/ui/world_end_screen.gd" id="1_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_end_backdrop"]
+bg_color = Color(0.0941176, 0.121569, 0.14902, 0.96)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_end_card"]
+bg_color = Color(0.964706, 0.94902, 0.901961, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.694118, 0.482353, 0.239216, 0.9)
+corner_radius_top_left = 24
+corner_radius_top_right = 24
+corner_radius_bottom_right = 24
+corner_radius_bottom_left = 24
+shadow_color = Color(0, 0, 0, 0.18)
+shadow_size = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_end_stat"]
+bg_color = Color(0.890196, 0.839216, 0.713726, 0.55)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.654902, 0.486275, 0.266667, 0.45)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+
+[node name="WorldEndScreen" type="PanelContainer"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_end_backdrop")
+script = ExtResource("1_script")
+
+[node name="EndMargin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 24
+
+[node name="EndCenter" type="CenterContainer" parent="EndMargin"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="EndCard" type="PanelContainer" parent="EndMargin/EndCenter"]
+custom_minimum_size = Vector2(760, 520)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_end_card")
+
+[node name="EndCardMargin" type="MarginContainer" parent="EndMargin/EndCenter/EndCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 28
+
+[node name="EndCardContent" type="VBoxContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 18
+
+[node name="EndEyebrow" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent"]
+layout_mode = 2
+text = "RUN COMPLETE"
+theme_override_colors/font_color = Color(0.654902, 0.352941, 0.145098, 1)
+
+[node name="EndTitle" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent"]
+layout_mode = 2
+text = "本轮已结束"
+
+[node name="EndSubtitle" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent"]
+layout_mode = 2
+text = "结束信息将在这里显示。"
+autowrap_mode = 3
+
+[node name="EndDivider" type="HSeparator" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent"]
+layout_mode = 2
+
+[node name="EndStats" type="HBoxContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="EndingStat" type="PanelContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_end_stat")
+
+[node name="EndingStatMargin" type="MarginContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/EndingStat"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="EndingStatContent" type="VBoxContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/EndingStat/EndingStatMargin"]
+layout_mode = 2
+
+[node name="EndingStatLabel" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/EndingStat/EndingStatMargin/EndingStatContent"]
+layout_mode = 2
+text = "结束事件"
+theme_override_colors/font_color = Color(0.396078, 0.278431, 0.160784, 1)
+
+[node name="EndingStatValue" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/EndingStat/EndingStatMargin/EndingStatContent"]
+layout_mode = 2
+text = "-"
+autowrap_mode = 3
+
+[node name="TurnStat" type="PanelContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_end_stat")
+
+[node name="TurnStatMargin" type="MarginContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/TurnStat"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="TurnStatContent" type="VBoxContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/TurnStat/TurnStatMargin"]
+layout_mode = 2
+
+[node name="TurnStatLabel" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/TurnStat/TurnStatMargin/TurnStatContent"]
+layout_mode = 2
+text = "完成回合"
+theme_override_colors/font_color = Color(0.396078, 0.278431, 0.160784, 1)
+
+[node name="TurnStatValue" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/TurnStat/TurnStatMargin/TurnStatContent"]
+layout_mode = 2
+text = "-"
+
+[node name="TaskStat" type="PanelContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_end_stat")
+
+[node name="TaskStatMargin" type="MarginContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/TaskStat"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="TaskStatContent" type="VBoxContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/TaskStat/TaskStatMargin"]
+layout_mode = 2
+
+[node name="TaskStatLabel" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/TaskStat/TaskStatMargin/TaskStatContent"]
+layout_mode = 2
+text = "任务结果"
+theme_override_colors/font_color = Color(0.396078, 0.278431, 0.160784, 1)
+
+[node name="TaskStatValue" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/TaskStat/TaskStatMargin/TaskStatContent"]
+layout_mode = 2
+text = "-"
+autowrap_mode = 3
+
+[node name="StateStat" type="PanelContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_end_stat")
+
+[node name="StateStatMargin" type="MarginContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/StateStat"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="StateStatContent" type="VBoxContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/StateStat/StateStatMargin"]
+layout_mode = 2
+
+[node name="StateStatLabel" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/StateStat/StateStatMargin/StateStatContent"]
+layout_mode = 2
+text = "最终状态"
+theme_override_colors/font_color = Color(0.396078, 0.278431, 0.160784, 1)
+
+[node name="StateStatValue" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndStats/StateStat/StateStatMargin/StateStatContent"]
+layout_mode = 2
+text = "-"
+autowrap_mode = 3
+
+[node name="EndSummary" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "结果摘要将在这里显示。"
+autowrap_mode = 3
+vertical_alignment = 1
+
+[node name="EndActionHeader" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent"]
+layout_mode = 2
+text = "后续操作"
+theme_override_colors/font_color = Color(0.396078, 0.278431, 0.160784, 1)
+
+[node name="EndActionList" type="VBoxContainer" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="EndActionHint" type="Label" parent="EndMargin/EndCenter/EndCard/EndCardMargin/EndCardContent/EndActionList"]
+layout_mode = 2
+text = "当前版本暂未接入后续流程选项。"
+autowrap_mode = 3
