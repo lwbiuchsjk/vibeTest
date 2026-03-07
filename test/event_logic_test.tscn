@@ -2,8 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cbx22u7e0gipa" path="res://test/event_logic_test.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://scripts/ui/task_summary_card.tscn" id="2_task_summary_card"]
-
-[sub_resource type="Theme" id="Theme_event_logic_test"]
+[ext_resource type="PackedScene" path="res://test/ui/world_end_screen.tscn" id="3_world_end_screen"]
 
 [node name="EventLogicTest" type="Control"]
 layout_mode = 3
@@ -12,7 +11,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme = SubResource("Theme_event_logic_test")
 script = ExtResource("1_script")
 
 [node name="Root" type="MarginContainer" parent="."]
@@ -47,6 +45,9 @@ horizontal_alignment = 1
 layout_mode = 2
 text = "Loading..."
 horizontal_alignment = 1
+
+[node name="EndRoot" parent="Root/RootContent" instance=ExtResource("3_world_end_screen")]
+layout_mode = 2
 
 [node name="MainSplit" type="HSplitContainer" parent="Root/RootContent"]
 layout_mode = 2
