@@ -1,6 +1,6 @@
 [gd_scene load_steps=5 format=3 uid="uid://cgv3i7k4wqm83"]
 
-[ext_resource type="Script" path="res://test/ui/world_end_screen.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/ui/world_end_screen.gd" id="1_script"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_end_backdrop"]
 bg_color = Color(0.0941176, 0.121569, 0.14902, 0.96)

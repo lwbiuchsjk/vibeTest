@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cbx22u7e0gipa" path="res://test/event_logic_test.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://scripts/ui/task_summary_card.tscn" id="2_task_summary_card"]
-[ext_resource type="PackedScene" path="res://test/ui/world_end_screen.tscn" id="3_world_end_screen"]
+[ext_resource type="PackedScene" path="res://scripts/ui/world_end_screen.tscn" id="3_world_end_screen"]
 
 [node name="EventLogicTest" type="Control"]
 layout_mode = 3
