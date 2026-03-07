@@ -3,7 +3,7 @@ extends Control
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 const TaskSummaryCard := preload("res://scripts/ui/task_summary_card.gd")
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
-const WorldEndScreen := preload("res://test/ui/world_end_screen.gd")
+const WorldEndScreen := preload("res://scripts/ui/world_end_screen.gd")
 
 const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
 
