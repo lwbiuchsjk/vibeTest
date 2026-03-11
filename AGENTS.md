@@ -1,5 +1,6 @@
 # Project Agent Instructions
 
-- 在本项目中处理任何任务前，优先读取 `_kb_sync/Design/KB_CACHE.md`（若存在且非空）下的文件，作为知识库上下文。
-- `_kb_sync/Design` 中其他`.md`文件是独立的知识库内容，其中保留了必要的格式信息。方便准确定位查找。
+- 在本项目中处理任何任务前，优先读取 `_kb_sync/Design/KB_CACHE.md`（若存在且非空）作为知识库总入口。
+- 如需查看单篇在线文档的独立内容与格式信息，优先读取 `_kb_sync/Design` 下对应的 `.md` 文件。
+- 如需查看知识库节点概览、索引和结构化缓存，使用 `_kb_sync/cache/KB_CONTEXT.md`、`_kb_sync/cache/KB_CONTEXT.json` 与 `_kb_sync/cache/cache_index.json`。
 - 本项目中生成、改动代码时，需要在代码中生成注释。需要有函数级注释，并在逻辑中关键位置做出特别说明。注释使用中文。
