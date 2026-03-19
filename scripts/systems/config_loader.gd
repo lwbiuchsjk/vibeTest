@@ -70,10 +70,12 @@ static func load_roles(path: String) -> Dictionary:
 			str(row.get("location_id", "")),
 			str(row.get("portrait_file", "")),
 			{
-				"will": _to_int(row.get("will", "1"), 1),
-				"intelligence": _to_int(row.get("intelligence", "1"), 1),
-				"charm": _to_int(row.get("charm", "1"), 1),
-				"luck": _to_int(row.get("luck", "1"), 1)
+				"aptitude": _to_int(row.get("aptitude", "1"), 1),
+				"physique": _to_int(row.get("physique", "1"), 1),
+				"craft": _to_int(row.get("craft", "1"), 1),
+				"insight": _to_int(row.get("insight", "1"), 1),
+				"energy": _to_int(row.get("energy", "0"), 0),
+				"xinxing": _to_int(row.get("xinxing", "0"), 0)
 			},
 			{
 				"money": _to_int(row.get("money", "0"), 0),

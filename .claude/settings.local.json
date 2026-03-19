@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(claude logout:*)"
+      "Bash(claude logout:*)",
+      "Bash(xargs grep:*)",
+      "Edit",
+      "Write",
+      "Bash(git *)",
+      "Bash(cd *)"
     ]
   }
 }

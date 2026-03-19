@@ -25,9 +25,9 @@ static func run_with_context(context: Dictionary) -> Dictionary:
 
 	var role_apply := RuleEngine.apply_role_delta(
 		player,
-		{"will": 5, "luck": -2},
+		{"aptitude": 5, "physique": -2},
 		{"money": -25, "manpower": 2},
-		{"will": 7, "intelligence": 8, "charm": 8, "luck": 6}
+		{"aptitude": 7, "physique": 8, "craft": 8, "insight": 6}
 	)
 	if not role_apply.get("ok", false):
 		return role_apply

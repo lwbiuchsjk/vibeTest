@@ -9,7 +9,12 @@ param,,,prosperity,20
 param,,,morale,50
 player,,,hp,100
 player,,,gold,30
-player,,,energy,3
+player,,,aptitude,3
+player,,,physique,999
+player,,,craft,2
+player,,,insight,1
+player,,,energy,5
+player,,,xinxing,0
 location_state,town_square,,security,60
 location_state,market,,security,55
 location_state,harbor,,security,35

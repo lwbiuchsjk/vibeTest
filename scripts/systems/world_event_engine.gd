@@ -1,4 +1,4 @@
-extends RefCounted
+﻿extends RefCounted
 class_name WorldEventEngine
 
 # 功能：世界与事件引擎（MVP）。
@@ -10,6 +10,7 @@ const TASK_BIAS_ADVANCE_DEFAULT := 6
 const TASK_BIAS_RISK_DEFAULT := -4
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 const LocationGraph := preload("res://scripts/models/location_graph.gd")
+# RuleEngine 通过 class_name 全局注册，无需 preload。
 
 var world_state: Dictionary = {}
 var events: Array = []
@@ -23,6 +24,10 @@ var _task_eval_index_by_task: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
 var _pending_turn_context: Dictionary = {}
 var _location_graph: LocationGraph
+# 玩家 RoleState 引用，用于承载能力与状态结构（本阶段鉴定读取走 world_state.player）。
+var player_role_state: Variant = null
+# 鉴定阶段阈值。本阶段以常量形式集中定义，后续可拆为配置文件。
+var _assessment_thresholds: Array = [0, 3, 7, 12]
 
 # 功能：初始化随机源。
 # 说明：seed=0 使用随机种子；指定 seed 可复现结果，便于测试回归。
@@ -70,6 +75,12 @@ func load_from_csv_dir(csv_dir_path: String) -> Dictionary:
 	var world_event_data := runtime.get_world_event_data()
 	if world_event_data.is_empty():
 		return {"ok": false, "error": "world event config is empty in config runtime"}
+	# 注入玩家 RoleState：从 ConfigRuntime 获取角色列表，找到 player 类型角色。
+	var roles: Array = runtime.get_roles()
+	for role_variant in roles:
+		if role_variant != null and role_variant.role_type == "player":
+			player_role_state = role_variant
+			break
 	return load_from_data(world_event_data, _location_graph)
 
 # 功能：从 JSON 文本加载数据。
@@ -1286,7 +1297,8 @@ func _apply_option_resolution(selected_option: Dictionary, event_def: Dictionary
 
 	var resolution := _dict_or_empty(selected_option.get("resolution", {}))
 	var check := _dict_or_empty(selected_option.get("check", {}))
-	if not _is_check_pass(check):
+	var check_result := _is_check_pass(check)
+	if not check_result.get("pass", true):
 		# 说明：检定失败时，可用 onFailResolution 覆盖默认 resolution。
 		var fail_resolution := _dict_or_empty(check.get("onFailResolution", {}))
 		if not fail_resolution.is_empty():
@@ -1295,15 +1307,44 @@ func _apply_option_resolution(selected_option: Dictionary, event_def: Dictionary
 	_apply_resolution(resolution, event_def)
 
 # 功能：执行选项检定。
-# 说明：当前仅支持 chance；无 check 或未知类型默认通过。
-func _is_check_pass(check: Dictionary) -> bool:
+# 说明：支持 chance（概率判定）和 assessment（能力/状态阶段鉴定）两种类型。
+#       无 check 或未知类型默认通过。
+func _is_check_pass(check: Dictionary) -> Dictionary:
 	if check.is_empty():
-		return true
+		return {"pass": true, "result_type": "success"}
 	var check_type := str(check.get("type", "")).strip_edges()
 	if check_type == "chance":
 		var rate := clampf(float(check.get("successRate", 1.0)), 0.0, 1.0)
-		return _rng.randf() <= rate
-	return true
+		var passed := _rng.randf() <= rate
+		return {"pass": passed, "result_type": "success" if passed else "fail"}
+	if check_type == "assessment":
+		return _run_assessment(check)
+	return {"pass": true, "result_type": "success"}
+
+# 功能：执行 assessment 鉴定。
+# 说明：从 world_state.player 读取各项阶段值（路径 B），累加正向、累减负向，
+#       与 difficultyStage 比较得出结果。结果中预留 critical_success / critical_fail。
+func _run_assessment(check: Dictionary) -> Dictionary:
+	var difficulty_stage := int(check.get("difficultyStage", 0))
+	var items: Array = check.get("items", [])
+	var player: Dictionary = world_state.get("player", {})
+	var score := RuleEngine.evaluate_assessment(items, player, _assessment_thresholds)
+	var passed := score >= difficulty_stage
+	var result_type := "success" if passed else "fail"
+	# 预留字段：本阶段不触发 critical_success / critical_fail
+	# 调试输出：打印鉴定详情
+	var items_debug := ""
+	for item_variant in items:
+		var item: Dictionary = item_variant
+		var key := str(item.get("key", ""))
+		var direction := str(item.get("direction", "positive"))
+		var stage := RuleEngine.get_stage_from_player(player, key, _assessment_thresholds)
+		var sign := "+" if direction != "negative" else "-"
+		if not items_debug.is_empty():
+			items_debug += " / "
+		items_debug += "%s(stage=%d, %s)" % [key, stage, sign]
+	print("[鉴定] difficulty: %d | items: %s | score: %d | result: %s" % [difficulty_stage, items_debug, score, result_type])
+	return {"pass": passed, "result_type": result_type}
 
 # 功能：应用 resolution，并衔接执行锁更新。
 # 说明：统一处理 worldStatePatch、forcedNextEventId、chainContextPatch。

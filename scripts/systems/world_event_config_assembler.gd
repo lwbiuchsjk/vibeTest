@@ -809,6 +809,12 @@ static func _apply_option_rule_row(row: Dictionary, cp_map: Dictionary, option_r
 			check["type"] = value_text
 		elif key == "successRate":
 			check["successRate"] = _to_float(value_text, 1.0)
+		elif key == "difficultyStage":
+			# 鉴定整体难度等级
+			check["difficultyStage"] = _to_int(value_text, 0)
+		elif key == "items":
+			# 鉴定参与项，格式：key:direction;key:direction
+			check["items"] = _parse_assessment_items(value_text)
 		option["check"] = check
 	elif rule_type == "resolution":
 		if branch == "fail":
@@ -1171,3 +1177,21 @@ static func _parse_literal(value: String) -> Variant:
 	if text.is_valid_float():
 		return float(text)
 	return text
+
+
+# 功能：解析鉴定参与项文本为结构化数组。
+# 说明：输入格式为 "key:direction;key:direction"，例如 "physique:positive;energy:negative"。
+static func _parse_assessment_items(text: String) -> Array:
+	var items: Array = []
+	for segment in text.split(";", false):
+		var trimmed := segment.strip_edges()
+		if trimmed.is_empty():
+			continue
+		var parts := trimmed.split(":", false, 1)
+		var item_key := str(parts[0]).strip_edges()
+		var item_direction := "positive"
+		if parts.size() > 1:
+			item_direction = str(parts[1]).strip_edges()
+		if not item_key.is_empty():
+			items.append({"key": item_key, "direction": item_direction})
+	return items

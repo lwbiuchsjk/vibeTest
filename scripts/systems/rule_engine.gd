@@ -5,6 +5,41 @@ class_name RuleEngine
 static func clamp_attribute(value: int, min_value: int = 1, max_value: int = 999999) -> int:
 	return clampi(value, min_value, max_value)
 
+# 根据属性当前值和阈值数组，返回阶段值（0 / 1 / 2 / 3）。
+# thresholds 为升序阈值数组，例如 [0, 3, 7, 12]。
+# value >= thresholds[i] 时进入第 i 阶段，返回最高匹配阶段。
+static func get_ability_stage(value: int, thresholds: Array) -> int:
+	var stage := 0
+	for i in thresholds.size():
+		if value >= int(thresholds[i]):
+			stage = i
+		else:
+			break
+	return stage
+
+# 从 world_state.player 读取指定字段值，调用 get_ability_stage 返回阶段值。
+# 说明：路径 B 实现——本阶段统一从 world_state.player 取值，作为鉴定的便捷入口。
+static func get_stage_from_player(player: Dictionary, key: String, thresholds: Array) -> int:
+	var value := int(player.get(key, 0))
+	return get_ability_stage(value, thresholds)
+
+# 执行鉴定聚合计算：遍历 items，累加正向阶段值、累减负向阶段值，返回综合得分。
+# items 格式：[{"key": "physique", "direction": "positive"}, ...]
+# player：world_state.player 字典（路径 B：本阶段从此处取值）。
+# thresholds：阶段阈值数组，所有项共用同一组阈值。
+static func evaluate_assessment(items: Array, player: Dictionary, thresholds: Array) -> int:
+	var score := 0
+	for item_variant in items:
+		var item: Dictionary = item_variant
+		var key := str(item.get("key", ""))
+		var direction := str(item.get("direction", "positive"))
+		var stage := get_stage_from_player(player, key, thresholds)
+		if direction == "negative":
+			score -= stage
+		else:
+			score += stage
+	return score
+
 # 应用资源增减。按设计资源允许为负数。
 static func apply_resource_delta(current_value: int, delta: int) -> int:
 	return current_value + delta
