@@ -110,6 +110,8 @@ func load_from_json_text(
 	choice_points = (parsed_choice_points as Array).duplicate(true)
 	task_defs = []
 	task_evaluation = {}
+	# JSON 路径不携带 RoleState，清空避免上一轮残留脏状态。
+	player_role_state = null
 	_ensure_run_state()
 	_ensure_task_runtime_state()
 	_rebuild_event_map()
@@ -152,9 +154,10 @@ func load_from_data(data: Dictionary, location_graph: Variant = null, role_state
 	_rebuild_choice_point_map()
 	_rebuild_task_def_map()
 	_rebuild_task_evaluation_index()
-	# 注入玩家 RoleState 并同步到 world_state，确保所有加载路径统一处理。
-	if role_state != null:
-		player_role_state = role_state
+	# 每次加载时无条件重置 player_role_state，避免上一轮残留脏状态。
+	# 若传入了 role_state 则注入并同步到 world_state。
+	player_role_state = role_state
+	if player_role_state != null:
 		_sync_role_to_world_state()
 	return {"ok": true}
 
@@ -1242,31 +1245,48 @@ func _match_inline_rule(actual: Variant, rule: String) -> bool:
 	var expected_literal: Variant = _parse_literal(rule)
 	return actual == expected_literal
 
+# 功能：读取玩家指定字段的值。
+# 说明：优先从 RoleState 读取（路径 A），若不存在则回退到 world_state.player（JSON 路径兼容）。
+func _get_player_value(key: String, default_value: int = 0) -> int:
+	if player_role_state != null:
+		return int(player_role_state.get_value(key, default_value))
+	var player: Dictionary = world_state.get("player", {})
+	return int(player.get(key, default_value))
+
+# 功能：写入玩家指定字段的值。
+# 说明：优先写入 RoleState 并同步（路径 A），若不存在则直接写 world_state.player（JSON 路径兼容）。
+func _set_player_value(key: String, value: int) -> void:
+	if player_role_state != null:
+		player_role_state.set_value(key, value)
+	else:
+		var player: Dictionary = world_state.get("player", {})
+		player[key] = value
+		world_state["player"] = player
+
 # 功能：检查玩家是否可支付选项代价。
-# 说明：从 RoleState 读取值进行比较。
+# 说明：通过 _get_player_value 读取，兼容 RoleState 和 JSON 两种路径。
 func _can_pay_cost(cost: Dictionary) -> bool:
 	if cost.is_empty():
 		return true
-	if player_role_state == null:
-		return false
 	for key_variant in cost.keys():
 		var key := str(key_variant)
 		var need := int(cost[key_variant])
-		var have := int(player_role_state.get_value(key, 0))
+		var have := _get_player_value(key, 0)
 		if have < need:
 			return false
 	return true
 
-# 功能：将选项代价扣减到 RoleState，并同步到 world_state.player。
-# 说明：RoleState 为权威数据源，扣减后同步到 world_state.player 保持一致。
+# 功能：将选项代价扣减到玩家数据。
+# 说明：通过 _set_player_value 写入，RoleState 路径会自动同步到 world_state。
 func _apply_cost(cost: Dictionary) -> void:
-	if cost.is_empty() or player_role_state == null:
+	if cost.is_empty():
 		return
 	for key_variant in cost.keys():
 		var key := str(key_variant)
-		var current := int(player_role_state.get_value(key, 0))
-		player_role_state.set_value(key, current - int(cost[key_variant]))
-	_sync_role_to_world_state()
+		var current := _get_player_value(key, 0)
+		_set_player_value(key, current - int(cost[key_variant]))
+	if player_role_state != null:
+		_sync_role_to_world_state()
 
 # 功能：在可选项中按外部传入 ID 精确选择。
 # 说明：仅当目标选项状态为 selectable 时返回，否则返回空字典。
@@ -1328,24 +1348,45 @@ func _is_check_pass(check: Dictionary) -> Dictionary:
 	return {"pass": true, "result_type": "success"}
 
 # 功能：执行 assessment 鉴定。
-# 说明：从 RoleState 读取各项阶段值（路径 A），累加正向、累减负向，
-#       与 difficultyStage 比较得出结果。结果中预留 critical_success / critical_fail。
+# 说明：优先从 RoleState 读取（路径 A），无 RoleState 时回退到 world_state.player（JSON 路径）。
+#       累加正向阶段值、累减负向阶段值，与 difficultyStage 比较。预留 critical_success / critical_fail。
 func _run_assessment(check: Dictionary) -> Dictionary:
 	var difficulty_stage := int(check.get("difficultyStage", 0))
 	var items: Array = check.get("items", [])
-	if player_role_state == null:
-		return {"pass": false, "result_type": "fail"}
-	var score := RuleEngine.evaluate_assessment(items, player_role_state, _assessment_thresholds)
+	# 构造鉴定数据源：RoleState 优先，JSON 路径回退到 world_state.player。
+	var role_or_player: Variant = player_role_state
+	var use_role_state := player_role_state != null
+	if not use_role_state:
+		role_or_player = world_state.get("player", {})
+	var score: int
+	if use_role_state:
+		score = RuleEngine.evaluate_assessment(items, role_or_player, _assessment_thresholds)
+	else:
+		# JSON 路径回退：从 Dictionary 手动计算各项阶段值。
+		score = 0
+		for item_variant in items:
+			var item: Dictionary = item_variant
+			var key := str(item.get("key", ""))
+			var direction := str(item.get("direction", "positive"))
+			var value := int(role_or_player.get(key, 0))
+			var stage := RuleEngine.get_ability_stage(value, _assessment_thresholds)
+			if direction == "negative":
+				score -= stage
+			else:
+				score += stage
 	var passed := score >= difficulty_stage
 	var result_type := "success" if passed else "fail"
-	# 预留字段：本阶段不触发 critical_success / critical_fail
 	# 调试输出：打印鉴定详情
 	var items_debug := ""
 	for item_variant in items:
 		var item: Dictionary = item_variant
 		var key := str(item.get("key", ""))
 		var direction := str(item.get("direction", "positive"))
-		var stage := RuleEngine.get_stage_from_role(player_role_state, key, _assessment_thresholds)
+		var stage: int
+		if use_role_state:
+			stage = RuleEngine.get_stage_from_role(player_role_state, key, _assessment_thresholds)
+		else:
+			stage = RuleEngine.get_ability_stage(int(role_or_player.get(key, 0)), _assessment_thresholds)
 		var sign := "+" if direction != "negative" else "-"
 		if not items_debug.is_empty():
 			items_debug += " / "
@@ -1920,12 +1961,13 @@ func _apply_world_state_patch(patch: Dictionary) -> void:
 		world_state["params"] = params
 
 	var player_patch: Dictionary = patch.get("player", {})
-	if not player_patch.is_empty() and player_role_state != null:
+	if not player_patch.is_empty():
 		for key in player_patch.keys():
 			var player_key := str(key)
-			var current := int(player_role_state.get_value(player_key, 0))
-			player_role_state.set_value(player_key, current + int(player_patch[key]))
-		_sync_role_to_world_state()
+			var current := _get_player_value(player_key, 0)
+			_set_player_value(player_key, current + int(player_patch[key]))
+		if player_role_state != null:
+			_sync_role_to_world_state()
 
 	var set_location := str(patch.get("currentLocationId", "")).strip_edges()
 	if not set_location.is_empty():
