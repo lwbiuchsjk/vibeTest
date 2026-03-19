@@ -24,7 +24,7 @@ var _task_eval_index_by_task: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
 var _pending_turn_context: Dictionary = {}
 var _location_graph: LocationGraph
-# 玩家 RoleState 引用，用于承载能力与状态结构（本阶段鉴定读取走 world_state.player）。
+# 玩家 RoleState 引用，作为玩家能力与状态的运行时权威数据源。
 var player_role_state: Variant = null
 # 鉴定阶段阈值。本阶段以常量形式集中定义，后续可拆为配置文件。
 var _assessment_thresholds: Array = [0, 3, 7, 12]
@@ -75,13 +75,14 @@ func load_from_csv_dir(csv_dir_path: String) -> Dictionary:
 	var world_event_data := runtime.get_world_event_data()
 	if world_event_data.is_empty():
 		return {"ok": false, "error": "world event config is empty in config runtime"}
-	# 注入玩家 RoleState：从 ConfigRuntime 获取角色列表，找到 player 类型角色。
+	# 从 ConfigRuntime 获取玩家 RoleState，传入 load_from_data 统一处理注入与同步。
+	var p_role_state: Variant = null
 	var roles: Array = runtime.get_roles()
 	for role_variant in roles:
 		if role_variant != null and role_variant.role_type == "player":
-			player_role_state = role_variant
+			p_role_state = role_variant
 			break
-	return load_from_data(world_event_data, _location_graph)
+	return load_from_data(world_event_data, _location_graph, p_role_state)
 
 # 功能：从 JSON 文本加载数据。
 # 说明：适合测试与热重载，成功后会重建事件与选择点索引。
@@ -119,7 +120,7 @@ func load_from_json_text(
 
 # 功能：从内存对象加载数据。
 # 说明：用于承接 CSV 编译结果，避免二次 JSON 序列化产生歧义。
-func load_from_data(data: Dictionary, location_graph: Variant = null) -> Dictionary:
+func load_from_data(data: Dictionary, location_graph: Variant = null, role_state: Variant = null) -> Dictionary:
 	if data.is_empty():
 		return {"ok": false, "error": "compiled data is empty"}
 	var raw_world: Variant = data.get("world_state", null)
@@ -151,6 +152,10 @@ func load_from_data(data: Dictionary, location_graph: Variant = null) -> Diction
 	_rebuild_choice_point_map()
 	_rebuild_task_def_map()
 	_rebuild_task_evaluation_index()
+	# 注入玩家 RoleState 并同步到 world_state，确保所有加载路径统一处理。
+	if role_state != null:
+		player_role_state = role_state
+		_sync_role_to_world_state()
 	return {"ok": true}
 
 # 功能：预览下一回合事件，但不立即结算。
@@ -1238,29 +1243,30 @@ func _match_inline_rule(actual: Variant, rule: String) -> bool:
 	return actual == expected_literal
 
 # 功能：检查玩家是否可支付选项代价。
-# 说明：从 world_state.player 读取资源并比较。
+# 说明：从 RoleState 读取值进行比较。
 func _can_pay_cost(cost: Dictionary) -> bool:
 	if cost.is_empty():
 		return true
-	var player: Dictionary = world_state.get("player", {})
+	if player_role_state == null:
+		return false
 	for key_variant in cost.keys():
 		var key := str(key_variant)
 		var need := int(cost[key_variant])
-		var have := int(player.get(key, 0))
+		var have := int(player_role_state.get_value(key, 0))
 		if have < need:
 			return false
 	return true
 
-# 功能：将选项代价扣减到 world_state.player。
-# 说明：按 cost 字段逐项扣减。
+# 功能：将选项代价扣减到 RoleState，并同步到 world_state.player。
+# 说明：RoleState 为权威数据源，扣减后同步到 world_state.player 保持一致。
 func _apply_cost(cost: Dictionary) -> void:
-	if cost.is_empty():
+	if cost.is_empty() or player_role_state == null:
 		return
-	var player: Dictionary = world_state.get("player", {})
 	for key_variant in cost.keys():
 		var key := str(key_variant)
-		player[key] = int(player.get(key, 0)) - int(cost[key_variant])
-	world_state["player"] = player
+		var current := int(player_role_state.get_value(key, 0))
+		player_role_state.set_value(key, current - int(cost[key_variant]))
+	_sync_role_to_world_state()
 
 # 功能：在可选项中按外部传入 ID 精确选择。
 # 说明：仅当目标选项状态为 selectable 时返回，否则返回空字典。
@@ -1322,13 +1328,14 @@ func _is_check_pass(check: Dictionary) -> Dictionary:
 	return {"pass": true, "result_type": "success"}
 
 # 功能：执行 assessment 鉴定。
-# 说明：从 world_state.player 读取各项阶段值（路径 B），累加正向、累减负向，
+# 说明：从 RoleState 读取各项阶段值（路径 A），累加正向、累减负向，
 #       与 difficultyStage 比较得出结果。结果中预留 critical_success / critical_fail。
 func _run_assessment(check: Dictionary) -> Dictionary:
 	var difficulty_stage := int(check.get("difficultyStage", 0))
 	var items: Array = check.get("items", [])
-	var player: Dictionary = world_state.get("player", {})
-	var score := RuleEngine.evaluate_assessment(items, player, _assessment_thresholds)
+	if player_role_state == null:
+		return {"pass": false, "result_type": "fail"}
+	var score := RuleEngine.evaluate_assessment(items, player_role_state, _assessment_thresholds)
 	var passed := score >= difficulty_stage
 	var result_type := "success" if passed else "fail"
 	# 预留字段：本阶段不触发 critical_success / critical_fail
@@ -1338,7 +1345,7 @@ func _run_assessment(check: Dictionary) -> Dictionary:
 		var item: Dictionary = item_variant
 		var key := str(item.get("key", ""))
 		var direction := str(item.get("direction", "positive"))
-		var stage := RuleEngine.get_stage_from_player(player, key, _assessment_thresholds)
+		var stage := RuleEngine.get_stage_from_role(player_role_state, key, _assessment_thresholds)
 		var sign := "+" if direction != "negative" else "-"
 		if not items_debug.is_empty():
 			items_debug += " / "
@@ -1913,16 +1920,27 @@ func _apply_world_state_patch(patch: Dictionary) -> void:
 		world_state["params"] = params
 
 	var player_patch: Dictionary = patch.get("player", {})
-	if not player_patch.is_empty():
-		var player: Dictionary = world_state.get("player", {})
+	if not player_patch.is_empty() and player_role_state != null:
 		for key in player_patch.keys():
 			var player_key := str(key)
-			player[player_key] = int(player.get(player_key, 0)) + int(player_patch[key])
-		world_state["player"] = player
+			var current := int(player_role_state.get_value(player_key, 0))
+			player_role_state.set_value(player_key, current + int(player_patch[key]))
+		_sync_role_to_world_state()
 
 	var set_location := str(patch.get("currentLocationId", "")).strip_edges()
 	if not set_location.is_empty():
 		world_state["currentLocationId"] = set_location
+
+# 功能：将 RoleState 的能力与状态同步到 world_state.player。
+# 说明：RoleState 为权威数据源，world_state.player 作为兼容层供 eligibility 表达式读取。
+func _sync_role_to_world_state() -> void:
+	if player_role_state == null:
+		return
+	var player: Dictionary = world_state.get("player", {})
+	var flat: Dictionary = player_role_state.to_flat_dict()
+	for key in flat.keys():
+		player[str(key)] = flat[key]
+	world_state["player"] = player
 
 # 功能：合并两个字典。
 # 说明：right 覆盖 left 的同名键，并返回新字典。

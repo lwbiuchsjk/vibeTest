@@ -74,12 +74,12 @@ static func load_roles(path: String) -> Dictionary:
 				"physique": _to_int(row.get("physique", "1"), 1),
 				"craft": _to_int(row.get("craft", "1"), 1),
 				"insight": _to_int(row.get("insight", "1"), 1),
-				"energy": _to_int(row.get("energy", "0"), 0),
 				"xinxing": _to_int(row.get("xinxing", "0"), 0)
 			},
 			{
-				"money": _to_int(row.get("money", "0"), 0),
-				"manpower": _to_int(row.get("manpower", "0"), 0)
+				"hp": _to_int(row.get("hp", "0"), 0),
+				"energy": _to_int(row.get("energy", "0"), 0),
+				"gold": _to_int(row.get("gold", "0"), 0)
 			}
 		)
 		roles.append(role)

@@ -17,23 +17,23 @@ static func get_ability_stage(value: int, thresholds: Array) -> int:
 			break
 	return stage
 
-# 从 world_state.player 读取指定字段值，调用 get_ability_stage 返回阶段值。
-# 说明：路径 B 实现——本阶段统一从 world_state.player 取值，作为鉴定的便捷入口。
-static func get_stage_from_player(player: Dictionary, key: String, thresholds: Array) -> int:
-	var value := int(player.get(key, 0))
+# 从 RoleState 读取指定字段值，调用 get_ability_stage 返回阶段值。
+# 说明：路径 A 实现——直接从 RoleState 取值，RoleState 是运行时权威数据源。
+static func get_stage_from_role(role_state: Variant, key: String, thresholds: Array) -> int:
+	var value := int(role_state.get_value(key, 0))
 	return get_ability_stage(value, thresholds)
 
 # 执行鉴定聚合计算：遍历 items，累加正向阶段值、累减负向阶段值，返回综合得分。
 # items 格式：[{"key": "physique", "direction": "positive"}, ...]
-# player：world_state.player 字典（路径 B：本阶段从此处取值）。
+# role_state：玩家 RoleState，鉴定直接从此处读取数据。
 # thresholds：阶段阈值数组，所有项共用同一组阈值。
-static func evaluate_assessment(items: Array, player: Dictionary, thresholds: Array) -> int:
+static func evaluate_assessment(items: Array, role_state: Variant, thresholds: Array) -> int:
 	var score := 0
 	for item_variant in items:
 		var item: Dictionary = item_variant
 		var key := str(item.get("key", ""))
 		var direction := str(item.get("direction", "positive"))
-		var stage := get_stage_from_player(player, key, thresholds)
+		var stage := get_stage_from_role(role_state, key, thresholds)
 		if direction == "negative":
 			score -= stage
 		else:

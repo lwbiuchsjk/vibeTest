@@ -67,6 +67,32 @@ func get_resource(key: String, default_value: int = 0) -> int:
 func set_resource(key: String, value: int) -> void:
 	resources[key] = value
 
+# 统一取值入口：优先查 attributes，再查 resources，均无则返回默认值。
+func get_value(key: String, default_value: int = 0) -> int:
+	if attributes.has(key):
+		return int(attributes[key])
+	if resources.has(key):
+		return int(resources[key])
+	return default_value
+
+# 统一写值入口：优先写已存在的字典，均无则写入 resources。
+func set_value(key: String, value: int) -> void:
+	if attributes.has(key):
+		attributes[key] = value
+	elif resources.has(key):
+		resources[key] = value
+	else:
+		resources[key] = value
+
+# 将所有 attributes 和 resources 合并为一个扁平字典，用于同步到 world_state.player。
+func to_flat_dict() -> Dictionary:
+	var flat := {}
+	for key in attributes.keys():
+		flat[str(key)] = int(attributes[key])
+	for key in resources.keys():
+		flat[str(key)] = int(resources[key])
+	return flat
+
 # 序列化为 Dictionary，便于存档、传输与调试输出。
 func to_dict() -> Dictionary:
 	return {

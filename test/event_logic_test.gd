@@ -1,4 +1,4 @@
-extends Control
+﻿extends Control
 
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 const TaskSummaryCard := preload("res://scripts/ui/task_summary_card.gd")
@@ -628,4 +628,12 @@ func _load_world_event_test_config(test_config: Dictionary) -> Dictionary:
 	if context_result.get("ok", false):
 		location_graph = context_result.get("graph", null)
 
-	return _engine.load_from_data(world_event_data, location_graph)
+	# 从 ConfigRuntime 获取玩家 RoleState，通过 load_from_data 统一注入。
+	var p_role_state: Variant = null
+	var roles: Array = runtime.get_roles()
+	for role_variant in roles:
+		if role_variant != null and role_variant.role_type == "player":
+			p_role_state = role_variant
+			break
+
+	return _engine.load_from_data(world_event_data, location_graph, p_role_state)
