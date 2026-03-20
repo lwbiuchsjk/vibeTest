@@ -10,3 +10,4 @@
 - 如需查看知识库节点概览、索引和结构化缓存，使用 `_kb_sync/cache/KB_CONTEXT.md`、`_kb_sync/cache/KB_CONTEXT.json` 与 `_kb_sync/cache/cache_index.json`。
 - 新增文档应当放在 `Design` 目录下。
 - 本项目中生成、改动代码时，需要在代码中生成注释。需要有函数级注释，并在逻辑中关键位置做出特别说明。注释使用中文。
+- 本项目 Godot 统一通过 `tools/run_godot.ps1` 调用，不要假设系统 PATH 中存在 `godot`。
