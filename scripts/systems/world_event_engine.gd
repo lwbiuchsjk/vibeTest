@@ -1,4 +1,4 @@
-﻿extends RefCounted
+extends RefCounted
 class_name WorldEventEngine
 
 # 功能：世界与事件引擎（MVP）。
@@ -1373,11 +1373,8 @@ func _apply_option_resolution(selected_option: Dictionary, event_def: Dictionary
 		print("[心性] 孤注一掷入口触发 → 挂起等待决策")
 		return
 
-	# 6. 应用 resolution（含 critical 分支叠加，Phase 2 暂不触发 critical）
-	if not check_result.get("pass", true):
-		var fail_resolution := _dict_or_empty(check.get("onFailResolution", {}))
-		if not fail_resolution.is_empty():
-			resolution = fail_resolution
+	# 6. 按 result_type 选择 resolution（支持 fail / critical_success / critical_fail 分支）
+	resolution = _resolve_check_resolution(check, resolution, check_result)
 
 	_apply_resolution(resolution, event_def)
 	# 回合结算末尾：稳健计数 +1（未使用孤注一掷的回合视为稳健）
@@ -1393,19 +1390,49 @@ func _apply_option_resolution(selected_option: Dictionary, event_def: Dictionary
 func _is_check_pass(check: Dictionary, risk_modifiers: Dictionary = {}) -> Dictionary:
 	if check.is_empty():
 		return {"pass": true, "result_type": "success"}
+	# 功能：附加心性上下文到 risk_modifiers，供概率引擎约束 critical 结构。
+	# 说明：调用方传入的 bias 与这里补充的心性字段做浅合并。
+	var merged_risk_modifiers := risk_modifiers.duplicate(true)
+	var current_xinxing := _get_current_xinxing()
+	var risk_profile := RuleEngine.get_xinxing_risk_profile(current_xinxing)
+	merged_risk_modifiers["xinxing"] = current_xinxing
+	merged_risk_modifiers["risk_profile"] = risk_profile
+	merged_risk_modifiers["stability_bias"] = int(risk_profile.get("stability_bias", 0))
+
 	# 构造鉴定数据源：RoleState 优先，JSON 路径回退到 world_state.player。
 	var role_or_player: Variant = player_role_state
 	if role_or_player == null:
 		role_or_player = world_state.get("player", {})
-	var result := RuleEngine.resolve_check(check, role_or_player, _assessment_thresholds, _rng, risk_modifiers)
+	var result := RuleEngine.resolve_check(check, role_or_player, _assessment_thresholds, _rng, merged_risk_modifiers)
 	# 调试输出
 	var check_type := str(check.get("type", "")).strip_edges()
 	if check_type == "assessment":
 		_print_assessment_debug(check, result)
 	return result
 
-# 功能：处理主动押注阶段的玩家决策。
-# 说明：selected_option_id 传入 "accept" 表示接受押注，其他值或空值表示跳过。
+# 功能：根据检定 result_type 选择最终 resolution。
+# 说明：优先级为 critical_success / critical_fail / fail / default；未配置时回退到基础 resolution。
+func _resolve_check_resolution(check: Dictionary, base_resolution: Dictionary, check_result: Dictionary) -> Dictionary:
+	var result_type := str(check_result.get("result_type", "success"))
+	if result_type == "critical_success":
+		var cs_resolution := _dict_or_empty(check.get("onCriticalSuccessResolution", {}))
+		if not cs_resolution.is_empty():
+			return cs_resolution
+		return base_resolution
+	if result_type == "critical_fail":
+		var cf_resolution := _dict_or_empty(check.get("onCriticalFailResolution", {}))
+		if not cf_resolution.is_empty():
+			return cf_resolution
+		var fail_resolution_fallback := _dict_or_empty(check.get("onFailResolution", {}))
+		if not fail_resolution_fallback.is_empty():
+			return fail_resolution_fallback
+		return base_resolution
+	if result_type == "fail":
+		var fail_resolution := _dict_or_empty(check.get("onFailResolution", {}))
+		if not fail_resolution.is_empty():
+			return fail_resolution
+	return base_resolution
+
 func _resolve_preemptive_bet_phase(selected_option_id: String) -> Dictionary:
 	var event_id := str(_pending_turn_context.get("event_id", ""))
 	var event_def: Dictionary = _event_map.get(event_id, {})
@@ -1437,10 +1464,7 @@ func _resolve_preemptive_bet_phase(selected_option_id: String) -> Dictionary:
 	var check_result := _is_check_pass(check, risk_modifiers)
 	print("[鉴定结果] result_type: %s | pass: %s" % [str(check_result.get("result_type", "")), str(check_result.get("pass", true))])
 
-	if not check_result.get("pass", true):
-		var fail_resolution := _dict_or_empty(check.get("onFailResolution", {}))
-		if not fail_resolution.is_empty():
-			resolution = fail_resolution
+	resolution = _resolve_check_resolution(check, resolution, check_result)
 
 	# 主动押注不提供孤注一掷（-2 心性不允许）
 	_pending_turn_context.erase("selected_option")
@@ -1473,10 +1497,12 @@ func _resolve_desperate_gamble_phase(selected_option_id: String) -> Dictionary:
 		print("[心性] 孤注一掷已使用 → 重新检定")
 		var check_result := _is_check_pass(check)
 		print("[鉴定结果] 重掷 result_type: %s | pass: %s" % [str(check_result.get("result_type", "")), str(check_result.get("pass", true))])
-		if not check_result.get("pass", true):
-			var fail_resolution := _dict_or_empty(check.get("onFailResolution", {}))
-			if not fail_resolution.is_empty():
-				resolution = fail_resolution
+		resolution = _resolve_check_resolution(check, resolution, check_result)
+		# 结构规则：-1 阶段孤注一掷重判为 critical_fail 时，立刻跌入 -2。
+		if str(check_result.get("result_type", "")) == "critical_fail" and _get_current_xinxing() == -1:
+			_set_player_value("xinxing", RuleEngine.apply_xinxing_delta(-1, -1))
+			if player_role_state != null:
+				_sync_role_to_world_state()
 		# 孤注一掷计数 +1，重置稳健计数
 		_ensure_xinxing_tracker()
 		var tracker: Dictionary = world_state["xinxingTracker"]
