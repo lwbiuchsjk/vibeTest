@@ -1273,6 +1273,9 @@ func _get_player_value(key: String, default_value: int = 0) -> int:
 
 # 功能：写入玩家指定字段的值。
 # 说明：优先写入 RoleState 并同步（路径 A），若不存在则直接写 world_state.player（JSON 路径兼容）。
+# 已知限制（Gap 2）：JSON 回退路径直接写字典，不经过 RoleState.set_value()，
+# xinxing 等有约束字段在此路径下不会触发 [-2,+2] 裁剪。
+# 正常运行时 player_role_state 始终存在，此路径仅在测试或异常初始化时触发。
 func _set_player_value(key: String, value: int) -> void:
 	if player_role_state != null:
 		player_role_state.set_value(key, value)

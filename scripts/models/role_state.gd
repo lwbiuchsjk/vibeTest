@@ -64,8 +64,11 @@ func set_xinxing(value: int) -> void:
 func get_attribute(key: String, default_value: int = 1) -> int:
 	return int(attributes.get(key, default_value))
 
-# 设置属性值。边界裁剪由规则层统一处理。
+# 设置属性值。有约束的字段（xinxing）路由至具名访问器以保证不变量。
 func set_attribute(key: String, value: int) -> void:
+	if key == "xinxing":
+		set_xinxing(value)
+		return
 	attributes[key] = value
 
 # 获取资源值；当键不存在时返回默认值（默认0）。
