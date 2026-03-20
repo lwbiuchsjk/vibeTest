@@ -2209,12 +2209,12 @@ func _check_xinxing_transition() -> void:
 		changed = true
 		print("[心性] 稳健累计触发 → 心性上升至 %d" % current_xinxing)
 
-	# 心性 > 0 时使用孤注一掷，累计达阈值退出正面区间
+	# 心性 > 0 时使用孤注一掷，累计达阈值直接退回 0（退出正面区间，不分步）
 	if current_xinxing > 0 and gamble_count >= int(config.get("gamble_to_exit_positive", 2)):
-		current_xinxing = RuleEngine.apply_xinxing_delta(current_xinxing, -1)
+		current_xinxing = 0
 		tracker["gamble_count"] = 0
 		changed = true
-		print("[心性] 正面区间孤注一掷触发 → 心性下降至 %d" % current_xinxing)
+		print("[心性] 正面区间孤注一掷触发 → 退回中立 0")
 
 	if changed:
 		_set_player_value("xinxing", current_xinxing)
