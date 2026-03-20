@@ -74,7 +74,7 @@ static func load_roles(path: String) -> Dictionary:
 				"physique": _to_int(row.get("physique", "1"), 1),
 				"craft": _to_int(row.get("craft", "1"), 1),
 				"insight": _to_int(row.get("insight", "1"), 1),
-				"xinxing": _to_int(row.get("xinxing", "0"), 0)
+				"xinxing": clampi(_to_int(row.get("xinxing", "0"), 0), -2, 2)
 			},
 			{
 				"hp": _to_int(row.get("hp", "0"), 0),

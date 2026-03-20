@@ -55,6 +55,11 @@ func load_portrait_texture() -> Texture2D:
 func get_xinxing() -> int:
 	return get_attribute("xinxing", 0)
 
+# 设置心性值，裁剪至 [-2, +2]。与 get_xinxing() 形成对称的读写边界。
+# xinxing 的值域约束属于数据不变量，由数据模型自身负责维护。
+func set_xinxing(value: int) -> void:
+	attributes["xinxing"] = clampi(value, -2, 2)
+
 # 获取属性值；当键不存在时返回默认值（默认1）。
 func get_attribute(key: String, default_value: int = 1) -> int:
 	return int(attributes.get(key, default_value))
@@ -80,7 +85,11 @@ func get_value(key: String, default_value: int = 0) -> int:
 	return default_value
 
 # 统一写值入口：优先写已存在的字典，均无则写入 resources。
+# 有约束的字段（xinxing）路由至具名访问器以保证不变量。
 func set_value(key: String, value: int) -> void:
+	if key == "xinxing":
+		set_xinxing(value)
+		return
 	if attributes.has(key):
 		attributes[key] = value
 	elif resources.has(key):

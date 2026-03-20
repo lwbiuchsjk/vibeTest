@@ -186,7 +186,7 @@ static func _build_test_engine(xinxing_value: int) -> WorldEventEngine:
 	engine.load_from_csv_dir("res://scripts/config/world_event_mvp")
 	# 注入心性值到玩家 RoleState
 	if engine.player_role_state != null:
-		engine.player_role_state.set_attribute("xinxing", xinxing_value)
+		engine.player_role_state.set_xinxing(xinxing_value)
 	else:
 		var player: Dictionary = engine.world_state.get("player", {})
 		player["xinxing"] = xinxing_value
