@@ -118,6 +118,7 @@ func load_from_json_text(
 	_rebuild_choice_point_map()
 	_rebuild_task_def_map()
 	_rebuild_task_evaluation_index()
+	_ensure_xinxing_tracker()
 	return {"ok": true}
 
 # 功能：从内存对象加载数据。
@@ -159,6 +160,8 @@ func load_from_data(data: Dictionary, location_graph: Variant = null, role_state
 	player_role_state = role_state
 	if player_role_state != null:
 		_sync_role_to_world_state()
+	# 初始化心性 tracker，记录孤注一掷使用次数与稳健连续回合数。
+	_ensure_xinxing_tracker()
 	return {"ok": true}
 
 # 功能：预览下一回合事件，但不立即结算。
@@ -240,6 +243,12 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 			_advance_pending_phase_after_presentation(event_def)
 		return _build_pending_turn_response(_pending_turn_context)
 
+	# 说明：处理心性风险入口挂起阶段。
+	if phase == "preemptive_bet":
+		return _resolve_preemptive_bet_phase(selected_option_id)
+	if phase == "desperate_gamble":
+		return _resolve_desperate_gamble_phase(selected_option_id)
+
 	var choice_result := pending_choice.duplicate(true)
 	if resolution_mode == "choice_resolution":
 		var choice_point_id := str(event_def.get("choicePointId", "")).strip_edges()
@@ -282,13 +291,17 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 		choice_result["selected_option_id"] = str(selected.get("id", ""))
 		choice_result["resolved_by"] = "option_resolution"
 		_apply_option_resolution(selected, event_def)
+		# 说明：如果 _apply_option_resolution 挂起到风险入口阶段，直接返回等待决策。
+		var post_phase := str(_pending_turn_context.get("phase", ""))
+		if post_phase == "preemptive_bet" or post_phase == "desperate_gamble":
+			return _build_pending_turn_response(_pending_turn_context)
 	else:
 		# 说明：普通事件、缺失选择点或无可选项事件，都在这里统一按事件默认效果结算。
 		world_state["forcedNextEventId"] = ""
 		_apply_event_effects(event_def)
 		_apply_continuation_policy(event_def)
 
-	# 说明：任务自动完成判定必须发生在“本回合结算动作完成后、任务到期推进前”。
+	# 说明：任务自动完成判定必须发生在"本回合结算动作完成后、任务到期推进前"。
 	_eval_complete_when_after_settlement()
 	_record_history(event_id)
 	_tick_tasks_after_turn()
@@ -311,7 +324,7 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 	)
 
 # 功能：选择下一条事件路由并返回事件定义。
-# 说明：该步骤只做选路，不产生副作用，便于“预览”和“直接执行”共用。
+# 说明：该步骤只做选路，不产生副作用，便于"预览"和"直接执行"共用。
 func _select_next_event() -> Dictionary:
 	var expected_forced := str(world_state.get("forcedNextEventId", ""))
 	var next_event_id := ""
@@ -449,7 +462,8 @@ func _build_pending_turn_response(pending_context: Dictionary) -> Dictionary:
 		return {"ok": false, "error": "pending event not found: %s" % event_id}
 
 	var choice_result: Dictionary = _dict_or_empty(pending_context.get("choice", {})).duplicate(true)
-	var awaiting_choice := phase == "choice" and resolution_mode == "choice_resolution"
+	# 说明：心性风险入口阶段也视为等待外部决策。
+	var awaiting_choice := (phase == "choice" and resolution_mode == "choice_resolution") or phase == "preemptive_bet" or phase == "desperate_gamble"
 	if awaiting_choice and choice_result.is_empty():
 		choice_result = {
 			"choice_point_id": str(event_def.get("choicePointId", "")),
@@ -503,6 +517,8 @@ func _build_result_payload(
 		"has_choice": has_choice,
 		"presentation": presentation_state,
 		"choice": choice_result,
+		"xinxing": _get_current_xinxing(),
+		"xinxing_risk_profile": RuleEngine.get_xinxing_risk_profile(_get_current_xinxing()),
 		"world_ended": bool(run_state_payload.get("world_ended", false)),
 		"run_status": str(run_state_payload.get("run_status", "running")),
 		"ending_event_id": str(run_state_payload.get("ending_event_id", "")),
@@ -588,6 +604,8 @@ func _build_world_ended_response() -> Dictionary:
 			"resolved_by": "world_ended",
 			"options": []
 		},
+		"xinxing": _get_current_xinxing(),
+		"xinxing_risk_profile": RuleEngine.get_xinxing_risk_profile(_get_current_xinxing()),
 		"world_ended": bool(run_state_payload.get("world_ended", true)),
 		"run_status": str(run_state_payload.get("run_status", "ended")),
 		"ending_event_id": str(run_state_payload.get("ending_event_id", "")),
@@ -604,7 +622,7 @@ func _set_location_graph(location_graph: Variant) -> void:
 		_location_graph = null
 
 # 功能：解析事件最终应展示的背景路径。
-# 说明：规则为“事件背景优先，地点背景兜底”；引擎统一产出，Consumer 不再自行判断。
+# 说明：规则为"事件背景优先，地点背景兜底"；引擎统一产出，Consumer 不再自行判断。
 func _resolve_background_art(event_def: Dictionary) -> String:
 	var event_background_art := str(event_def.get("backgroundArt", "")).strip_edges()
 	if not event_background_art.is_empty():
@@ -1301,7 +1319,7 @@ func _select_option_by_id(options_eval: Array, option_id: String) -> Dictionary:
 	return {}
 
 # 功能：在可选项中查找第一个 selectable 选项。
-# 说明：仅用于判断“是否存在可选项”，不用于自动结算。
+# 说明：仅用于判断"是否存在可选项"，不用于自动结算。
 func _select_first_selectable(options_eval: Array) -> Dictionary:
 	for option_variant in options_eval:
 		var option_def: Dictionary = option_variant
@@ -1309,74 +1327,210 @@ func _select_first_selectable(options_eval: Array) -> Dictionary:
 			return option_def
 	return {}
 
-# 功能：执行选项结算主流程。
-# 说明：流程为扣代价、检定、应用 resolution。
+# 功能：执行选项结算主流程（支持心性风险入口挂起）。
+# 说明：流程为扣代价 → 读心性 → 主动押注检查 → 检定 → 孤注一掷检查 → 应用 resolution。
+#       遇到风险入口时挂起到对应 phase，等待外部决策后继续推进。
 func _apply_option_resolution(selected_option: Dictionary, event_def: Dictionary) -> void:
 	var cost := _dict_or_empty(selected_option.get("cost", {}))
 	if not _can_pay_cost(cost):
-		# 说明：正常情况下不应进入该分支，这里保留为防御性兜底。
 		_apply_event_effects(event_def)
 		_apply_continuation_policy(event_def)
 		return
 
+	# 1. 支付 cost
 	_apply_cost(cost)
 
+	# 2. 读取心性 → 获取风险入口配置
+	var xinxing := _get_current_xinxing()
+	var risk_profile := RuleEngine.get_xinxing_risk_profile(xinxing)
+	print("[心性] 当前心性: %d | 风险配置: %s" % [xinxing, str(risk_profile)])
+
+	# 3. 主动押注检查：心性允许且选项配置了 preemptiveBet
+	var preemptive_bet := _dict_or_empty(selected_option.get("preemptiveBet", {}))
+	if bool(risk_profile.get("allow_preemptive_bet", false)) and not preemptive_bet.is_empty():
+		# 挂起到 preemptive_bet phase，等待玩家决策
+		_pending_turn_context["phase"] = "preemptive_bet"
+		_pending_turn_context["selected_option"] = selected_option.duplicate(true)
+		_pending_turn_context["risk_modifiers"] = {}
+		print("[心性] 主动押注入口触发 → 挂起等待决策")
+		return
+
+	# 4. 执行检定
 	var resolution := _dict_or_empty(selected_option.get("resolution", {}))
 	var check := _dict_or_empty(selected_option.get("check", {}))
 	var check_result := _is_check_pass(check)
+	print("[鉴定结果] result_type: %s | pass: %s" % [str(check_result.get("result_type", "")), str(check_result.get("pass", true))])
+
+	# 5. 孤注一掷检查：主结果 fail 且心性允许
+	if not check_result.get("pass", true) and bool(risk_profile.get("allow_desperate_gamble", false)):
+		_pending_turn_context["phase"] = "desperate_gamble"
+		_pending_turn_context["selected_option"] = selected_option.duplicate(true)
+		_pending_turn_context["check_result"] = check_result.duplicate(true)
+		_pending_turn_context["risk_modifiers"] = {}
+		print("[心性] 孤注一掷入口触发 → 挂起等待决策")
+		return
+
+	# 6. 应用 resolution（含 critical 分支叠加，Phase 2 暂不触发 critical）
 	if not check_result.get("pass", true):
-		# 说明：检定失败时，可用 onFailResolution 覆盖默认 resolution。
 		var fail_resolution := _dict_or_empty(check.get("onFailResolution", {}))
 		if not fail_resolution.is_empty():
 			resolution = fail_resolution
 
 	_apply_resolution(resolution, event_def)
+	# 回合结算末尾：稳健计数 +1（未使用孤注一掷的回合视为稳健）
+	_ensure_xinxing_tracker()
+	var tracker: Dictionary = world_state["xinxingTracker"]
+	tracker["steady_count"] = int(tracker.get("steady_count", 0)) + 1
+	world_state["xinxingTracker"] = tracker
+	_check_xinxing_transition()
 
 # 功能：执行选项检定。
-# 说明：支持 chance（概率判定）和 assessment（能力/状态阶段鉴定）两种类型。
-#       无 check 或未知类型默认通过。
-func _is_check_pass(check: Dictionary) -> Dictionary:
+# 说明：委托 RuleEngine.resolve_check 统一判定，传入引擎自身的 rng 和阈值。
+#       risk_modifiers 可由风险入口（主动押注）额外构建后传入。
+func _is_check_pass(check: Dictionary, risk_modifiers: Dictionary = {}) -> Dictionary:
 	if check.is_empty():
 		return {"pass": true, "result_type": "success"}
-	var check_type := str(check.get("type", "")).strip_edges()
-	if check_type == "chance":
-		var rate := clampf(float(check.get("successRate", 1.0)), 0.0, 1.0)
-		var passed := _rng.randf() <= rate
-		return {"pass": passed, "result_type": "success" if passed else "fail"}
-	if check_type == "assessment":
-		return _run_assessment(check)
-	return {"pass": true, "result_type": "success"}
-
-# 功能：执行 assessment 鉴定。
-# 说明：优先从 RoleState 读取（路径 A），无 RoleState 时回退到 world_state.player（JSON 路径）。
-#       累加正向阶段值、累减负向阶段值，与 difficultyStage 比较。预留 critical_success / critical_fail。
-func _run_assessment(check: Dictionary) -> Dictionary:
-	var difficulty_stage := int(check.get("difficultyStage", 0))
-	var items: Array = check.get("items", [])
 	# 构造鉴定数据源：RoleState 优先，JSON 路径回退到 world_state.player。
 	var role_or_player: Variant = player_role_state
-	var use_role_state := player_role_state != null
-	if not use_role_state:
+	if role_or_player == null:
 		role_or_player = world_state.get("player", {})
-	var score: int
-	if use_role_state:
-		score = RuleEngine.evaluate_assessment(items, role_or_player, _assessment_thresholds)
+	var result := RuleEngine.resolve_check(check, role_or_player, _assessment_thresholds, _rng, risk_modifiers)
+	# 调试输出
+	var check_type := str(check.get("type", "")).strip_edges()
+	if check_type == "assessment":
+		_print_assessment_debug(check, result)
+	return result
+
+# 功能：处理主动押注阶段的玩家决策。
+# 说明：selected_option_id 传入 "accept" 表示接受押注，其他值或空值表示跳过。
+func _resolve_preemptive_bet_phase(selected_option_id: String) -> Dictionary:
+	var event_id := str(_pending_turn_context.get("event_id", ""))
+	var event_def: Dictionary = _event_map.get(event_id, {})
+	var selected_option: Dictionary = _dict_or_empty(_pending_turn_context.get("selected_option", {}))
+	var decision := selected_option_id.strip_edges()
+
+	var risk_modifiers: Dictionary = {}
+	if decision == "accept":
+		# 玩家接受主动押注，构建 risk_modifiers
+		var preemptive_bet := _dict_or_empty(selected_option.get("preemptiveBet", {}))
+		risk_modifiers["bet_modifier"] = int(preemptive_bet.get("betModifier", 0))
+		risk_modifiers["bet_active"] = true
+		print("[心性] 主动押注已接受 → bet_modifier: %d" % risk_modifiers["bet_modifier"])
 	else:
-		# JSON 路径回退：从 Dictionary 手动计算各项阶段值。
-		score = 0
-		for item_variant in items:
-			var item: Dictionary = item_variant
-			var key := str(item.get("key", ""))
-			var direction := str(item.get("direction", "positive"))
-			var value := int(role_or_player.get(key, 0))
-			var stage := RuleEngine.get_ability_stage(value, _assessment_thresholds)
-			if direction == "negative":
-				score -= stage
-			else:
-				score += stage
-	var passed := score >= difficulty_stage
-	var result_type := "success" if passed else "fail"
-	# 调试输出：打印鉴定详情
+		print("[心性] 主动押注已跳过")
+
+	# 继续执行检定
+	var resolution := _dict_or_empty(selected_option.get("resolution", {}))
+	var check := _dict_or_empty(selected_option.get("check", {}))
+	var check_result := _is_check_pass(check, risk_modifiers)
+	print("[鉴定结果] result_type: %s | pass: %s" % [str(check_result.get("result_type", "")), str(check_result.get("pass", true))])
+
+	if not check_result.get("pass", true):
+		var fail_resolution := _dict_or_empty(check.get("onFailResolution", {}))
+		if not fail_resolution.is_empty():
+			resolution = fail_resolution
+
+	# 主动押注不提供孤注一掷（-2 心性不允许）
+	_pending_turn_context.erase("selected_option")
+	_pending_turn_context.erase("risk_modifiers")
+	_pending_turn_context["phase"] = "confirm"
+	_apply_resolution(resolution, event_def)
+
+	# 稳健计数 +1（主动押注不算孤注一掷）
+	_ensure_xinxing_tracker()
+	var tracker: Dictionary = world_state["xinxingTracker"]
+	tracker["steady_count"] = int(tracker.get("steady_count", 0)) + 1
+	world_state["xinxingTracker"] = tracker
+	_check_xinxing_transition()
+	return _finalize_option_turn(event_def)
+
+# 功能：处理孤注一掷阶段的玩家决策。
+# 说明：selected_option_id 传入 "accept" 表示使用孤注一掷，其他值或空值表示放弃。
+func _resolve_desperate_gamble_phase(selected_option_id: String) -> Dictionary:
+	var event_id := str(_pending_turn_context.get("event_id", ""))
+	var event_def: Dictionary = _event_map.get(event_id, {})
+	var selected_option: Dictionary = _dict_or_empty(_pending_turn_context.get("selected_option", {}))
+	var original_check_result: Dictionary = _dict_or_empty(_pending_turn_context.get("check_result", {}))
+	var decision := selected_option_id.strip_edges()
+
+	var resolution := _dict_or_empty(selected_option.get("resolution", {}))
+	var check := _dict_or_empty(selected_option.get("check", {}))
+
+	if decision == "accept":
+		# 玩家使用孤注一掷，重新执行检定
+		print("[心性] 孤注一掷已使用 → 重新检定")
+		var check_result := _is_check_pass(check)
+		print("[鉴定结果] 重掷 result_type: %s | pass: %s" % [str(check_result.get("result_type", "")), str(check_result.get("pass", true))])
+		if not check_result.get("pass", true):
+			var fail_resolution := _dict_or_empty(check.get("onFailResolution", {}))
+			if not fail_resolution.is_empty():
+				resolution = fail_resolution
+		# 孤注一掷计数 +1，重置稳健计数
+		_ensure_xinxing_tracker()
+		var tracker: Dictionary = world_state["xinxingTracker"]
+		tracker["gamble_count"] = int(tracker.get("gamble_count", 0)) + 1
+		tracker["steady_count"] = 0
+		world_state["xinxingTracker"] = tracker
+		# 孤注一掷使用后立即检查心性切换
+		_check_xinxing_transition()
+	else:
+		# 玩家放弃孤注一掷，走 fail resolution
+		print("[心性] 孤注一掷已放弃 → 使用失败结果")
+		var fail_resolution := _dict_or_empty(check.get("onFailResolution", {}))
+		if not fail_resolution.is_empty():
+			resolution = fail_resolution
+		# 稳健计数 +1
+		_ensure_xinxing_tracker()
+		var tracker: Dictionary = world_state["xinxingTracker"]
+		tracker["steady_count"] = int(tracker.get("steady_count", 0)) + 1
+		world_state["xinxingTracker"] = tracker
+		_check_xinxing_transition()
+
+	_pending_turn_context.erase("selected_option")
+	_pending_turn_context.erase("check_result")
+	_pending_turn_context.erase("risk_modifiers")
+	_pending_turn_context["phase"] = "confirm"
+	_apply_resolution(resolution, event_def)
+	return _finalize_option_turn(event_def)
+
+# 功能：风险入口结算后完成回合推进。
+# 说明：抽取自 _resolve_pending_turn 的回合末尾逻辑，避免风险入口与主流程重复编写。
+func _finalize_option_turn(event_def: Dictionary) -> Dictionary:
+	var event_id := str(_pending_turn_context.get("event_id", ""))
+	var route := str(_pending_turn_context.get("route", "scheduler"))
+	var expected_forced := str(_pending_turn_context.get("expected_forced", ""))
+	var pending_has_choice := bool(_pending_turn_context.get("has_choice", false))
+	var pending_choice: Dictionary = _dict_or_empty(_pending_turn_context.get("choice", {}))
+	var choice_result := pending_choice.duplicate(true)
+
+	_eval_complete_when_after_settlement()
+	_record_history(event_id)
+	_tick_tasks_after_turn()
+	var ended_this_turn := false
+	if bool(event_def.get("isEndingEvent", false)):
+		_finalize_world(event_id)
+		ended_this_turn = true
+	if not ended_this_turn:
+		world_state["turn"] = int(world_state.get("turn", 0)) + 1
+		_pending_turn_context.clear()
+
+	return _build_result_payload(
+		route,
+		event_id,
+		event_def,
+		expected_forced,
+		false,
+		pending_has_choice,
+		choice_result
+	)
+
+# 功能：打印 assessment 鉴定调试信息。
+# 说明：在 _is_check_pass 委托 RuleEngine 计算后，输出详细的鉴定过程。
+func _print_assessment_debug(check: Dictionary, result: Dictionary) -> void:
+	var difficulty_stage := int(check.get("difficultyStage", 0))
+	var items: Array = check.get("items", [])
+	var use_role_state := player_role_state != null
+	var role_or_player: Variant = player_role_state if use_role_state else world_state.get("player", {})
 	var items_debug := ""
 	for item_variant in items:
 		var item: Dictionary = item_variant
@@ -1391,8 +1545,13 @@ func _run_assessment(check: Dictionary) -> Dictionary:
 		if not items_debug.is_empty():
 			items_debug += " / "
 		items_debug += "%s(stage=%d, %s)" % [key, stage, sign]
-	print("[鉴定] difficulty: %d | items: %s | score: %d | result: %s" % [difficulty_stage, items_debug, score, result_type])
-	return {"pass": passed, "result_type": result_type}
+	var score := int(result.get("score", 0))
+	var result_type := str(result.get("result_type", ""))
+	var risk_mods: Dictionary = result.get("risk_modifiers", {})
+	var risk_debug := ""
+	if not risk_mods.is_empty():
+		risk_debug = " | risk_modifiers: %s" % str(risk_mods)
+	print("[鉴定] difficulty: %d | items: %s | score: %d | result: %s%s" % [difficulty_stage, items_debug, score, result_type, risk_debug])
 
 # 功能：应用 resolution，并衔接执行锁更新。
 # 说明：统一处理 worldStatePatch、forcedNextEventId、chainContextPatch。
@@ -1801,7 +1960,7 @@ func _to_bool_text(raw: String) -> bool:
 
 
 # 功能：在结算后评估并自动完成任务。
-# 说明：判定时机为“事件/选项动作全部落地后，任务回合推进前”，保证同回合达成不会被到期失败覆盖。
+# 说明：判定时机为"事件/选项动作全部落地后，任务回合推进前"，保证同回合达成不会被到期失败覆盖。
 func _eval_complete_when_after_settlement() -> void:
 	_ensure_task_runtime_state()
 	var tasks_state := _dict_or_empty(world_state.get("tasks", {}))
@@ -1972,6 +2131,84 @@ func _apply_world_state_patch(patch: Dictionary) -> void:
 	var set_location := str(patch.get("currentLocationId", "")).strip_edges()
 	if not set_location.is_empty():
 		world_state["currentLocationId"] = set_location
+
+# 功能：确保心性 tracker 结构完整。
+# 说明：从 xinxingConfig 读取阈值配置，初始化 xinxingTracker 计数器。
+func _ensure_xinxing_tracker() -> void:
+	if not world_state.has("xinxingTracker"):
+		world_state["xinxingTracker"] = {"gamble_count": 0, "steady_count": 0}
+	var tracker: Dictionary = world_state["xinxingTracker"]
+	if not tracker.has("gamble_count"):
+		tracker["gamble_count"] = 0
+	if not tracker.has("steady_count"):
+		tracker["steady_count"] = 0
+	world_state["xinxingTracker"] = tracker
+	# 确保 xinxingConfig 存在（有默认值兜底）
+	if not world_state.has("xinxingConfig"):
+		world_state["xinxingConfig"] = {}
+	var config: Dictionary = world_state["xinxingConfig"]
+	if not config.has("gamble_to_neg1"):
+		config["gamble_to_neg1"] = 3
+	if not config.has("steady_to_pos1"):
+		config["steady_to_pos1"] = 5
+	if not config.has("steady_to_pos2"):
+		config["steady_to_pos2"] = 5
+	if not config.has("gamble_to_exit_positive"):
+		config["gamble_to_exit_positive"] = 2
+	world_state["xinxingConfig"] = config
+
+# 功能：读取当前心性值。
+# 说明：优先从 RoleState 读取，回退到 world_state.player。
+func _get_current_xinxing() -> int:
+	if player_role_state != null and player_role_state.has_method("get_xinxing"):
+		return player_role_state.get_xinxing()
+	var player: Dictionary = world_state.get("player", {})
+	return int(player.get("xinxing", 0))
+
+# 功能：心性阶段切换检查。
+# 说明：在每次孤注一掷使用后和回合结算末尾调用，根据累积计数触发心性偏移。
+func _check_xinxing_transition() -> void:
+	_ensure_xinxing_tracker()
+	var tracker: Dictionary = world_state["xinxingTracker"]
+	var config: Dictionary = world_state["xinxingConfig"]
+	var current_xinxing := _get_current_xinxing()
+	var gamble_count := int(tracker.get("gamble_count", 0))
+	var steady_count := int(tracker.get("steady_count", 0))
+	var changed := false
+
+	# 孤注一掷累计触发心性下降：当前心性 >= 0 时，连续使用孤注一掷达到阈值会下降到 -1
+	if current_xinxing >= 0 and gamble_count >= int(config.get("gamble_to_neg1", 3)):
+		current_xinxing = RuleEngine.apply_xinxing_delta(current_xinxing, -1)
+		tracker["gamble_count"] = 0
+		changed = true
+		print("[心性] 孤注一掷累计触发 → 心性下降至 %d" % current_xinxing)
+
+	# 稳健累计触发心性上升：心性 0 → +1
+	if current_xinxing == 0 and steady_count >= int(config.get("steady_to_pos1", 5)):
+		current_xinxing = RuleEngine.apply_xinxing_delta(current_xinxing, 1)
+		tracker["steady_count"] = 0
+		changed = true
+		print("[心性] 稳健累计触发 → 心性上升至 %d" % current_xinxing)
+
+	# 稳健累计触发心性上升：心性 +1 → +2
+	if current_xinxing == 1 and steady_count >= int(config.get("steady_to_pos2", 5)):
+		current_xinxing = RuleEngine.apply_xinxing_delta(current_xinxing, 1)
+		tracker["steady_count"] = 0
+		changed = true
+		print("[心性] 稳健累计触发 → 心性上升至 %d" % current_xinxing)
+
+	# 心性 > 0 时使用孤注一掷，累计达阈值退出正面区间
+	if current_xinxing > 0 and gamble_count >= int(config.get("gamble_to_exit_positive", 2)):
+		current_xinxing = RuleEngine.apply_xinxing_delta(current_xinxing, -1)
+		tracker["gamble_count"] = 0
+		changed = true
+		print("[心性] 正面区间孤注一掷触发 → 心性下降至 %d" % current_xinxing)
+
+	if changed:
+		_set_player_value("xinxing", current_xinxing)
+		if player_role_state != null:
+			_sync_role_to_world_state()
+	world_state["xinxingTracker"] = tracker
 
 # 功能：将 RoleState 的能力与状态同步到 world_state.player。
 # 说明：RoleState 为权威数据源，world_state.player 作为兼容层供 eligibility 表达式读取。

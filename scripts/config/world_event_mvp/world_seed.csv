@@ -13,3 +13,7 @@ location_state,harbor,,security,35
 npc_presence,town_square,,npc_id,npc_guard
 npc_presence,harbor,,npc_id,npc_smuggler
 npc_presence,harbor,,npc_id,npc_guard
+xinxing_config,,,gamble_to_neg1,3
+xinxing_config,,,steady_to_pos1,5
+xinxing_config,,,steady_to_pos2,5
+xinxing_config,,,gamble_to_exit_positive,2

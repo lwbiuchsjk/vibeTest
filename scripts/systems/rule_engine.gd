@@ -52,6 +52,81 @@ static func affinity_tier(score: int) -> String:
 		return "neutral"
 	return "favor"
 
+# 统一鉴定判定入口。
+# 说明：接收 check 配置、角色状态、风险修正器，返回判定结果。
+# Phase 2 占位实现：沿用 score vs difficultyStage 比较，result_type 只返回 success/fail。
+# risk_modifiers 完整传入存储但不参与计算。
+# thresholds：阶段阈值数组；rng：随机数生成器（chance 类型使用）。
+static func resolve_check(
+	check: Dictionary,
+	role_state: Variant,
+	thresholds: Array = [],
+	rng: Variant = null,
+	risk_modifiers: Dictionary = {}
+) -> Dictionary:
+	if check.is_empty():
+		return {"pass": true, "result_type": "success", "risk_modifiers": risk_modifiers}
+	var check_type := str(check.get("type", "")).strip_edges()
+	if check_type == "chance":
+		# chance 类型：按 successRate 概率判定
+		var rate := clampf(float(check.get("successRate", 1.0)), 0.0, 1.0)
+		var passed := true
+		if rng != null and rng.has_method("randf"):
+			passed = rng.randf() <= rate
+		else:
+			passed = randf() <= rate
+		var rt := "success" if passed else "fail"
+		return {"pass": passed, "result_type": rt, "risk_modifiers": risk_modifiers}
+	if check_type == "assessment":
+		# assessment 类型：能力/状态阶段鉴定
+		var difficulty_stage := int(check.get("difficultyStage", 0))
+		var items: Array = check.get("items", [])
+		var score := 0
+		if role_state != null and role_state.has_method("get_value"):
+			score = evaluate_assessment(items, role_state, thresholds)
+		else:
+			# JSON 路径回退：从 Dictionary 手动计算
+			for item_variant in items:
+				var item: Dictionary = item_variant
+				var key := str(item.get("key", ""))
+				var direction := str(item.get("direction", "positive"))
+				var value := 0
+				if typeof(role_state) == TYPE_DICTIONARY and role_state != null:
+					value = int(role_state.get(key, 0))
+				var stage := get_ability_stage(value, thresholds)
+				if direction == "negative":
+					score -= stage
+				else:
+					score += stage
+		var passed := score >= difficulty_stage
+		var rt := "success" if passed else "fail"
+		return {"pass": passed, "result_type": rt, "score": score, "risk_modifiers": risk_modifiers}
+	# 未知类型默认通过
+	return {"pass": true, "result_type": "success", "risk_modifiers": risk_modifiers}
+
+# 执行心性偏移并裁剪至 [-2, +2] 区间。
+static func apply_xinxing_delta(current: int, delta: int) -> int:
+	return clampi(current + delta, -2, 2)
+
+# 根据心性值返回风险入口配置。
+# 说明：决定当前心性阶段下可用的风险机制（孤注一掷 / 主动押注）与稳定收益偏置。
+static func get_xinxing_risk_profile(xinxing: int) -> Dictionary:
+	match xinxing:
+		-2:
+			return {"allow_desperate_gamble": false, "allow_preemptive_bet": true, "stability_bias": 0}
+		-1:
+			return {"allow_desperate_gamble": true, "allow_preemptive_bet": false, "stability_bias": 0}
+		0:
+			return {"allow_desperate_gamble": true, "allow_preemptive_bet": false, "stability_bias": 0}
+		1:
+			return {"allow_desperate_gamble": true, "allow_preemptive_bet": false, "stability_bias": 0}
+		2:
+			# +2 稳定收益预留结构，不实现效果
+			return {"allow_desperate_gamble": true, "allow_preemptive_bet": false, "stability_bias": 1}
+		_:
+			# 超出范围时按 0 处理
+			return {"allow_desperate_gamble": true, "allow_preemptive_bet": false, "stability_bias": 0}
+
 # 应用好感度变化，并裁剪到[-100, 100]后返回分值与档位。
 static func apply_affinity_delta(current_score: int, delta: int) -> Dictionary:
 	var next_score := clampi(current_score + delta, -100, 100)

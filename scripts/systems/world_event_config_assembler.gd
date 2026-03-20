@@ -200,6 +200,11 @@ static func _assemble_world_state(tables: Dictionary) -> Dictionary:
 				if seq <= 0 or value_text.is_empty():
 					continue
 				history_pairs.append({"seq": seq, "event_id": value_text})
+			"xinxing_config":
+				# 说明：心性阶段切换阈值配置，写入 xinxingConfig 字典。
+				var xinxing_config: Dictionary = world_state.get("xinxingConfig", {})
+				xinxing_config[key] = _to_int(value_text, 0)
+				world_state["xinxingConfig"] = xinxing_config
 			"chain":
 				chain_seed[key] = value_text
 			_:
@@ -816,6 +821,14 @@ static func _apply_option_rule_row(row: Dictionary, cp_map: Dictionary, option_r
 			# 鉴定参与项，格式：key:direction;key:direction
 			check["items"] = _parse_assessment_items(value_text)
 		option["check"] = check
+	elif rule_type == "preemptive_bet":
+		# 说明：主动押注配置，解析 bet_modifier 和额外变化，写入 option.preemptiveBet。
+		var preemptive_bet: Dictionary = option.get("preemptiveBet", {})
+		if key == "bet_modifier":
+			preemptive_bet["betModifier"] = _to_int(value_text, 0)
+		else:
+			_apply_effect_or_resolution_action(preemptive_bet, target, op, key, value_text)
+		option["preemptiveBet"] = preemptive_bet
 	elif rule_type == "resolution":
 		if branch == "fail":
 			var fail_check_variant: Variant = option.get("check", {})
@@ -833,6 +846,40 @@ static func _apply_option_rule_row(row: Dictionary, cp_map: Dictionary, option_r
 			_apply_effect_or_resolution_action(fail_resolution, target, op, key, value_text)
 			fail_check["onFailResolution"] = fail_resolution
 			option["check"] = fail_check
+		elif branch == "critical_success":
+			# 说明：大成功分支，解析并写入 check.onCriticalSuccessResolution。
+			var cs_check_variant: Variant = option.get("check", {})
+			var cs_check: Dictionary = {}
+			if typeof(cs_check_variant) == TYPE_DICTIONARY and cs_check_variant != null:
+				cs_check = cs_check_variant
+			var cs_resolution: Dictionary = cs_check.get(
+				"onCriticalSuccessResolution",
+				{
+					"worldStatePatch": {},
+					"forcedNextEventId": "",
+					"chainContextPatch": {}
+				}
+			)
+			_apply_effect_or_resolution_action(cs_resolution, target, op, key, value_text)
+			cs_check["onCriticalSuccessResolution"] = cs_resolution
+			option["check"] = cs_check
+		elif branch == "critical_fail":
+			# 说明：大失败分支，解析并写入 check.onCriticalFailResolution。
+			var cf_check_variant: Variant = option.get("check", {})
+			var cf_check: Dictionary = {}
+			if typeof(cf_check_variant) == TYPE_DICTIONARY and cf_check_variant != null:
+				cf_check = cf_check_variant
+			var cf_resolution: Dictionary = cf_check.get(
+				"onCriticalFailResolution",
+				{
+					"worldStatePatch": {},
+					"forcedNextEventId": "",
+					"chainContextPatch": {}
+				}
+			)
+			_apply_effect_or_resolution_action(cf_resolution, target, op, key, value_text)
+			cf_check["onCriticalFailResolution"] = cf_resolution
+			option["check"] = cf_check
 		else:
 			var resolution: Dictionary = option.get("resolution", {})
 			_apply_effect_or_resolution_action(resolution, target, op, key, value_text)

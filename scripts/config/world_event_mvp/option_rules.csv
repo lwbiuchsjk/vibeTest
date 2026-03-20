@@ -46,3 +46,7 @@ opt_bribe_guard,resolution,default,params,,add,,danger,-4
 opt_bribe_guard,resolution,default,flags,,set,,isWanted,FALSE
 opt_bribe_guard,resolution,default,world,,set_forced_next,,,evt_smuggle_end_001
 opt_bribe_guard,resolution,default,task,,abandon_task,,task_smuggle,
+opt_market_bargain,resolution,critical_success,params,,add,,prosperity,3
+opt_market_bargain,resolution,critical_success,params,,add,,morale,3
+opt_market_bargain,resolution,critical_fail,params,,add,,morale,-5
+opt_market_bargain,preemptive_bet,default,,,,,bet_modifier,1

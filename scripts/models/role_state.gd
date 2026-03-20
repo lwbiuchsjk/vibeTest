@@ -51,6 +51,10 @@ func load_portrait_texture() -> Texture2D:
 	# 兜底：若资源未被导入，尝试按文件直接加载。
 	return _load_texture_from_file(portrait_path)
 
+# 便捷读取心性值，等同于 get_attribute("xinxing", 0)。
+func get_xinxing() -> int:
+	return get_attribute("xinxing", 0)
+
 # 获取属性值；当键不存在时返回默认值（默认1）。
 func get_attribute(key: String, default_value: int = 1) -> int:
 	return int(attributes.get(key, default_value))
