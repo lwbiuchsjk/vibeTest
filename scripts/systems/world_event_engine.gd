@@ -1411,11 +1411,20 @@ func _resolve_preemptive_bet_phase(selected_option_id: String) -> Dictionary:
 
 	var risk_modifiers: Dictionary = {}
 	if decision == "accept":
-		# 玩家接受主动押注，构建 risk_modifiers
+		# 提取 biasModifiers 写入 risk_modifiers，传入 resolve_check 供概率引擎消费。
 		var preemptive_bet := _dict_or_empty(selected_option.get("preemptiveBet", {}))
-		risk_modifiers["bet_modifier"] = int(preemptive_bet.get("betModifier", 0))
+		var bias_modifiers := _dict_or_empty(preemptive_bet.get("biasModifiers", {}))
+		risk_modifiers["successBias"] = int(bias_modifiers.get("successBias", 0))
+		risk_modifiers["criticalSuccessBias"] = int(bias_modifiers.get("criticalSuccessBias", 0))
+		risk_modifiers["criticalFailBias"] = int(bias_modifiers.get("criticalFailBias", 0))
 		risk_modifiers["bet_active"] = true
-		print("[心性] 主动押注已接受 → bet_modifier: %d" % risk_modifiers["bet_modifier"])
+		# 押注前立即应用额外资源/属性变化（如有配置）。
+		var pre_bet_patch := _dict_or_empty(preemptive_bet.get("worldStatePatch", {}))
+		if not pre_bet_patch.is_empty():
+			_apply_world_state_patch(pre_bet_patch)
+		print("[心性] 主动押注已接受 → successBias: %d | criticalFailBias: %d" % [
+			risk_modifiers["successBias"], risk_modifiers["criticalFailBias"]
+		])
 	else:
 		print("[心性] 主动押注已跳过")
 

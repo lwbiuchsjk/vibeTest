@@ -822,10 +822,15 @@ static func _apply_option_rule_row(row: Dictionary, cp_map: Dictionary, option_r
 			check["items"] = _parse_assessment_items(value_text)
 		option["check"] = check
 	elif rule_type == "preemptive_bet":
-		# 说明：主动押注配置，解析 bet_modifier 和额外变化，写入 option.preemptiveBet。
+		# 说明：主动押注配置，写入 option.preemptiveBet。
+		# target == "bet_modifier" 时，key 为 bias 字段名（successBias / criticalSuccessBias / criticalFailBias），写入 biasModifiers 子字典。
+		# 其他 target（如 player）走 _apply_effect_or_resolution_action，写入 worldStatePatch，押注前由引擎预应用。
 		var preemptive_bet: Dictionary = option.get("preemptiveBet", {})
-		if key == "bet_modifier":
-			preemptive_bet["betModifier"] = _to_int(value_text, 0)
+		if target == "bet_modifier":
+			if not key.is_empty():
+				var bias_modifiers: Dictionary = preemptive_bet.get("biasModifiers", {})
+				bias_modifiers[key] = _to_int(value_text, 0)
+				preemptive_bet["biasModifiers"] = bias_modifiers
 		else:
 			_apply_effect_or_resolution_action(preemptive_bet, target, op, key, value_text)
 		option["preemptiveBet"] = preemptive_bet
@@ -934,6 +939,15 @@ static func _apply_effect_or_resolution_action(container: Dictionary, target: St
 
 	if target == "world" and op == "clear_forced_next":
 		container["clearForcedNext"] = _to_bool(value_text)
+		return
+
+	if target == "player" and op == "add":
+		# 说明：玩家属性/资源增量，写入 worldStatePatch.player，供引擎通过 _apply_world_state_patch 消费。
+		var world_patch_p: Dictionary = container.get("worldStatePatch", {})
+		var player_patch: Dictionary = world_patch_p.get("player", {})
+		player_patch[key] = int(player_patch.get(key, 0)) + _to_int(value_text, 0)
+		world_patch_p["player"] = player_patch
+		container["worldStatePatch"] = world_patch_p
 		return
 
 	if target == "chain_context" and op == "patch":

@@ -49,4 +49,7 @@ opt_bribe_guard,resolution,default,task,,abandon_task,,task_smuggle,
 opt_market_bargain,resolution,critical_success,params,,add,,prosperity,3
 opt_market_bargain,resolution,critical_success,params,,add,,morale,3
 opt_market_bargain,resolution,critical_fail,params,,add,,morale,-5
-opt_market_bargain,preemptive_bet,default,,,,,bet_modifier,1
+opt_market_bargain,preemptive_bet,default,bet_modifier,,,,successBias,2
+opt_market_bargain,preemptive_bet,default,bet_modifier,,,,criticalSuccessBias,-99
+opt_market_bargain,preemptive_bet,default,bet_modifier,,,,criticalFailBias,3
+opt_market_bargain,preemptive_bet,default,player,,add,,energy,-1
