@@ -10,7 +10,7 @@ const TASK_BIAS_ADVANCE_DEFAULT := 6
 const TASK_BIAS_RISK_DEFAULT := -4
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 const LocationGraph := preload("res://scripts/models/location_graph.gd")
-# RuleEngine 通过 class_name 全局注册，无需 preload。
+const RuleEngine := preload("res://scripts/systems/rule_engine.gd")
 
 var world_state: Dictionary = {}
 var events: Array = []
