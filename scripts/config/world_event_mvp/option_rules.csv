@@ -19,7 +19,8 @@ opt_market_buy,resolution,default,task,,advance_task,,task_part_time,work:1
 opt_market_bargain,eligibility,default,,player.energy,>=,1,,
 opt_market_bargain,cost,default,,,,,energy,1
 opt_market_bargain,check,default,check,,,,type,assessment
-opt_market_bargain,check,default,check,,,,difficultyStage,2
+opt_market_bargain,check,default,check,,,,hitThreshold,6
+opt_market_bargain,check,default,check,,,,requiredHits,2
 opt_market_bargain,check,default,check,,,,items,physique:positive;energy:negative
 opt_market_bargain,resolution,default,params,,add,,prosperity,1
 opt_market_bargain,resolution,default,params,,add,,morale,1
@@ -49,7 +50,5 @@ opt_bribe_guard,resolution,default,task,,abandon_task,,task_smuggle,
 opt_market_bargain,resolution,critical_success,params,,add,,prosperity,3
 opt_market_bargain,resolution,critical_success,params,,add,,morale,3
 opt_market_bargain,resolution,critical_fail,params,,add,,morale,-5
-opt_market_bargain,preemptive_bet,default,bet_modifier,,,,successBias,2
-opt_market_bargain,preemptive_bet,default,bet_modifier,,,,criticalSuccessBias,-99
-opt_market_bargain,preemptive_bet,default,bet_modifier,,,,criticalFailBias,3
+opt_market_bargain,preemptive_bet,default,bet_modifier,,,,successBias,1
 opt_market_bargain,preemptive_bet,default,player,,add,,energy,-1

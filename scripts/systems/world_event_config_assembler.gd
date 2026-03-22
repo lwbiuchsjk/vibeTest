@@ -814,9 +814,12 @@ static func _apply_option_rule_row(row: Dictionary, cp_map: Dictionary, option_r
 			check["type"] = value_text
 		elif key == "successRate":
 			check["successRate"] = _to_float(value_text, 1.0)
-		elif key == "difficultyStage":
-			# 鉴定整体难度等级
-			check["difficultyStage"] = _to_int(value_text, 0)
+		elif key == "hitThreshold":
+			# 骰池命中阈值：单颗 d10 ≥ 该值算命中
+			check["hitThreshold"] = _to_int(value_text, 6)
+		elif key == "requiredHits":
+			# 骰池需要命中数：凑够该数量算通过
+			check["requiredHits"] = _to_int(value_text, 1)
 		elif key == "items":
 			# 鉴定参与项，格式：key:direction;key:direction
 			check["items"] = _parse_assessment_items(value_text)

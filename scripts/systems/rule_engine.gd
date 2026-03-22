@@ -76,10 +76,11 @@ static func resolve_check(
 			"risk_modifiers": risk_modifiers
 		}
 	if check_type == "assessment":
-		var difficulty_stage := int(check.get("difficultyStage", 0))
+		var hit_threshold := int(check.get("hitThreshold", 6))
+		var required_hits := int(check.get("requiredHits", 1))
 		var items: Array = check.get("items", [])
 		var score := 0
-		if role_state != null and role_state.has_method("get_value"):
+		if role_state != null and typeof(role_state) != TYPE_DICTIONARY and role_state.has_method("get_value"):
 			score = evaluate_assessment(items, role_state, thresholds)
 		else:
 			# JSON 路径回退：从 Dictionary 手动计算评分。
@@ -95,16 +96,22 @@ static func resolve_check(
 					score -= stage
 				else:
 					score += stage
-		var probs := _build_assessment_probabilities(score, difficulty_stage)
-		probs = _apply_probability_biases(probs, risk_modifiers)
-		probs = _apply_risk_profile_constraints(probs, risk_modifiers)
-		var result_type := _roll_result_type(probs, rng)
+		# 骰池机制：score 决定骰子数，偏置加减骰子，心性额外加骰。
+		var bonus_dice := _calc_bonus_dice(risk_modifiers)
+		var pool_size := maxi(1, score + bonus_dice)
+		var dice := _roll_dice_pool(pool_size, rng)
+		var raw_result := _evaluate_dice_pool(dice, hit_threshold, required_hits)
+		var result_type := _apply_xinxing_constraint(raw_result, risk_modifiers)
+		var hits := _count_hits(dice, hit_threshold)
 		return {
 			"pass": _is_pass_result(result_type),
 			"result_type": result_type,
 			"score": score,
-			"difficultyStage": difficulty_stage,
-			"probabilities": probs,
+			"pool_size": pool_size,
+			"dice": dice,
+			"hits": hits,
+			"hitThreshold": hit_threshold,
+			"requiredHits": required_hits,
 			"risk_modifiers": risk_modifiers
 		}
 	# 未知类型默认通过
@@ -125,23 +132,72 @@ static func _build_chance_probabilities(pass_rate: float) -> Dictionary:
 		}
 	)
 
-# 功能：构建 assessment 检定的基础概率分布。
-# 说明：difficultyStage 作为难度基准，items 计算出的 score 决定概率区间。
-static func _build_assessment_probabilities(score: int, difficulty_stage: int) -> Dictionary:
-	var margin := float(score - difficulty_stage)
-	var pass_rate := clampf(0.50 + margin * 0.18, 0.05, 0.95)
-	var critical_success := clampf(0.04 + margin * 0.03, 0.0, 0.35)
-	var critical_fail := clampf(0.04 - margin * 0.03, 0.0, 0.35)
-	critical_success = minf(critical_success, pass_rate)
-	critical_fail = minf(critical_fail, 1.0 - pass_rate)
-	return _normalize_probabilities(
-		{
-			"critical_success": critical_success,
-			"success": maxf(0.0, pass_rate - critical_success),
-			"fail": maxf(0.0, (1.0 - pass_rate) - critical_fail),
-			"critical_fail": critical_fail
-		}
-	)
+# 功能：掷骰池，返回每颗 d10 的骰面数组。
+# 说明：pool_size 颗 d10，每颗结果范围 1~10。
+static func _roll_dice_pool(pool_size: int, rng: Variant = null) -> Array:
+	var dice: Array = []
+	for i in pool_size:
+		var roll: int
+		if rng != null and rng.has_method("randi_range"):
+			roll = rng.randi_range(1, 10)
+		elif rng != null and rng.has_method("randf"):
+			# 兼容只有 randf 的 MockRng：将 0~1 映射到 1~10。
+			roll = int(rng.randf() * 10.0) + 1
+			roll = clampi(roll, 1, 10)
+		else:
+			roll = randi_range(1, 10)
+		dice.append(roll)
+	return dice
+
+# 功能：统计骰池中命中数。
+static func _count_hits(dice: Array, hit_threshold: int) -> int:
+	var hits := 0
+	for die in dice:
+		if int(die) >= hit_threshold:
+			hits += 1
+	return hits
+
+# 功能：根据骰池结果判定四档 result_type。
+# 说明：通过=命中数≥需要数；大成功=通过且有10；大失败=失败且有1。
+static func _evaluate_dice_pool(dice: Array, hit_threshold: int, required_hits: int) -> String:
+	var hits := _count_hits(dice, hit_threshold)
+	var has_ten := false
+	var has_one := false
+	for die in dice:
+		if int(die) == 10:
+			has_ten = true
+		if int(die) == 1:
+			has_one = true
+	if hits >= required_hits:
+		if has_ten:
+			return "critical_success"
+		return "success"
+	else:
+		if has_one:
+			return "critical_fail"
+		return "fail"
+
+# 功能：计算偏置带来的额外骰子数。
+# 说明：successBias + stability_bias 合并为加减骰子数（正数加骰，负数减骰）。
+static func _calc_bonus_dice(risk_modifiers: Dictionary) -> int:
+	return int(risk_modifiers.get("successBias", 0)) + int(risk_modifiers.get("stability_bias", 0))
+
+# 功能：根据心性阶段对骰池 result_type 做门控约束。
+# 说明：与 chance 检定的 _apply_risk_profile_constraints 逻辑对应，但直接操作 result_type 字符串。
+static func _apply_xinxing_constraint(result_type: String, risk_modifiers: Dictionary) -> String:
+	var xinxing := int(risk_modifiers.get("xinxing", 0))
+	if xinxing < -2 or xinxing > 2:
+		xinxing = 0
+	# 0 / -1 / -2 不允许大成功 → 降级为 success。
+	if xinxing <= 0 and result_type == "critical_success":
+		return "success"
+	# +1 / +2 / 0 不允许大失败 → 降级为 fail。
+	if xinxing >= 0 and result_type == "critical_fail":
+		return "fail"
+	# -2 阶段所有失败强制升级为大失败。
+	if xinxing == -2 and result_type == "fail":
+		return "critical_fail"
+	return result_type
 
 # 功能：应用主动押注与稳定倾向等偏置参数。
 # 说明：successBias / criticalSuccessBias / criticalFailBias 使用“百分点”语义（1=1%）。

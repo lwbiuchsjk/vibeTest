@@ -1441,19 +1441,18 @@ func _resolve_preemptive_bet_phase(selected_option_id: String) -> Dictionary:
 
 	var risk_modifiers: Dictionary = {}
 	if decision == "accept":
-		# 提取 biasModifiers 写入 risk_modifiers，传入 resolve_check 供概率引擎消费。
+		# 提取 biasModifiers 写入 risk_modifiers，传入 resolve_check 供骰池引擎消费。
+		# successBias 在骰池模式下语义为"加减骰子数"。
 		var preemptive_bet := _dict_or_empty(selected_option.get("preemptiveBet", {}))
 		var bias_modifiers := _dict_or_empty(preemptive_bet.get("biasModifiers", {}))
 		risk_modifiers["successBias"] = int(bias_modifiers.get("successBias", 0))
-		risk_modifiers["criticalSuccessBias"] = int(bias_modifiers.get("criticalSuccessBias", 0))
-		risk_modifiers["criticalFailBias"] = int(bias_modifiers.get("criticalFailBias", 0))
 		risk_modifiers["bet_active"] = true
 		# 押注前立即应用额外资源/属性变化（如有配置）。
 		var pre_bet_patch := _dict_or_empty(preemptive_bet.get("worldStatePatch", {}))
 		if not pre_bet_patch.is_empty():
 			_apply_world_state_patch(pre_bet_patch)
-		print("[心性] 主动押注已接受 → successBias: %d | criticalFailBias: %d" % [
-			risk_modifiers["successBias"], risk_modifiers["criticalFailBias"]
+		print("[心性] 主动押注已接受 → bonus_dice: %d" % [
+			risk_modifiers["successBias"]
 		])
 	else:
 		print("[心性] 主动押注已跳过")
@@ -1562,10 +1561,11 @@ func _finalize_option_turn(event_def: Dictionary) -> Dictionary:
 		choice_result
 	)
 
-# 功能：打印 assessment 鉴定调试信息。
-# 说明：在 _is_check_pass 委托 RuleEngine 计算后，输出详细的鉴定过程。
+# 功能：打印 assessment 骰池鉴定调试信息。
+# 说明：在 _is_check_pass 委托 RuleEngine 计算后，输出骰面、命中数等骰池详情。
 func _print_assessment_debug(check: Dictionary, result: Dictionary) -> void:
-	var difficulty_stage := int(check.get("difficultyStage", 0))
+	var hit_threshold := int(check.get("hitThreshold", 6))
+	var required_hits := int(check.get("requiredHits", 1))
 	var items: Array = check.get("items", [])
 	var use_role_state := player_role_state != null
 	var role_or_player: Variant = player_role_state if use_role_state else world_state.get("player", {})
@@ -1584,12 +1584,13 @@ func _print_assessment_debug(check: Dictionary, result: Dictionary) -> void:
 			items_debug += " / "
 		items_debug += "%s(stage=%d, %s)" % [key, stage, sign]
 	var score := int(result.get("score", 0))
+	var pool_size := int(result.get("pool_size", 0))
+	var dice: Array = result.get("dice", [])
+	var hits := int(result.get("hits", 0))
 	var result_type := str(result.get("result_type", ""))
-	var risk_mods: Dictionary = result.get("risk_modifiers", {})
-	var risk_debug := ""
-	if not risk_mods.is_empty():
-		risk_debug = " | risk_modifiers: %s" % str(risk_mods)
-	print("[鉴定] difficulty: %d | items: %s | score: %d | result: %s%s" % [difficulty_stage, items_debug, score, result_type, risk_debug])
+	print("[鉴定] items: %s | score: %d | pool: %dd10 | dice: %s | hits: %d/%d (≥%d) | result: %s" % [
+		items_debug, score, pool_size, str(dice), hits, required_hits, hit_threshold, result_type
+	])
 
 # 功能：应用 resolution，并衔接执行锁更新。
 # 说明：统一处理 worldStatePatch、forcedNextEventId、chainContextPatch。
