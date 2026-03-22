@@ -10,7 +10,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 # 说明：这里维护项目级固定 Godot 路径；如后续升级版本，只需修改这一处。
-$godotExe = "D:\software\Godot_v4.5.1-stable_mono_win64\Godot_v4.5.1-stable_mono_win64_console.exe"
+$godotExe = "\godot.exe"
 
 if (-not (Test-Path $godotExe)) {
     throw "Godot executable not found: $godotExe"
