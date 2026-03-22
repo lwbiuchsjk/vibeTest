@@ -40,5 +40,9 @@ Godot 4.5，GDScript，Git 版本控制
 
 - 如需查看知识库节点概览、索引和结构化缓存，使用 `_kb_sync/cache/KB_CONTEXT.md`、`_kb_sync/cache/KB_CONTEXT.json` 与 `_kb_sync/cache/cache_index.json`。
 
+## 测试流程
+
+- 本项目 Godot 统一通过 `tools/run_godot.ps1` 调用，不要假设系统 PATH 中存在 `godot`。
+
 # 当前进度
 <!-- 例：已完成主菜单，正在开发玩家移动系统 -->
