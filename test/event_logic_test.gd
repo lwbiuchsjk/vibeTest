@@ -117,8 +117,10 @@ func _render_current_event(turn_result: Dictionary) -> void:
 
 	# 心性风险入口：主动押注
 	if phase == "preemptive_bet":
-		status_label.text = "心性 -2 可发动主动押注，获取额外加骰。"
-		_render_risk_entry_buttons("主动押注：接受", "主动押注：放弃")
+		var bet_info := _build_preemptive_bet_info()
+		status_label.text = "心性 -2 可发动主动押注。"
+		var can_afford := bool(bet_info.get("can_afford", true))
+		_render_preemptive_bet_buttons(can_afford, bet_info)
 		return
 
 	if awaiting_choice:
@@ -160,6 +162,77 @@ func _render_risk_entry_buttons(accept_text: String, reject_text: String) -> voi
 	var reject_button := Button.new()
 	reject_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	reject_button.text = reject_text
+	reject_button.pressed.connect(_on_option_pressed.bind("reject"))
+	option_list.add_child(reject_button)
+
+
+# 功能：构建主动押注的完整信息摘要（消耗、调整、是否可负担）。
+# 说明：合并选项原有 cost 与押注额外 cost，同名字段累加显示总消耗。
+func _build_preemptive_bet_info() -> Dictionary:
+	var pending := _engine._pending_turn_context
+	var selected_option: Dictionary = pending.get("selected_option", {})
+	var option_cost: Dictionary = selected_option.get("cost", {})
+	var option_bet_cfg: Dictionary = selected_option.get("preemptiveBet", {})
+	if typeof(option_bet_cfg) != TYPE_DICTIONARY:
+		option_bet_cfg = {}
+	var effective_bet: Dictionary = _engine._merge_preemptive_bet_config(option_bet_cfg)
+	var bet_cost: Dictionary = effective_bet.get("cost", {})
+	var bet_bias: Dictionary = effective_bet.get("bias", {})
+
+	# 合并总消耗：选项 cost + 押注额外 cost，同名字段累加。
+	var total_cost: Dictionary = {}
+	for key in option_cost.keys():
+		total_cost[str(key)] = int(option_cost[key])
+	for key in bet_cost.keys():
+		var k := str(key)
+		total_cost[k] = int(total_cost.get(k, 0)) + int(bet_cost[key])
+
+	# 构建消耗文本
+	var cost_parts: Array[String] = []
+	for key in total_cost.keys():
+		var total := int(total_cost[key])
+		var base := int(option_cost.get(key, 0))
+		var extra := int(bet_cost.get(key, 0))
+		if base > 0 and extra > 0:
+			cost_parts.append("%s %d（基础 %d + 押注 %d）" % [str(key), total, base, extra])
+		elif extra > 0:
+			cost_parts.append("%s %d（押注消耗）" % [str(key), extra])
+		else:
+			cost_parts.append("%s %d" % [str(key), total])
+	var cost_text := "无" if cost_parts.is_empty() else "、".join(cost_parts)
+
+	# 构建调整文本
+	var bias_parts: Array[String] = []
+	var success_bias := int(bet_bias.get("successBias", 0))
+	if success_bias != 0:
+		bias_parts.append("+%d 鉴定骰" % success_bias if success_bias > 0 else "%d 鉴定骰" % success_bias)
+	var bias_text := "无" if bias_parts.is_empty() else "、".join(bias_parts)
+
+	# 精力够不够
+	var can_afford := _engine._can_pay_bet_cost(bet_cost)
+
+	return {"can_afford": can_afford, "cost_text": cost_text, "bias_text": bias_text, "total_cost": total_cost, "bet_cost": bet_cost, "bet_bias": bet_bias}
+
+
+# 功能：渲染主动押注的接受/放弃按钮，按钮上显示消耗与调整详情，精力不足时禁用接受按钮。
+func _render_preemptive_bet_buttons(can_afford: bool, bet_info: Dictionary) -> void:
+	var cost_text := str(bet_info.get("cost_text", ""))
+	var bias_text := str(bet_info.get("bias_text", ""))
+	var accept_label := "主动押注：接受\n消耗: %s | 调整: %s" % [cost_text, bias_text]
+	if not can_afford:
+		accept_label += "\n（精力不足，无法发动）"
+
+	var accept_button := Button.new()
+	accept_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	accept_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	accept_button.text = accept_label
+	accept_button.disabled = not can_afford
+	accept_button.pressed.connect(_on_option_pressed.bind("accept"))
+	option_list.add_child(accept_button)
+
+	var reject_button := Button.new()
+	reject_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reject_button.text = "主动押注：放弃"
 	reject_button.pressed.connect(_on_option_pressed.bind("reject"))
 	option_list.add_child(reject_button)
 

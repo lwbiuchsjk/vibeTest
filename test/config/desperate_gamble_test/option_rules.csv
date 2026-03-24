@@ -1,4 +1,5 @@
 option_id,rule_type,branch,target,left,op,right,key,value
+opt_gamble_hard,cost,default,,,,,energy,3
 opt_gamble_hard,check,default,check,,,,type,assessment
 opt_gamble_hard,check,default,check,,,,hitThreshold,10
 opt_gamble_hard,check,default,check,,,,requiredHits,3
