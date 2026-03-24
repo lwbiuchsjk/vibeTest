@@ -20,3 +20,6 @@ Design/
 
 # Local IDE settings
 .vscode/settings.json
+
+# Local Godot runner (path varies per machine)
+tools/run_godot.ps1
