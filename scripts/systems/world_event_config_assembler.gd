@@ -841,14 +841,23 @@ static func _apply_option_rule_row(row: Dictionary, cp_map: Dictionary, option_r
 		option["check"] = check
 	elif rule_type == "preemptive_bet":
 		# 说明：主动押注配置，写入 option.preemptiveBet。
-		# target == "bet_modifier" 时，key 为 bias 字段名（successBias / criticalSuccessBias / criticalFailBias），写入 biasModifiers 子字典。
+		# target == "disabled" 时，标记该选项关闭主动押注（不走全局默认）。
+		# target == "bet_modifier" 时，key 为 bias 字段名（successBias 等），写入 biasModifiers 子字典，覆盖全局默认。
+		# target == "cost_override" 时，key 为资源名（如 energy），写入 costOverride 子字典，覆盖全局默认代价。
 		# 其他 target（如 player）走 _apply_effect_or_resolution_action，写入 worldStatePatch，押注前由引擎预应用。
 		var preemptive_bet: Dictionary = option.get("preemptiveBet", {})
-		if target == "bet_modifier":
+		if target == "disabled":
+			preemptive_bet["disabled"] = true
+		elif target == "bet_modifier":
 			if not key.is_empty():
 				var bias_modifiers: Dictionary = preemptive_bet.get("biasModifiers", {})
 				bias_modifiers[key] = _to_int(value_text, 0)
 				preemptive_bet["biasModifiers"] = bias_modifiers
+		elif target == "cost_override":
+			if not key.is_empty():
+				var cost_override: Dictionary = preemptive_bet.get("costOverride", {})
+				cost_override[key] = _to_int(value_text, 0)
+				preemptive_bet["costOverride"] = cost_override
 		else:
 			_apply_effect_or_resolution_action(preemptive_bet, target, op, key, value_text)
 		option["preemptiveBet"] = preemptive_bet

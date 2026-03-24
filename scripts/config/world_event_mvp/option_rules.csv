@@ -52,5 +52,3 @@ opt_market_bargain,resolution,default,affinity,,,,affinityDeltas,player->npc_men
 opt_market_bargain,resolution,critical_success,params,,add,,prosperity,3
 opt_market_bargain,resolution,critical_success,params,,add,,morale,3
 opt_market_bargain,resolution,critical_fail,params,,add,,morale,-5
-opt_market_bargain,preemptive_bet,default,bet_modifier,,,,successBias,1
-opt_market_bargain,preemptive_bet,default,player,,add,,energy,-1

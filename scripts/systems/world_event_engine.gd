@@ -39,6 +39,11 @@ var _last_check_result: Dictionary = {}
 var _last_affinity_changes: Array = []
 # 最近一次心性转移记录（{old_value, new_value}），无转移时为空字典。
 var _last_xinxing_transition: Dictionary = {}
+# 主动押注全局默认配置：cost 为额外代价（叠加在选项 cost 之上），bias 为鉴定加骰。
+var _preemptive_bet_defaults: Dictionary = {
+	"cost": {"energy": 5},
+	"bias": {"successBias": 1}
+}
 
 # 功能：初始化随机源。
 # 说明：seed=0 使用随机种子；指定 seed 可复现结果，便于测试回归。
@@ -1329,6 +1334,46 @@ func _apply_cost(cost: Dictionary) -> void:
 	if player_role_state != null:
 		_sync_role_to_world_state()
 
+# 功能：合并全局主动押注默认配置与选项级覆盖。
+# 说明：选项级 biasModifiers 覆盖全局 bias，选项级 cost（worldStatePatch.player）覆盖全局 cost。
+#       未配置覆盖的字段回退到 _preemptive_bet_defaults。
+func _merge_preemptive_bet_config(option_bet_cfg: Dictionary) -> Dictionary:
+	var defaults := _preemptive_bet_defaults
+	# bias 合并：选项级 biasModifiers 存在时覆盖全局 bias。
+	var option_bias := _dict_or_empty(option_bet_cfg.get("biasModifiers", {}))
+	var effective_bias: Dictionary = defaults.get("bias", {}).duplicate(true)
+	for key in option_bias.keys():
+		effective_bias[str(key)] = option_bias[key]
+	# cost 合并：选项级若通过 preemptive_bet rule 显式配置了 costOverride 则覆盖全局 cost。
+	var option_cost_override := _dict_or_empty(option_bet_cfg.get("costOverride", {}))
+	var effective_cost: Dictionary = defaults.get("cost", {}).duplicate(true)
+	if not option_cost_override.is_empty():
+		effective_cost = option_cost_override.duplicate(true)
+	return {"cost": effective_cost, "bias": effective_bias}
+
+# 功能：检查玩家是否能支付主动押注的额外代价。
+func _can_pay_bet_cost(bet_cost: Dictionary) -> bool:
+	if bet_cost.is_empty():
+		return true
+	for key_variant in bet_cost.keys():
+		var key := str(key_variant)
+		var need := int(bet_cost[key_variant])
+		var have := _get_player_value(key, 0)
+		if have < need:
+			return false
+	return true
+
+# 功能：扣除主动押注的额外代价。
+func _apply_bet_cost(bet_cost: Dictionary) -> void:
+	if bet_cost.is_empty():
+		return
+	for key_variant in bet_cost.keys():
+		var key := str(key_variant)
+		var current := _get_player_value(key, 0)
+		_set_player_value(key, current - int(bet_cost[key_variant]))
+	if player_role_state != null:
+		_sync_role_to_world_state()
+
 # 功能：在可选项中按外部传入 ID 精确选择。
 # 说明：仅当目标选项状态为 selectable 时返回，否则返回空字典。
 func _select_option_by_id(options_eval: Array, option_id: String) -> Dictionary:
@@ -1368,9 +1413,13 @@ func _apply_option_resolution(selected_option: Dictionary, event_def: Dictionary
 	var risk_profile := RuleEngine.get_xinxing_risk_profile(xinxing)
 	print("[心性] 当前心性: %d | 风险配置: %s" % [xinxing, str(risk_profile)])
 
-	# 3. 主动押注检查：心性允许且选项配置了 preemptiveBet
-	var preemptive_bet := _dict_or_empty(selected_option.get("preemptiveBet", {}))
-	if bool(risk_profile.get("allow_preemptive_bet", false)) and not preemptive_bet.is_empty():
+	# 3. 主动押注检查：心性允许且选项含鉴定且未被 disabled。
+	#    全局化后不再要求选项显式配置 preemptiveBet，含鉴定的选项默认走全局默认。
+	var check_for_bet := _dict_or_empty(selected_option.get("check", {}))
+	var option_bet_cfg: Variant = selected_option.get("preemptiveBet", null)
+	var bet_disabled: bool = (typeof(option_bet_cfg) == TYPE_DICTIONARY and bool(option_bet_cfg.get("disabled", false)))
+	var has_check := not check_for_bet.is_empty()
+	if bool(risk_profile.get("allow_preemptive_bet", false)) and has_check and not bet_disabled:
 		# 挂起到 preemptive_bet phase，等待玩家决策
 		_pending_turn_context["phase"] = "preemptive_bet"
 		_pending_turn_context["selected_option"] = selected_option.duplicate(true)
@@ -1504,19 +1553,29 @@ func _resolve_preemptive_bet_phase(selected_option_id: String) -> Dictionary:
 
 	var risk_modifiers: Dictionary = {}
 	if decision == "accept":
-		# 提取 biasModifiers 写入 risk_modifiers，传入 resolve_check 供骰池引擎消费。
-		# successBias 在骰池模式下语义为"加减骰子数"。
-		var preemptive_bet := _dict_or_empty(selected_option.get("preemptiveBet", {}))
-		var bias_modifiers := _dict_or_empty(preemptive_bet.get("biasModifiers", {}))
-		risk_modifiers["successBias"] = int(bias_modifiers.get("successBias", 0))
-		risk_modifiers["bet_active"] = true
-		# 押注前立即应用额外资源/属性变化（如有配置）。
-		var pre_bet_patch := _dict_or_empty(preemptive_bet.get("worldStatePatch", {}))
-		if not pre_bet_patch.is_empty():
-			_apply_world_state_patch(pre_bet_patch)
-		print("[心性] 主动押注已接受 → bonus_dice: %d" % [
-			risk_modifiers["successBias"]
-		])
+		# 合并全局默认与选项覆盖：选项级 biasModifiers / worldStatePatch 覆盖全局默认。
+		var option_bet_cfg := _dict_or_empty(selected_option.get("preemptiveBet", {}))
+		var effective_bet := _merge_preemptive_bet_config(option_bet_cfg)
+
+		# 额外代价检查与扣除（叠加在选项 cost 之上，选项 cost 已在入口处扣过）。
+		var bet_cost: Dictionary = effective_bet.get("cost", {})
+		if not _can_pay_bet_cost(bet_cost):
+			# 精力不足，视为放弃押注，直接走常规检定。
+			print("[心性] 主动押注精力不足 → 自动跳过")
+		else:
+			_apply_bet_cost(bet_cost)
+			# 提取 biasModifiers 写入 risk_modifiers，传入 resolve_check 供骰池引擎消费。
+			# successBias 在骰池模式下语义为"加减骰子数"。
+			var bias: Dictionary = effective_bet.get("bias", {})
+			risk_modifiers["successBias"] = int(bias.get("successBias", 0))
+			risk_modifiers["bet_active"] = true
+			# 押注前立即应用额外资源/属性变化（如选项配置了 worldStatePatch）。
+			var pre_bet_patch := _dict_or_empty(option_bet_cfg.get("worldStatePatch", {}))
+			if not pre_bet_patch.is_empty():
+				_apply_world_state_patch(pre_bet_patch)
+			print("[心性] 主动押注已接受 → bonus_dice: %d | cost: %s" % [
+				risk_modifiers["successBias"], str(bet_cost)
+			])
 	else:
 		print("[心性] 主动押注已跳过")
 

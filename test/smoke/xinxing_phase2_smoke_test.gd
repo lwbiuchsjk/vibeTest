@@ -50,6 +50,9 @@ static func run_all() -> Dictionary:
 	_test_j_dice_pool_assessment(checks, failed)
 	_test_k_dice_pool_xinxing_constraints(checks, failed)
 	_test_l_dice_pool_bonus_dice(checks, failed)
+	_test_m_global_bet_default_no_explicit_config(checks, failed)
+	_test_n_global_bet_disabled_option(checks, failed)
+	_test_o_global_bet_cost_deducted(checks, failed)
 
 	return {
 		"ok": failed.is_empty(),
@@ -540,6 +543,133 @@ static func _test_l_dice_pool_bonus_dice(checks: Array, failed: Array) -> void:
 		return
 
 	_pass(checks, label)
+
+
+# 场景 M：心性 -2，选项无显式 preemptiveBet 配置，应通过全局默认自动触发主动押注。
+static func _test_m_global_bet_default_no_explicit_config(checks: Array, failed: Array) -> void:
+	var label := "M: xinxing=-2, no explicit preemptiveBet -> global default triggers bet"
+	var engine := _build_test_engine(-2)
+
+	# 移除 opt_market_bargain 的 preemptiveBet 配置，模拟"无显式配置"。
+	_strip_preemptive_bet_config(engine, "opt_market_bargain")
+
+	var preview := engine.preview_next_turn()
+	if not preview.get("ok", false):
+		_fail(checks, failed, label, "preview failed: %s" % str(preview.get("error", "")))
+		return
+	if not _ensure_ready_for_option_choice(engine, checks, failed, label):
+		return
+
+	var result := engine.confirm_pending_turn("opt_market_bargain")
+	if not result.get("ok", false):
+		_fail(checks, failed, label, "confirm failed: %s" % str(result.get("error", "")))
+		return
+
+	if str(result.get("phase", "")) != "preemptive_bet":
+		_fail(checks, failed, label, "expected preemptive_bet phase from global default, got: %s" % str(result.get("phase", "")))
+		return
+
+	_pass(checks, label)
+
+
+# 场景 N：心性 -2，选项显式 disabled 主动押注，不应触发。
+static func _test_n_global_bet_disabled_option(checks: Array, failed: Array) -> void:
+	var label := "N: xinxing=-2, preemptiveBet disabled -> no bet phase"
+	var engine := _build_test_engine(-2)
+	_inject_check_config(engine, "chance", 0.0)
+
+	# 注入 disabled 标记。
+	_inject_preemptive_bet_disabled(engine, "opt_market_bargain")
+
+	var preview := engine.preview_next_turn()
+	if not preview.get("ok", false):
+		_fail(checks, failed, label, "preview failed: %s" % str(preview.get("error", "")))
+		return
+	if not _ensure_ready_for_option_choice(engine, checks, failed, label):
+		return
+
+	var result := engine.confirm_pending_turn("opt_market_bargain")
+	if not result.get("ok", false):
+		_fail(checks, failed, label, "confirm failed: %s" % str(result.get("error", "")))
+		return
+
+	if str(result.get("phase", "")) == "preemptive_bet":
+		_fail(checks, failed, label, "preemptive_bet should not appear when disabled")
+		return
+
+	_pass(checks, label)
+
+
+# 场景 O：心性 -2 接受主动押注后，应扣除全局默认额外精力消耗（5 点）。
+static func _test_o_global_bet_cost_deducted(checks: Array, failed: Array) -> void:
+	var label := "O: preemptive_bet accept deducts global cost (energy -5)"
+	var engine := _build_test_engine(-2)
+
+	# 移除显式配置，走全局默认。
+	_strip_preemptive_bet_config(engine, "opt_market_bargain")
+
+	var energy_before := int(engine.world_state.get("player", {}).get("energy", 0))
+
+	var preview := engine.preview_next_turn()
+	if not preview.get("ok", false):
+		_fail(checks, failed, label, "preview failed: %s" % str(preview.get("error", "")))
+		return
+	if not _ensure_ready_for_option_choice(engine, checks, failed, label):
+		return
+
+	var result := engine.confirm_pending_turn("opt_market_bargain")
+	if not result.get("ok", false):
+		_fail(checks, failed, label, "confirm failed: %s" % str(result.get("error", "")))
+		return
+	if str(result.get("phase", "")) != "preemptive_bet":
+		_fail(checks, failed, label, "expected preemptive_bet phase, got: %s" % str(result.get("phase", "")))
+		return
+
+	# 选项 cost 已在入口扣除，此时精力可能已减。记录押注前精力。
+	var energy_before_bet := int(engine.world_state.get("player", {}).get("energy", 0))
+
+	var bet_result := engine.confirm_pending_turn("accept")
+	if not bet_result.get("ok", false):
+		_fail(checks, failed, label, "bet confirm failed: %s" % str(bet_result.get("error", "")))
+		return
+
+	var energy_after := int(engine.world_state.get("player", {}).get("energy", 0))
+	# 全局默认 cost 为 energy: 5，押注接受后应额外扣 5 精力。
+	var expected_delta := -5
+	var actual_delta := energy_after - energy_before_bet
+	if actual_delta != expected_delta:
+		_fail(checks, failed, label, "expected energy delta %d from bet cost, got %d (before_bet=%d, after=%d)" % [expected_delta, actual_delta, energy_before_bet, energy_after])
+		return
+
+	_pass(checks, label)
+
+
+# 功能：移除指定选项的 preemptiveBet 配置，用于测试全局默认行为。
+static func _strip_preemptive_bet_config(engine: WorldEventEngine, option_id: String) -> void:
+	for cp_variant in engine.choice_points:
+		var cp: Dictionary = cp_variant
+		var options: Array = cp.get("options", [])
+		for idx in options.size():
+			var option: Dictionary = options[idx]
+			if str(option.get("id", "")) == option_id:
+				option.erase("preemptiveBet")
+				options[idx] = option
+		cp["options"] = options
+	engine._rebuild_choice_point_map()
+
+
+# 功能：向指定选项注入 preemptiveBet disabled 标记。
+static func _inject_preemptive_bet_disabled(engine: WorldEventEngine, option_id: String) -> void:
+	for cp_variant in engine.choice_points:
+		var cp: Dictionary = cp_variant
+		var options: Array = cp.get("options", [])
+		for idx in options.size():
+			var option: Dictionary = options[idx]
+			if str(option.get("id", "")) == option_id:
+				option["preemptiveBet"] = {"disabled": true}
+				options[idx] = option
+		cp["options"] = options
+	engine._rebuild_choice_point_map()
 
 
 # 功能：推进当前挂起回合，直到离开展示阶段。
