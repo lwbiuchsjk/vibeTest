@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://bokou8esfakxm"
+
+[deps]
+
+files=["res://test/config/desperate_gamble_test/world_seed.scope.translation", "res://test/config/desperate_gamble_test/world_seed.scope.translation", "res://test/config/desperate_gamble_test/world_seed.key.translation", "res://test/config/desperate_gamble_test/world_seed.value.translation"]
+
+source_file="res://test/config/desperate_gamble_test/world_seed.csv"
+dest_files=["res://test/config/desperate_gamble_test/world_seed.scope.translation", "res://test/config/desperate_gamble_test/world_seed.scope.translation", "res://test/config/desperate_gamble_test/world_seed.key.translation", "res://test/config/desperate_gamble_test/world_seed.value.translation"]
+
+[params]
+
+compress=true
+delimiter=0

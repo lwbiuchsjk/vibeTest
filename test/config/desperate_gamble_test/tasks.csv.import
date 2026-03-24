@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://bnkc3r4e4cek3"
+
+[deps]
+
+files=["res://test/config/desperate_gamble_test/tasks.title.translation", "res://test/config/desperate_gamble_test/tasks.duration.translation", "res://test/config/desperate_gamble_test/tasks.on.translation", "res://test/config/desperate_gamble_test/tasks.weight.translation", "res://test/config/desperate_gamble_test/tasks.complete.translation"]
+
+source_file="res://test/config/desperate_gamble_test/tasks.csv"
+dest_files=["res://test/config/desperate_gamble_test/tasks.title.translation", "res://test/config/desperate_gamble_test/tasks.duration.translation", "res://test/config/desperate_gamble_test/tasks.on.translation", "res://test/config/desperate_gamble_test/tasks.weight.translation", "res://test/config/desperate_gamble_test/tasks.complete.translation"]
+
+[params]
+
+compress=true
+delimiter=0

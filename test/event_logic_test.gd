@@ -65,7 +65,7 @@ func _handle_preview_turn_result(turn_result: Dictionary) -> void:
 
 
 # 功能：渲染当前事件。
-# 说明：根据 phase 分别处理展示、选择、确认三种界面状态，避免测试场景自行推断引擎内部流程。
+# 说明：根据 phase 分别处理展示、选择、确认、心性风险入口等界面状态。
 func _render_current_event(turn_result: Dictionary) -> void:
 	if _is_world_ended_result(turn_result):
 		_render_end_screen(turn_result)
@@ -85,6 +85,10 @@ func _render_current_event(turn_result: Dictionary) -> void:
 	]
 
 	var detail_text := _build_event_detail_text(turn_result)
+	# 鉴定结果摘要追加到事件详情末尾
+	var check_summary := _build_check_result_summary(turn_result)
+	if not check_summary.is_empty():
+		detail_text += "\n\n" + check_summary
 	event_detail_label.text = detail_text
 	_set_end_screen_visible(false)
 	_update_left_task_panel(turn_result)
@@ -103,6 +107,18 @@ func _render_current_event(turn_result: Dictionary) -> void:
 		status_label.text = "当前处于展示阶段，点击继续查看下一条文本。"
 		continue_button.visible = true
 		continue_button.disabled = false
+		return
+
+	# 心性风险入口：孤注一掷
+	if phase == "desperate_gamble":
+		status_label.text = "鉴定失败，可以选择孤注一掷重新检定。"
+		_render_risk_entry_buttons("孤注一掷：接受", "孤注一掷：放弃")
+		return
+
+	# 心性风险入口：主动押注
+	if phase == "preemptive_bet":
+		status_label.text = "心性 -2 可发动主动押注，获取额外加骰。"
+		_render_risk_entry_buttons("主动押注：接受", "主动押注：放弃")
 		return
 
 	if awaiting_choice:
@@ -130,6 +146,64 @@ func _render_current_event(turn_result: Dictionary) -> void:
 
 	if visible_count == 0:
 		_add_option_hint("当前事件没有可见选项。")
+
+
+# 功能：渲染心性风险入口的接受/放弃按钮对。
+# 说明：两个按钮分别绑定 "accept" 和 "reject"，走正常的 confirm_pending_turn 分流。
+func _render_risk_entry_buttons(accept_text: String, reject_text: String) -> void:
+	var accept_button := Button.new()
+	accept_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	accept_button.text = accept_text
+	accept_button.pressed.connect(_on_option_pressed.bind("accept"))
+	option_list.add_child(accept_button)
+
+	var reject_button := Button.new()
+	reject_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reject_button.text = reject_text
+	reject_button.pressed.connect(_on_option_pressed.bind("reject"))
+	option_list.add_child(reject_button)
+
+
+# 功能：构建鉴定结果摘要文本，用于追加到事件详情区。
+# 说明：仅在 check_result 非空时返回内容，包含骰池明细和关系修正。
+func _build_check_result_summary(turn_result: Dictionary) -> String:
+	var check_result: Dictionary = turn_result.get("check_result", {})
+	if check_result.is_empty():
+		return ""
+	var lines: Array[String] = []
+	var result_type := str(check_result.get("result_type", ""))
+	var is_pass := bool(check_result.get("pass", true))
+	var is_gamble := bool(check_result.get("is_desperate_gamble", false))
+	var prefix := "【孤注一掷重掷】" if is_gamble else "【鉴定结果】"
+	lines.append("%s %s (%s)" % [prefix, result_type, "通过" if is_pass else "失败"])
+
+	var pool_size := int(check_result.get("pool_size", 0))
+	if pool_size > 0:
+		var dice: Array = check_result.get("dice", [])
+		var hits := int(check_result.get("hits", 0))
+		var required_hits := int(check_result.get("requiredHits", 1))
+		lines.append("骰池: %dd10  骰面: %s  命中: %d/%d" % [pool_size, str(dice), hits, required_hits])
+
+	# 关系修正摘要
+	var rel_details: Array = check_result.get("relationship_details", [])
+	for rel_entry_variant in rel_details:
+		var rel_entry: Dictionary = rel_entry_variant
+		var npc_id := str(rel_entry.get("npc_id", ""))
+		var detail: Dictionary = rel_entry.get("detail", {})
+		var bias := int(detail.get("bias", 0))
+		var npc_tier := str(detail.get("npc_tier", ""))
+		var direction := str(detail.get("direction", ""))
+		lines.append("关系修正: %s (%s, %s) bias=%+d" % [npc_id, npc_tier, direction, bias])
+
+	# 心性转移摘要
+	var transition: Dictionary = turn_result.get("xinxing_transition", {})
+	if not transition.is_empty():
+		lines.append("心性转移: %d → %d" % [
+			int(transition.get("old_value", 0)),
+			int(transition.get("new_value", 0))
+		])
+
+	return "\n".join(lines)
 
 
 # 功能：处理玩家点击选项。
@@ -178,9 +252,16 @@ func _on_continue_button_pressed() -> void:
 
 
 # 功能：统一处理已结算的回合结果。
-# 说明：将日志、结束态分流、侧栏刷新和下一次预览收口到一个入口，避免流程散落在多个按钮回调中。
+# 说明：将日志、鉴定摘要、关系变化、结束态分流、侧栏刷新和下一次预览收口到一个入口。
 func _handle_resolved_turn_result(turn_result: Dictionary, resolved_log: String) -> void:
 	_append_log(resolved_log)
+	# 鉴定结果日志
+	_append_check_result_log(turn_result)
+	# 关系变化日志
+	_append_affinity_changes_log(turn_result)
+	# 心性转移日志
+	_append_xinxing_transition_log(turn_result)
+
 	_current_turn_result = (turn_result as Dictionary).duplicate(true)
 	if _is_world_ended_result(turn_result):
 		_append_end_log(turn_result)
@@ -248,7 +329,7 @@ func _update_left_task_panel(turn_result: Dictionary) -> void:
 
 
 # 功能：刷新右侧世界状态与底部日志。
-# 说明：集中展示玩家数据、世界参数、链上下文、任务信息和历史事件，便于验证结算结果。
+# 说明：按重要性分组展示：角色 → 关系 → 世界 → 任务 → 历史，核心数据提级到顶部。
 func _update_side_panels() -> void:
 	var world_state := _engine.world_state
 	var player: Dictionary = world_state.get("player", {})
@@ -259,29 +340,42 @@ func _update_side_panels() -> void:
 	var history: Array = world_state.get("history", [])
 	var task_config: Dictionary = world_state.get("taskConfig", {})
 	var tasks_state: Dictionary = world_state.get("tasks", {})
+	var xinxing_tracker: Dictionary = world_state.get("xinxingTracker", {})
 
 	var lines: Array[String] = []
-	lines.append("回合: %s" % str(world_state.get("turn", 0)))
-	lines.append("地点: %s" % str(world_state.get("currentLocationId", "")))
-	lines.append("强制下一事件: %s" % str(world_state.get("forcedNextEventId", "")))
+
+	# ── 第一组：角色（能力 + 心性 + 资源）──
+	lines.append("═══ 角色 ═══")
+	lines.append(_build_ability_display_text())
 	lines.append(
-		"运行态: status=%s  ending=%s  finished_turn=%s" % [
-			str(run_state.get("status", "")),
-			str(run_state.get("endingEventId", "")),
-			str(run_state.get("finishedTurn", 0))
+		"心性: %s | 稳健=%s  孤注=%s" % [
+			str(player.get("xinxing", 0)),
+			str(xinxing_tracker.get("steady_count", 0)),
+			str(xinxing_tracker.get("gamble_count", 0))
 		]
 	)
-	lines.append("")
-	lines.append("玩家")
 	lines.append(
-		"hp=%s  gold=%s  energy=%s" % [
+		"hp=%s  energy=%s  gold=%s" % [
 			str(player.get("hp", 0)),
-			str(player.get("gold", 0)),
-			str(player.get("energy", 0))
+			str(player.get("energy", 0)),
+			str(player.get("gold", 0))
 		]
 	)
+
+	# ── 第二组：关系 ──
+	var affinity_text := _build_affinity_display_text()
+	if not affinity_text.is_empty():
+		lines.append("")
+		lines.append("═══ 关系 ═══")
+		lines.append(affinity_text)
+
+	# ── 第三组：世界 ──
 	lines.append("")
-	lines.append("参数")
+	lines.append("═══ 世界 ═══")
+	lines.append("回合: %s  地点: %s" % [
+		str(world_state.get("turn", 0)),
+		str(world_state.get("currentLocationId", ""))
+	])
 	lines.append(
 		"danger=%s  prosperity=%s  morale=%s" % [
 			str(params.get("danger", 0)),
@@ -289,30 +383,71 @@ func _update_side_panels() -> void:
 			str(params.get("morale", 0))
 		]
 	)
-	lines.append("")
-	lines.append("标记")
+	# 标记：遍历所有 flag 键值，避免硬编码
+	var flag_parts: Array[String] = []
+	for flag_key in flags.keys():
+		flag_parts.append("%s=%s" % [str(flag_key), str(flags[flag_key])])
+	if not flag_parts.is_empty():
+		lines.append("标记: %s" % "  ".join(flag_parts))
 	lines.append(
-		"isWanted=%s  gotHarborIntel=%s" % [
-			str(flags.get("isWanted", false)),
-			str(flags.get("gotHarborIntel", false))
+		"运行态: status=%s  ending=%s  finished_turn=%s" % [
+			str(run_state.get("status", "")),
+			str(run_state.get("endingEventId", "")),
+			str(run_state.get("finishedTurn", 0))
 		]
 	)
-	lines.append("")
-	lines.append("链上下文")
+	if world_state.get("forcedNextEventId", "") != "":
+		lines.append("强制下一事件: %s" % str(world_state.get("forcedNextEventId", "")))
 	if typeof(chain_context) == TYPE_DICTIONARY and chain_context != null:
-		lines.append(JSON.stringify(chain_context))
-	else:
-		lines.append("null")
+		lines.append("链上下文: %s" % JSON.stringify(chain_context))
+
+	# ── 第四组：任务 ──
 	lines.append("")
 	lines.append(_build_task_debug_text(task_config, tasks_state))
+
+	# ── 第五组：历史 ──
 	lines.append("")
-	lines.append("最近历史")
+	lines.append("═══ 最近历史 ═══")
 	lines.append(", ".join(_history_to_string_array(history)))
 
 	world_state_label.text = "\n".join(lines)
 	# 说明：文本刷新后延迟一帧再复位滚动，避免 RichTextLabel 重排后覆盖滚动位置。
 	world_state_label.call_deferred("scroll_to_line", 0)
 	log_label.text = "\n".join(_event_logs)
+
+
+# 功能：构建四大能力的展示文本，包含原始值和鉴定阶段。
+func _build_ability_display_text() -> String:
+	if _engine.player_role_state == null:
+		return "能力: 无 RoleState"
+	var role: RoleState = _engine.player_role_state
+	var thresholds: Array = _engine.get_assessment_thresholds()
+	var ability_keys := ["aptitude", "physique", "craft", "insight"]
+	var ability_names := {"aptitude": "资质", "physique": "体魄", "craft": "技艺", "insight": "见识"}
+	var parts: Array[String] = []
+	for key in ability_keys:
+		var value := int(role.get_attribute(key, 0))
+		var stage := RuleEngine.get_ability_stage(value, thresholds)
+		parts.append("%s=%d(阶段%d)" % [str(ability_names.get(key, key)), value, stage])
+	return "  ".join(parts)
+
+
+# 功能：构建关系面板展示文本。
+# 说明：遍历 affinity_map 所有关系对，按 from→to 格式列出分值和档位。
+func _build_affinity_display_text() -> String:
+	var snapshot: Array = _engine.get_affinity_snapshot()
+	if snapshot.is_empty():
+		return ""
+	var lines: Array[String] = []
+	for pair_variant in snapshot:
+		var pair: Dictionary = pair_variant
+		lines.append("%s→%s: %d (%s)" % [
+			str(pair.get("from", "")),
+			str(pair.get("to", "")),
+			int(pair.get("score", 0)),
+			str(pair.get("tier", ""))
+		])
+	return "\n".join(lines)
 
 
 # 功能：判断当前返回结果是否代表世界结束。
@@ -401,6 +536,81 @@ func _append_end_log(turn_result: Dictionary) -> void:
 			str(turn_result.get("finished_turn", 0))
 		]
 	)
+
+
+# 功能：将鉴定结果写入日志，展示骰池明细与关系修正。
+# 说明：仅在 check_result 非空时输出，避免无检定事件产生空日志。
+func _append_check_result_log(turn_result: Dictionary) -> void:
+	var check_result: Dictionary = turn_result.get("check_result", {})
+	if check_result.is_empty():
+		return
+	var result_type := str(check_result.get("result_type", ""))
+	var is_pass := bool(check_result.get("pass", true))
+	var pool_size := int(check_result.get("pool_size", 0))
+	var dice: Array = check_result.get("dice", [])
+	var hits := int(check_result.get("hits", 0))
+	var required_hits := int(check_result.get("requiredHits", 1))
+	var is_gamble := bool(check_result.get("is_desperate_gamble", false))
+	var prefix := "孤注一掷重掷" if is_gamble else "鉴定"
+	if pool_size > 0:
+		_append_log(
+			"%s | %s(%s) | 骰池:%dd10 骰面:%s 命中:%d/%d" % [
+				prefix, result_type, "通过" if is_pass else "失败",
+				pool_size, str(dice), hits, required_hits
+			]
+		)
+	else:
+		_append_log("%s | %s(%s)" % [prefix, result_type, "通过" if is_pass else "失败"])
+
+	# 关系修正明细
+	var rel_details: Array = check_result.get("relationship_details", [])
+	for rel_entry_variant in rel_details:
+		var rel_entry: Dictionary = rel_entry_variant
+		var npc_id := str(rel_entry.get("npc_id", ""))
+		var detail: Dictionary = rel_entry.get("detail", {})
+		var bias := int(detail.get("bias", 0))
+		if bias == 0:
+			continue
+		_append_log(
+			"  关系修正 | %s | 档位:%s | 方向:%s | 对齐:%s | bias:%+d" % [
+				npc_id,
+				str(detail.get("npc_tier", "")),
+				str(detail.get("direction", "")),
+				str(detail.get("aligned", false)),
+				bias
+			]
+		)
+
+
+# 功能：将关系变化写入日志。
+# 说明：仅在 affinity_changes 非空时输出。
+func _append_affinity_changes_log(turn_result: Dictionary) -> void:
+	var changes: Array = turn_result.get("affinity_changes", [])
+	if changes.is_empty():
+		return
+	var parts: Array[String] = []
+	for change_variant in changes:
+		var change: Dictionary = change_variant
+		parts.append("%s→%s: %+d (%d→%d, %s)" % [
+			str(change.get("from", "")),
+			str(change.get("to", "")),
+			int(change.get("delta", 0)),
+			int(change.get("old_score", 0)),
+			int(change.get("new_score", 0)),
+			str(change.get("new_tier", ""))
+		])
+	_append_log("关系变化 | %s" % " | ".join(parts))
+
+
+# 功能：将心性转移写入日志。
+func _append_xinxing_transition_log(turn_result: Dictionary) -> void:
+	var transition: Dictionary = turn_result.get("xinxing_transition", {})
+	if transition.is_empty():
+		return
+	_append_log("心性转移 | %d → %d" % [
+		int(transition.get("old_value", 0)),
+		int(transition.get("new_value", 0))
+	])
 
 
 # 功能：解析终局事件 id。

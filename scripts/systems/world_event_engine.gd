@@ -33,6 +33,12 @@ var _assessment_thresholds: Array = [0, 3, 7, 12]
 var _affinity_map: AffinityMapClass = null
 # 关系五档阈值配置（从 world_seed affinityConfig 读取）。
 var _affinity_thresholds: Dictionary = {}
+# 最近一次结算的鉴定结果缓存，供 payload 透传给 UI 消费。
+var _last_check_result: Dictionary = {}
+# 最近一次结算的关系变化记录，供 payload 透传给 UI 消费。
+var _last_affinity_changes: Array = []
+# 最近一次心性转移记录（{old_value, new_value}），无转移时为空字典。
+var _last_xinxing_transition: Dictionary = {}
 
 # 功能：初始化随机源。
 # 说明：seed=0 使用随机种子；指定 seed 可复现结果，便于测试回归。
@@ -174,6 +180,10 @@ func load_from_data(data: Dictionary, location_graph: Variant = null, role_state
 # 功能：预览下一回合事件，但不立即结算。
 # 说明：统一创建待处理上下文，并返回当前阶段的事件数据；若已有待处理事件，则直接复用当前上下文。
 func preview_next_turn() -> Dictionary:
+	# 预览阶段清空上次结算缓存，避免 UI 显示过期数据。
+	_last_check_result = {}
+	_last_affinity_changes = []
+	_last_xinxing_transition = {}
 	if events.is_empty():
 		return {"ok": false, "error": "event pool is empty"}
 	if _is_world_ended():
@@ -526,6 +536,9 @@ func _build_result_payload(
 		"choice": choice_result,
 		"xinxing": _get_current_xinxing(),
 		"xinxing_risk_profile": RuleEngine.get_xinxing_risk_profile(_get_current_xinxing()),
+		"check_result": _last_check_result.duplicate(true),
+		"affinity_changes": _last_affinity_changes.duplicate(true),
+		"xinxing_transition": _last_xinxing_transition.duplicate(true),
 		"world_ended": bool(run_state_payload.get("world_ended", false)),
 		"run_status": str(run_state_payload.get("run_status", "running")),
 		"ending_event_id": str(run_state_payload.get("ending_event_id", "")),
@@ -1365,13 +1378,20 @@ func _apply_option_resolution(selected_option: Dictionary, event_def: Dictionary
 		print("[心性] 主动押注入口触发 → 挂起等待决策")
 		return
 
-	# 4. 执行检定
+	# 4. 清空上次缓存，准备本次结算数据透传
+	_last_check_result = {}
+	_last_affinity_changes = []
+	_last_xinxing_transition = {}
+	var xinxing_before := xinxing
+
+	# 5. 执行检定
 	var resolution := _dict_or_empty(selected_option.get("resolution", {}))
 	var check := _dict_or_empty(selected_option.get("check", {}))
 	var check_result := _is_check_pass(check)
+	_last_check_result = check_result.duplicate(true)
 	print("[鉴定结果] result_type: %s | pass: %s" % [str(check_result.get("result_type", "")), str(check_result.get("pass", true))])
 
-	# 5. 孤注一掷检查：主结果 fail 且心性允许
+	# 6. 孤注一掷检查：主结果 fail 且心性允许
 	if not check_result.get("pass", true) and bool(risk_profile.get("allow_desperate_gamble", false)):
 		_pending_turn_context["phase"] = "desperate_gamble"
 		_pending_turn_context["selected_option"] = selected_option.duplicate(true)
@@ -1380,7 +1400,7 @@ func _apply_option_resolution(selected_option: Dictionary, event_def: Dictionary
 		print("[心性] 孤注一掷入口触发 → 挂起等待决策")
 		return
 
-	# 6. 按 result_type 选择 resolution（支持 fail / critical_success / critical_fail 分支）
+	# 7. 按 result_type 选择 resolution（支持 fail / critical_success / critical_fail 分支）
 	resolution = _resolve_check_resolution(check, resolution, check_result)
 
 	_apply_resolution(resolution, event_def)
@@ -1392,6 +1412,10 @@ func _apply_option_resolution(selected_option: Dictionary, event_def: Dictionary
 	tracker["steady_count"] = int(tracker.get("steady_count", 0)) + 1
 	world_state["xinxingTracker"] = tracker
 	_check_xinxing_transition()
+	# 记录心性转移
+	var xinxing_after := _get_current_xinxing()
+	if xinxing_after != xinxing_before:
+		_last_xinxing_transition = {"old_value": xinxing_before, "new_value": xinxing_after}
 
 # 功能：执行选项检定。
 # 说明：委托 RuleEngine.resolve_check 统一判定，传入引擎自身的 rng 和阈值。
@@ -1472,6 +1496,11 @@ func _resolve_preemptive_bet_phase(selected_option_id: String) -> Dictionary:
 	var event_def: Dictionary = _event_map.get(event_id, {})
 	var selected_option: Dictionary = _dict_or_empty(_pending_turn_context.get("selected_option", {}))
 	var decision := selected_option_id.strip_edges()
+	# 清空缓存，准备本次结算数据透传
+	_last_check_result = {}
+	_last_affinity_changes = []
+	_last_xinxing_transition = {}
+	var xinxing_before := _get_current_xinxing()
 
 	var risk_modifiers: Dictionary = {}
 	if decision == "accept":
@@ -1495,6 +1524,7 @@ func _resolve_preemptive_bet_phase(selected_option_id: String) -> Dictionary:
 	var resolution := _dict_or_empty(selected_option.get("resolution", {}))
 	var check := _dict_or_empty(selected_option.get("check", {}))
 	var check_result := _is_check_pass(check, risk_modifiers)
+	_last_check_result = check_result.duplicate(true)
 	print("[鉴定结果] result_type: %s | pass: %s" % [str(check_result.get("result_type", "")), str(check_result.get("pass", true))])
 
 	resolution = _resolve_check_resolution(check, resolution, check_result)
@@ -1513,6 +1543,10 @@ func _resolve_preemptive_bet_phase(selected_option_id: String) -> Dictionary:
 	tracker["steady_count"] = int(tracker.get("steady_count", 0)) + 1
 	world_state["xinxingTracker"] = tracker
 	_check_xinxing_transition()
+	# 记录心性转移
+	var xinxing_after := _get_current_xinxing()
+	if xinxing_after != xinxing_before:
+		_last_xinxing_transition = {"old_value": xinxing_before, "new_value": xinxing_after}
 	return _finalize_option_turn(event_def)
 
 # 功能：处理孤注一掷阶段的玩家决策。
@@ -1523,6 +1557,11 @@ func _resolve_desperate_gamble_phase(selected_option_id: String) -> Dictionary:
 	var selected_option: Dictionary = _dict_or_empty(_pending_turn_context.get("selected_option", {}))
 	var original_check_result: Dictionary = _dict_or_empty(_pending_turn_context.get("check_result", {}))
 	var decision := selected_option_id.strip_edges()
+	# 清空缓存，准备本次结算数据透传
+	_last_check_result = {}
+	_last_affinity_changes = []
+	_last_xinxing_transition = {}
+	var xinxing_before := _get_current_xinxing()
 
 	var resolution := _dict_or_empty(selected_option.get("resolution", {}))
 	var check := _dict_or_empty(selected_option.get("check", {}))
@@ -1531,6 +1570,8 @@ func _resolve_desperate_gamble_phase(selected_option_id: String) -> Dictionary:
 		# 玩家使用孤注一掷，重新执行检定
 		print("[心性] 孤注一掷已使用 → 重新检定")
 		var check_result := _is_check_pass(check)
+		_last_check_result = check_result.duplicate(true)
+		_last_check_result["is_desperate_gamble"] = true
 		print("[鉴定结果] 重掷 result_type: %s | pass: %s" % [str(check_result.get("result_type", "")), str(check_result.get("pass", true))])
 		resolution = _resolve_check_resolution(check, resolution, check_result)
 		# 结构规则：-1 阶段孤注一掷重判为 critical_fail 时，立刻跌入 -2。
@@ -1566,6 +1607,10 @@ func _resolve_desperate_gamble_phase(selected_option_id: String) -> Dictionary:
 	_apply_resolution(resolution, event_def)
 	# -2 阶段关系回响：孤注一掷路径使用原始 check_result（回响仅关注关系判定详情）。
 	_try_relationship_echo(original_check_result)
+	# 记录心性转移
+	var xinxing_after := _get_current_xinxing()
+	if xinxing_after != xinxing_before:
+		_last_xinxing_transition = {"old_value": xinxing_before, "new_value": xinxing_after}
 	return _finalize_option_turn(event_def)
 
 # 功能：风险入口结算后完成回合推进。
@@ -1655,6 +1700,29 @@ func _print_assessment_debug(check: Dictionary, result: Dictionary) -> void:
 			npc_id, npc_tier, player_tier, direction, str(aligned), rolls_str, bias
 		])
 
+# 功能：获取关系数据快照，供 UI 读取当前所有关系分值和档位。
+# 说明：返回数组 [{from, to, score, tier}, ...]，无关系数据时返回空数组。
+func get_affinity_snapshot() -> Array:
+	if _affinity_map == null:
+		return []
+	var pairs := _affinity_map.get_all_pairs()
+	var result: Array = []
+	for pair_variant in pairs:
+		var pair: Dictionary = pair_variant
+		var score := int(pair.get("score", 0))
+		var tier := RuleEngine.affinity_tier(score, _affinity_thresholds)
+		result.append({
+			"from": str(pair.get("from", "")),
+			"to": str(pair.get("to", "")),
+			"score": score,
+			"tier": tier
+		})
+	return result
+
+# 功能：获取鉴定阈值数组，供 UI 计算能力阶段。
+func get_assessment_thresholds() -> Array:
+	return _assessment_thresholds
+
 # 功能：初始化关系系统，加载五档阈值和初始关系分值。
 func _init_affinity_system() -> void:
 	# 读取 affinityConfig（五档阈值 + 回响参数）
@@ -1687,9 +1755,17 @@ func _apply_affinity_deltas(deltas: Array) -> void:
 			continue
 		var current := _affinity_map.get_score(from_id, to_id)
 		var result := RuleEngine.apply_affinity_delta(current, delta_value, _affinity_thresholds)
-		_affinity_map.set_score(from_id, to_id, int(result.get("score", 0)))
+		var new_score := int(result.get("score", 0))
+		var new_tier := str(result.get("tier", ""))
+		_affinity_map.set_score(from_id, to_id, new_score)
+		# 记录关系变化，供 payload 透传给 UI。
+		_last_affinity_changes.append({
+			"from": from_id, "to": to_id,
+			"delta": delta_value, "old_score": current,
+			"new_score": new_score, "new_tier": new_tier
+		})
 		print("[关系] %s->%s: %d → %d (delta: %+d, tier: %s)" % [
-			from_id, to_id, current, int(result.get("score", 0)), delta_value, str(result.get("tier", ""))
+			from_id, to_id, current, new_score, delta_value, new_tier
 		])
 
 # 功能：判断玩家是否关注指定 NPC。

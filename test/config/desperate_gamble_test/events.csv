@@ -1,0 +1,2 @@
+event_id,title,background_art,base_weight,continuation_policy,choice_point_id,tags,task_links,is_ending_event
+evt_gamble_test,孤注一掷测试,,100,ReturnToScheduler,cp_gamble_test,daily,,FALSE

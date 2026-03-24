@@ -1,0 +1,3 @@
+option_id,choice_point_id,text,display_order
+opt_gamble_hard,cp_gamble_test,尝试挑战（极难鉴定）,1
+opt_gamble_skip,cp_gamble_test,绕道而行（无鉴定）,2

@@ -1,0 +1,3 @@
+event_id,presentation_id,display_order,item_type,speaker,text
+evt_gamble_test,pre_gamble_001,1,text,旁白,前方是一道几乎无法逾越的障碍。你的直觉告诉你这次检定凶多吉少。
+evt_gamble_test,pre_gamble_002,2,text,旁白,但你的内心深处似乎有一股冲动——也许可以孤注一掷。

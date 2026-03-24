@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://k22udvda3qid"
+
+[deps]
+
+files=["res://test/config/desperate_gamble_test/event_outcomes.branch.translation", "res://test/config/desperate_gamble_test/event_outcomes.target.translation", "res://test/config/desperate_gamble_test/event_outcomes.op.translation", "res://test/config/desperate_gamble_test/event_outcomes.key.translation", "res://test/config/desperate_gamble_test/event_outcomes.value.translation"]
+
+source_file="res://test/config/desperate_gamble_test/event_outcomes.csv"
+dest_files=["res://test/config/desperate_gamble_test/event_outcomes.branch.translation", "res://test/config/desperate_gamble_test/event_outcomes.target.translation", "res://test/config/desperate_gamble_test/event_outcomes.op.translation", "res://test/config/desperate_gamble_test/event_outcomes.key.translation", "res://test/config/desperate_gamble_test/event_outcomes.value.translation"]
+
+[params]
+
+compress=true
+delimiter=0

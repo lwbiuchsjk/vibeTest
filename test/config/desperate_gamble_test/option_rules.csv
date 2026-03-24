@@ -1,0 +1,11 @@
+option_id,rule_type,branch,target,left,op,right,key,value
+opt_gamble_hard,check,default,check,,,,type,assessment
+opt_gamble_hard,check,default,check,,,,hitThreshold,10
+opt_gamble_hard,check,default,check,,,,requiredHits,3
+opt_gamble_hard,check,default,check,,,,items,insight:positive
+opt_gamble_hard,resolution,default,params,,add,,morale,5
+opt_gamble_hard,resolution,fail,params,,add,,morale,-3
+opt_gamble_hard,resolution,critical_fail,params,,add,,morale,-8
+opt_gamble_hard,preemptive_bet,default,bet_modifier,,,,successBias,1
+opt_gamble_hard,preemptive_bet,default,player,,add,,energy,-1
+opt_gamble_skip,resolution,default,params,,add,,morale,1
