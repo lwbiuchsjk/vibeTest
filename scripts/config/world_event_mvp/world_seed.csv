@@ -17,3 +17,13 @@ xinxing_config,,,gamble_to_neg1,3
 xinxing_config,,,steady_to_pos1,5
 xinxing_config,,,steady_to_pos2,5
 xinxing_config,,,gamble_to_exit_positive,2
+affinity_config,,,tier_hatred_max,-51
+affinity_config,,,tier_distrust_max,-11
+affinity_config,,,tier_trust_min,11
+affinity_config,,,tier_devotion_min,51
+affinity_config,,,echo_trust_delta,5
+affinity_config,,,echo_distrust_delta,-5
+affinity,player->npc_mentor,,score,20
+affinity,npc_mentor->player,,score,15
+affinity,player->npc_rival,,score,-10
+affinity,npc_rival->player,,score,-30

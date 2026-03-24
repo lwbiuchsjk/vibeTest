@@ -11,6 +11,7 @@ const TASK_BIAS_RISK_DEFAULT := -4
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 const LocationGraph := preload("res://scripts/models/location_graph.gd")
 const RuleEngine := preload("res://scripts/systems/rule_engine.gd")
+const AffinityMapClass := preload("res://scripts/models/affinity_map.gd")
 
 var world_state: Dictionary = {}
 var events: Array = []
@@ -28,6 +29,10 @@ var _location_graph: LocationGraph
 var player_role_state: Variant = null
 # 鉴定阶段阈值。本阶段以常量形式集中定义，后续可拆为配置文件。
 var _assessment_thresholds: Array = [0, 3, 7, 12]
+# 关系数据运行时权威数据源。
+var _affinity_map: AffinityMapClass = null
+# 关系五档阈值配置（从 world_seed affinityConfig 读取）。
+var _affinity_thresholds: Dictionary = {}
 
 # 功能：初始化随机源。
 # 说明：seed=0 使用随机种子；指定 seed 可复现结果，便于测试回归。
@@ -162,6 +167,8 @@ func load_from_data(data: Dictionary, location_graph: Variant = null, role_state
 		_sync_role_to_world_state()
 	# 初始化心性 tracker，记录孤注一掷使用次数与稳健连续回合数。
 	_ensure_xinxing_tracker()
+	# 初始化关系系统：加载五档阈值配置和初始关系分值。
+	_init_affinity_system()
 	return {"ok": true}
 
 # 功能：预览下一回合事件，但不立即结算。
@@ -1377,6 +1384,8 @@ func _apply_option_resolution(selected_option: Dictionary, event_def: Dictionary
 	resolution = _resolve_check_resolution(check, resolution, check_result)
 
 	_apply_resolution(resolution, event_def)
+	# -2 阶段关系回响：检定结束后检查是否触发自动关系反馈。
+	_try_relationship_echo(check_result)
 	# 回合结算末尾：稳健计数 +1（未使用孤注一掷的回合视为稳健）
 	_ensure_xinxing_tracker()
 	var tracker: Dictionary = world_state["xinxingTracker"]
@@ -1399,11 +1408,36 @@ func _is_check_pass(check: Dictionary, risk_modifiers: Dictionary = {}) -> Dicti
 	merged_risk_modifiers["risk_profile"] = risk_profile
 	merged_risk_modifiers["stability_bias"] = int(risk_profile.get("stability_bias", 0))
 
+	# 关系修正判定：遍历 relationshipNpcs，汇总 relationship_bias 注入骰池。
+	var relationship_npcs: Array = check.get("relationshipNpcs", [])
+	var relationship_details: Array = []
+	if not relationship_npcs.is_empty() and _affinity_map != null:
+		var total_bias := 0
+		for npc_entry_variant in relationship_npcs:
+			var npc_entry: Dictionary = npc_entry_variant
+			var npc_id := str(npc_entry.get("npc_id", ""))
+			var rel_difficulty := int(npc_entry.get("difficulty", 0))
+			if npc_id.is_empty():
+				continue
+			var npc_to_player := _affinity_map.get_score(npc_id, "player")
+			var player_to_npc := _affinity_map.get_score("player", npc_id)
+			var rel_result := RuleEngine.resolve_relationship_check(
+				npc_to_player, player_to_npc, rel_difficulty, _affinity_thresholds, _rng
+			)
+			total_bias += int(rel_result.get("bias", 0))
+			relationship_details.append({"npc_id": npc_id, "detail": rel_result})
+		merged_risk_modifiers["relationship_bias"] = total_bias
+
 	# 构造鉴定数据源：RoleState 优先，JSON 路径回退到 world_state.player。
 	var role_or_player: Variant = player_role_state
 	if role_or_player == null:
 		role_or_player = world_state.get("player", {})
 	var result := RuleEngine.resolve_check(check, role_or_player, _assessment_thresholds, _rng, merged_risk_modifiers)
+
+	# 将关系判定详情附加到结果中，供调试和回响使用。
+	if not relationship_details.is_empty():
+		result["relationship_details"] = relationship_details
+
 	# 调试输出
 	var check_type := str(check.get("type", "")).strip_edges()
 	if check_type == "assessment":
@@ -1470,6 +1504,8 @@ func _resolve_preemptive_bet_phase(selected_option_id: String) -> Dictionary:
 	_pending_turn_context.erase("risk_modifiers")
 	_pending_turn_context["phase"] = "confirm"
 	_apply_resolution(resolution, event_def)
+	# -2 阶段关系回响
+	_try_relationship_echo(check_result)
 
 	# 稳健计数 +1（主动押注不算孤注一掷）
 	_ensure_xinxing_tracker()
@@ -1528,6 +1564,8 @@ func _resolve_desperate_gamble_phase(selected_option_id: String) -> Dictionary:
 	_pending_turn_context.erase("risk_modifiers")
 	_pending_turn_context["phase"] = "confirm"
 	_apply_resolution(resolution, event_def)
+	# -2 阶段关系回响：孤注一掷路径使用原始 check_result（回响仅关注关系判定详情）。
+	_try_relationship_echo(original_check_result)
 	return _finalize_option_turn(event_def)
 
 # 功能：风险入口结算后完成回合推进。
@@ -1591,6 +1629,136 @@ func _print_assessment_debug(check: Dictionary, result: Dictionary) -> void:
 	print("[鉴定] items: %s | score: %d | pool: %dd10 | dice: %s | hits: %d/%d (≥%d) | result: %s" % [
 		items_debug, score, pool_size, str(dice), hits, required_hits, hit_threshold, result_type
 	])
+	# 关系修正调试输出
+	var rel_details: Array = result.get("relationship_details", [])
+	for rel_entry_variant in rel_details:
+		var rel_entry: Dictionary = rel_entry_variant
+		var npc_id := str(rel_entry.get("npc_id", ""))
+		var detail: Dictionary = rel_entry.get("detail", {})
+		var npc_tier := str(detail.get("npc_tier", ""))
+		var player_tier := str(detail.get("player_tier", ""))
+		var direction := str(detail.get("direction", ""))
+		var aligned := bool(detail.get("aligned", false))
+		var bias := int(detail.get("bias", 0))
+		var rolls: Array = detail.get("rolls", [])
+		var rolls_str := ""
+		for roll_variant in rolls:
+			var roll: Dictionary = roll_variant
+			if not rolls_str.is_empty():
+				rolls_str += ", "
+			rolls_str += "d10=%d vs≤%d→%s" % [
+				int(roll.get("die", 0)),
+				int(roll.get("hit_value", 0)),
+				"hit" if bool(roll.get("success", false)) else "miss"
+			]
+		print("[关系修正] npc: %s | npc_tier: %s | player_tier: %s | dir: %s | aligned: %s | rolls: [%s] | bias: %+d" % [
+			npc_id, npc_tier, player_tier, direction, str(aligned), rolls_str, bias
+		])
+
+# 功能：初始化关系系统，加载五档阈值和初始关系分值。
+func _init_affinity_system() -> void:
+	# 读取 affinityConfig（五档阈值 + 回响参数）
+	_affinity_thresholds = _dict_or_empty(world_state.get("affinityConfig", {}))
+	# 初始化 AffinityMap，从 affinityInit 加载初始关系分值
+	_affinity_map = AffinityMapClass.new()
+	var affinity_init: Dictionary = _dict_or_empty(world_state.get("affinityInit", {}))
+	for pair_key in affinity_init.keys():
+		var parts := str(pair_key).split("->", false, 1)
+		if parts.size() == 2:
+			var from_id := parts[0].strip_edges()
+			var to_id := parts[1].strip_edges()
+			_affinity_map.set_score(from_id, to_id, int(affinity_init[pair_key]))
+	if not affinity_init.is_empty():
+		print("[关系] AffinityMap 已初始化，共 %d 条关系" % affinity_init.size())
+
+# 功能：执行 affinityDeltas 配置驱动的关系变更。
+# 说明：NPC→玩家方向直接执行；玩家→NPC 方向受关注过滤。
+func _apply_affinity_deltas(deltas: Array) -> void:
+	for delta_variant in deltas:
+		var delta_entry: Dictionary = delta_variant
+		var from_id := str(delta_entry.get("from", ""))
+		var to_id := str(delta_entry.get("to", ""))
+		var delta_value := int(delta_entry.get("delta", 0))
+		if from_id.is_empty() or to_id.is_empty() or delta_value == 0:
+			continue
+		# 玩家→NPC 方向受关注过滤
+		if from_id == "player" and not _is_player_focusing(to_id):
+			print("[关系] 玩家未关注 %s，跳过 affinity delta" % to_id)
+			continue
+		var current := _affinity_map.get_score(from_id, to_id)
+		var result := RuleEngine.apply_affinity_delta(current, delta_value, _affinity_thresholds)
+		_affinity_map.set_score(from_id, to_id, int(result.get("score", 0)))
+		print("[关系] %s->%s: %d → %d (delta: %+d, tier: %s)" % [
+			from_id, to_id, current, int(result.get("score", 0)), delta_value, str(result.get("tier", ""))
+		])
+
+# 功能：判断玩家是否关注指定 NPC。
+# 说明：当前版本默认返回 true（关注所有 NPC），后续可接入关注列表或事件上下文。
+func _is_player_focusing(npc_id: String) -> bool:
+	return true
+
+# 功能：检查并触发 -2 阶段关系回响。
+# 说明：遍历 check_result 中的 relationship_details，对每个 NPC 调用 _apply_relationship_echo。
+func _try_relationship_echo(check_result: Dictionary) -> void:
+	if _affinity_map == null:
+		return
+	if _get_current_xinxing() != -2:
+		return
+	var rel_details: Array = check_result.get("relationship_details", [])
+	if rel_details.is_empty():
+		return
+	for rel_entry_variant in rel_details:
+		var rel_entry: Dictionary = rel_entry_variant
+		var npc_id := str(rel_entry.get("npc_id", ""))
+		var detail: Dictionary = rel_entry.get("detail", {})
+		var rolls: Array = detail.get("rolls", [])
+		var npc_tier := str(detail.get("npc_tier", ""))
+		var player_tier := str(detail.get("player_tier", ""))
+		var direction := str(detail.get("direction", ""))
+		_apply_relationship_echo(npc_id, rolls, npc_tier, player_tier, direction)
+
+# 功能：-2 阶段关系回响自动反馈。
+# 说明：当心性 -2、态度对齐、且关系掷骰任意一次成功时，自动修改 NPC→玩家关系分值。
+#       后续设计调整只改这一个方法。
+func _apply_relationship_echo(
+	npc_id: String,
+	roll_results: Array,
+	npc_to_player_tier: String,
+	player_to_npc_tier: String,
+	direction: String
+) -> void:
+	if npc_id.is_empty() or direction == "none":
+		return
+	# 检查是否对齐
+	var is_aligned := false
+	if direction == "add" and (player_to_npc_tier == "trust" or player_to_npc_tier == "devotion"):
+		is_aligned = true
+	elif direction == "remove" and (player_to_npc_tier == "distrust" or player_to_npc_tier == "hatred"):
+		is_aligned = true
+	if not is_aligned:
+		return
+	# 检查是否有任意一次成功
+	var any_success := false
+	for roll_variant in roll_results:
+		var roll: Dictionary = roll_variant
+		if bool(roll.get("success", false)):
+			any_success = true
+			break
+	if not any_success:
+		return
+	# 根据对齐方向决定关系变化
+	var echo_delta := 0
+	if direction == "add":
+		echo_delta = int(_affinity_thresholds.get("echo_trust_delta", 5))
+	else:
+		echo_delta = int(_affinity_thresholds.get("echo_distrust_delta", -5))
+	# 执行 NPC→玩家关系变化
+	var current := _affinity_map.get_score(npc_id, "player")
+	var result := RuleEngine.apply_affinity_delta(current, echo_delta, _affinity_thresholds)
+	_affinity_map.set_score(npc_id, "player", int(result.get("score", 0)))
+	print("[关系回响] -2阶段 %s->player: %d → %d (echo_delta: %+d, tier: %s)" % [
+		npc_id, current, int(result.get("score", 0)), echo_delta, str(result.get("tier", ""))
+	])
 
 # 功能：应用 resolution，并衔接执行锁更新。
 # 说明：统一处理 worldStatePatch、forcedNextEventId、chainContextPatch。
@@ -1608,6 +1776,11 @@ func _apply_resolution(resolution: Dictionary, event_def: Dictionary) -> void:
 
 	var task_actions := _array_or_empty(resolution.get("taskActions", []))
 	_apply_task_actions(task_actions)
+
+	# 关系变化：执行 affinityDeltas 配置驱动的关系变更。
+	var affinity_deltas: Array = resolution.get("affinityDeltas", [])
+	if not affinity_deltas.is_empty() and _affinity_map != null:
+		_apply_affinity_deltas(affinity_deltas)
 
 
 # 功能：确保任务运行时结构完整。

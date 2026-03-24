@@ -205,6 +205,18 @@ static func _assemble_world_state(tables: Dictionary) -> Dictionary:
 				var xinxing_config: Dictionary = world_state.get("xinxingConfig", {})
 				xinxing_config[key] = _to_int(value_text, 0)
 				world_state["xinxingConfig"] = xinxing_config
+			"affinity_config":
+				# 说明：关系五档阈值与回响参数配置，写入 affinityConfig 字典。
+				var affinity_config: Dictionary = world_state.get("affinityConfig", {})
+				affinity_config[key] = _to_int(value_text, 0)
+				world_state["affinityConfig"] = affinity_config
+			"affinity":
+				# 说明：初始关系分值配置。scope_a 为 "from->to" 格式，key 固定为 "score"。
+				if scope_a.is_empty() or key != "score":
+					continue
+				var affinity_init: Dictionary = world_state.get("affinityInit", {})
+				affinity_init[scope_a] = _to_int(value_text, 0)
+				world_state["affinityInit"] = affinity_init
 			"chain":
 				chain_seed[key] = value_text
 			_:
@@ -823,6 +835,9 @@ static func _apply_option_rule_row(row: Dictionary, cp_map: Dictionary, option_r
 		elif key == "items":
 			# 鉴定参与项，格式：key:direction;key:direction
 			check["items"] = _parse_assessment_items(value_text)
+		elif key == "relationshipNpcs":
+			# 关系修正 NPC 列表，格式：npc_id:difficulty;npc_id:difficulty
+			check["relationshipNpcs"] = _parse_relationship_npcs(value_text)
 		option["check"] = check
 	elif rule_type == "preemptive_bet":
 		# 说明：主动押注配置，写入 option.preemptiveBet。
@@ -951,6 +966,11 @@ static func _apply_effect_or_resolution_action(container: Dictionary, target: St
 		player_patch[key] = int(player_patch.get(key, 0)) + _to_int(value_text, 0)
 		world_patch_p["player"] = player_patch
 		container["worldStatePatch"] = world_patch_p
+		return
+
+	if target == "affinity" and key == "affinityDeltas":
+		# 说明：关系变化配置，格式为 "from->to:delta;from->to:delta"。
+		container["affinityDeltas"] = _parse_affinity_deltas(value_text)
 		return
 
 	if target == "chain_context" and op == "patch":
@@ -1259,3 +1279,46 @@ static func _parse_assessment_items(text: String) -> Array:
 		if not item_key.is_empty():
 			items.append({"key": item_key, "direction": item_direction})
 	return items
+
+
+# 功能：解析关系修正 NPC 配置文本为结构化数组。
+# 说明：输入格式为 "npc_id:difficulty;npc_id:difficulty"。
+static func _parse_relationship_npcs(text: String) -> Array:
+	var npcs: Array = []
+	for segment in text.split(";", false):
+		var trimmed := segment.strip_edges()
+		if trimmed.is_empty():
+			continue
+		var parts := trimmed.split(":", false, 1)
+		var npc_id := str(parts[0]).strip_edges()
+		var difficulty := 0
+		if parts.size() > 1:
+			difficulty = _to_int(str(parts[1]).strip_edges(), 0)
+		if not npc_id.is_empty():
+			npcs.append({"npc_id": npc_id, "difficulty": difficulty})
+	return npcs
+
+
+# 功能：解析关系变化配置文本为结构化数组。
+# 说明：输入格式为 "from->to:delta;from->to:delta"，例如 "player->npc_mentor:+10;npc_mentor->player:+5"。
+static func _parse_affinity_deltas(text: String) -> Array:
+	var deltas: Array = []
+	for segment in text.split(";", false):
+		var trimmed := segment.strip_edges()
+		if trimmed.is_empty():
+			continue
+		# 分离 "from->to" 和 ":delta"
+		var colon_parts := trimmed.split(":", false, 1)
+		if colon_parts.size() < 2:
+			continue
+		var pair_text := str(colon_parts[0]).strip_edges()
+		var delta := _to_int(str(colon_parts[1]).strip_edges(), 0)
+		# 分离 "from" 和 "to"
+		var arrow_parts := pair_text.split("->", false, 1)
+		if arrow_parts.size() < 2:
+			continue
+		var from_id := str(arrow_parts[0]).strip_edges()
+		var to_id := str(arrow_parts[1]).strip_edges()
+		if not from_id.is_empty() and not to_id.is_empty():
+			deltas.append({"from": from_id, "to": to_id, "delta": delta})
+	return deltas

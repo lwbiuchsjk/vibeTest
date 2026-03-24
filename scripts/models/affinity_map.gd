@@ -16,6 +16,23 @@ func get_score(from_role_id: String, to_role_id: String, default_value: int = 0)
 func set_score(from_role_id: String, to_role_id: String, score: int) -> void:
 	_scores[_pair_key(from_role_id, to_role_id)] = score
 
+# 判断是否存在指定方向的关系记录。
+func has_pair(from_role_id: String, to_role_id: String) -> bool:
+	return _scores.has(_pair_key(from_role_id, to_role_id))
+
+# 返回所有关系对的数组，每项为 {from, to, score}。
+func get_all_pairs() -> Array:
+	var result: Array = []
+	for pair_key in _scores.keys():
+		var parts := str(pair_key).split("->", false, 1)
+		if parts.size() == 2:
+			result.append({
+				"from": parts[0],
+				"to": parts[1],
+				"score": int(_scores[pair_key])
+			})
+	return result
+
 # 导出完整关系表。
 func to_dict() -> Dictionary:
 	return _scores.duplicate(true)

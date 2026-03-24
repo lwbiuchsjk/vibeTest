@@ -9,6 +9,7 @@ const WorldEndMilestone2SmokeTest := preload("res://test/smoke/world_end_milesto
 const WorldEndMilestone3SmokeTest := preload("res://test/smoke/world_end_milestone_3_smoke_test.gd")
 const WorldEndMilestone4SmokeTest := preload("res://test/smoke/world_end_milestone_4_smoke_test.gd")
 const XinxingPhase2SmokeTest := preload("res://test/smoke/xinxing_phase2_smoke_test.gd")
+const RelationshipPhase3SmokeTest := preload("res://test/smoke/relationship_phase3_smoke_test.gd")
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 
 
@@ -64,6 +65,10 @@ func _ready() -> void:
 	# 功能：输出第二阶段心性与风险结构冒烟测试结果。
 	var xinxing_phase2_result: Dictionary = XinxingPhase2SmokeTest.run_all()
 	print("[XinxingPhase2] %s" % JSON.stringify(xinxing_phase2_result))
+
+	# 功能：输出第三阶段关系接入鉴定冒烟测试结果。
+	var relationship_phase3_result: Dictionary = RelationshipPhase3SmokeTest.run_all()
+	print("[RelationshipPhase3] %s" % JSON.stringify(relationship_phase3_result))
 
 	# 说明：执行 MVP 世界事件回归测试并输出摘要。
 	var mvp_result: Dictionary = MvpWorldEventSmokeTest.run_from_csv()

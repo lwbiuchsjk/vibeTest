@@ -42,13 +42,23 @@ static func evaluate_assessment(items: Array, role_state: Variant, thresholds: A
 static func apply_resource_delta(current_value: int, delta: int) -> int:
 	return current_value + delta
 
-# 功能：将好感度分值映射为粗粒度档位标签。
-static func affinity_tier(score: int) -> String:
-	if score < -25:
+# 功能：将好感度分值映射为五档档位标签。
+# 说明：五档依次为 hatred / distrust / neutral / trust / devotion。
+#       阈值从 thresholds 字典读取，缺省使用默认值。
+static func affinity_tier(score: int, thresholds: Dictionary = {}) -> String:
+	var hatred_max := int(thresholds.get("tier_hatred_max", -51))
+	var distrust_max := int(thresholds.get("tier_distrust_max", -11))
+	var trust_min := int(thresholds.get("tier_trust_min", 11))
+	var devotion_min := int(thresholds.get("tier_devotion_min", 51))
+	if score <= hatred_max:
 		return "hatred"
-	if score <= 25:
-		return "neutral"
-	return "favor"
+	if score <= distrust_max:
+		return "distrust"
+	if score >= devotion_min:
+		return "devotion"
+	if score >= trust_min:
+		return "trust"
+	return "neutral"
 
 # 功能：统一检定判定入口。
 # 说明：接收 check 配置、角色状态、风险修正器，返回判定结果。
@@ -178,9 +188,11 @@ static func _evaluate_dice_pool(dice: Array, hit_threshold: int, required_hits: 
 		return "fail"
 
 # 功能：计算偏置带来的额外骰子数。
-# 说明：successBias + stability_bias 合并为加减骰子数（正数加骰，负数减骰）。
+# 说明：successBias + stability_bias + relationship_bias 合并为加减骰子数（正数加骰，负数减骰）。
 static func _calc_bonus_dice(risk_modifiers: Dictionary) -> int:
-	return int(risk_modifiers.get("successBias", 0)) + int(risk_modifiers.get("stability_bias", 0))
+	return int(risk_modifiers.get("successBias", 0)) \
+		 + int(risk_modifiers.get("stability_bias", 0)) \
+		 + int(risk_modifiers.get("relationship_bias", 0))
 
 # 功能：根据心性阶段对骰池 result_type 做门控约束。
 # 说明：与 chance 检定的 _apply_risk_profile_constraints 逻辑对应，但直接操作 result_type 字符串。
@@ -317,12 +329,113 @@ static func get_xinxing_risk_profile(xinxing: int) -> Dictionary:
 			return {"allow_desperate_gamble": true, "allow_preemptive_bet": false, "stability_bias": 0}
 
 # 功能：应用好感度变化，并裁剪到 [-100, 100] 后返回分值与档位。
-static func apply_affinity_delta(current_score: int, delta: int) -> Dictionary:
+static func apply_affinity_delta(current_score: int, delta: int, thresholds: Dictionary = {}) -> Dictionary:
 	var next_score := clampi(current_score + delta, -100, 100)
 	return {
 		"score": next_score,
-		"tier": affinity_tier(next_score)
+		"tier": affinity_tier(next_score, thresholds)
 	}
+
+# 功能：执行单个 NPC 的关系修正判定，返回 bias 和掷骰详情。
+# 说明：NPC→玩家档位决定判定次数与方向；玩家→NPC态度对齐修正命中值；掷 1d10 判定。
+# 参数：
+#   npc_to_player_score: NPC 对玩家的好感分值
+#   player_to_npc_score: 玩家对 NPC 的好感分值
+#   difficulty: 该 NPC 独立配置的关系鉴定难度
+#   affinity_thresholds: 五档阈值字典
+#   rng: 可选随机源，null 时使用全局随机
+# 返回：{ bias, rolls, npc_tier, player_tier, direction, aligned }
+static func resolve_relationship_check(
+	npc_to_player_score: int,
+	player_to_npc_score: int,
+	difficulty: int,
+	affinity_thresholds: Dictionary,
+	rng: Variant = null
+) -> Dictionary:
+	var npc_tier := affinity_tier(npc_to_player_score, affinity_thresholds)
+	var player_tier := affinity_tier(player_to_npc_score, affinity_thresholds)
+
+	# NPC→玩家档位决定判定次数和方向
+	var roll_count := 0
+	var direction := "none"
+	match npc_tier:
+		"hatred":
+			roll_count = 2
+			direction = "remove"
+		"distrust":
+			roll_count = 1
+			direction = "remove"
+		"neutral":
+			roll_count = 0
+			direction = "none"
+		"trust":
+			roll_count = 1
+			direction = "add"
+		"devotion":
+			roll_count = 2
+			direction = "add"
+
+	# neutral 不介入，直接返回
+	if roll_count == 0:
+		return {
+			"bias": 0,
+			"rolls": [],
+			"npc_tier": npc_tier,
+			"player_tier": player_tier,
+			"direction": direction,
+			"aligned": false
+		}
+
+	# 计算玩家态度对齐修正
+	var alignment_bonus := _calc_alignment_bonus(player_tier, direction)
+	var aligned := alignment_bonus != 0
+
+	# 逐次掷骰判定
+	var rolls: Array = []
+	var bias := 0
+	for i in roll_count:
+		# 基础命中值 5，减去难度，加对齐修正，裁剪到 [0, 10]
+		var hit_value := clampi(5 - difficulty + alignment_bonus, 0, 10)
+		var die: int
+		if rng != null and rng.has_method("randi_range"):
+			die = rng.randi_range(1, 10)
+		else:
+			die = randi_range(1, 10)
+		var success := die <= hit_value
+		rolls.append({"die": die, "hit_value": hit_value, "success": success})
+		if success:
+			if direction == "add":
+				bias += 1
+			else:
+				bias -= 1
+
+	return {
+		"bias": bias,
+		"rolls": rolls,
+		"npc_tier": npc_tier,
+		"player_tier": player_tier,
+		"direction": direction,
+		"aligned": aligned
+	}
+
+# 功能：计算玩家态度对齐修正值。
+# 说明：仅当玩家态度方向与 NPC 判定方向一致时生效，否则返回 0。
+static func _calc_alignment_bonus(player_tier: String, npc_direction: String) -> int:
+	if npc_direction == "add":
+		# NPC 在帮助方向，玩家也偏信赖侧才对齐
+		match player_tier:
+			"devotion":
+				return 2
+			"trust":
+				return 1
+	elif npc_direction == "remove":
+		# NPC 在阻挠方向，玩家也偏警戒侧才对齐
+		match player_tier:
+			"hatred":
+				return -2
+			"distrust":
+				return -1
+	return 0
 
 # 功能：检查移动是否合法。
 # 说明：支持 LocationGraph 对象或原始 Dictionary 两种输入。
