@@ -1,0 +1,62 @@
+# 功能：将 Godot 项目导出为 Web 版本并部署到 GitHub Pages。
+# 说明：push 到 main 分支时自动触发，使用 barichello/godot-ci 镜像完成导出。
+
+name: Deploy Web to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # 允许手动触发
+  workflow_dispatch:
+
+# GitHub Pages 部署所需权限
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只允许一个部署，跳过排队中的运行，不取消正在进行的运行
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  export-and-deploy:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.5.1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup export templates
+        run: |
+          mkdir -p /root/.local/share/godot/export_templates/4.5.1.stable
+          mv /root/.local/share/godot/templates/* /root/.local/share/godot/export_templates/4.5.1.stable/ || true
+
+      - name: Import project
+        run: |
+          godot --headless --import 2>&1 || true
+        timeout-minutes: 2
+
+      - name: Export Web
+        run: |
+          mkdir -p output
+          godot --headless --export-release "Web" output/index.html
+        timeout-minutes: 5
+
+      - name: Add coi-serviceworker
+        run: |
+          # GitHub Pages 不支持自定义响应头，用 service worker 注入
+          # Cross-Origin-Isolation 头，使 SharedArrayBuffer 可用。
+          wget -q https://raw.githubusercontent.com/nicolo-ribaudo/coi-serviceworker/master/coi-serviceworker.min.js -O output/coi-serviceworker.min.js
+          sed -i 's|<head>|<head><script src="coi-serviceworker.min.js"></script>|' output/index.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: output
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

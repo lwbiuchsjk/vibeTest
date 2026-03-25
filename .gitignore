@@ -23,3 +23,6 @@ Design/
 
 # Local Godot runner (path varies per machine)
 tools/run_godot.ps1
+
+# Web export output (CI handles export and deploy)
+output/
