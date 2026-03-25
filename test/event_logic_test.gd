@@ -4,14 +4,9 @@ const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 const TaskSummaryCard := preload("res://scripts/ui/task_summary_card.gd")
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 const WorldEndScreen := preload("res://scripts/ui/world_end_screen.gd")
+const ResponsiveLayout := preload("res://scripts/ui/responsive_layout.gd")
 
 const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
-
-# 响应式布局常量
-const ASPECT_RATIO := 9.0 / 16.0   # 宽高比 9:16（竖屏手机）
-const MIN_WIDTH := 540              # 最小窗口宽度
-const MAX_CONTENT_WIDTH := 1200     # 内容区最大宽度，超出后两侧露出装饰衬底
-const BASE_MARGIN := 24             # 内容区基础边距
 
 var _engine: WorldEventEngine
 var _event_logs: Array[String] = []
@@ -47,11 +42,8 @@ func _ready() -> void:
 	end_root.action_requested.connect(_on_end_action_requested)
 	_setup_overlay_styles()
 	_setup_screen_background()
-	# 限制最小窗口尺寸为 9:16 基准
-	DisplayServer.window_set_min_size(Vector2i(MIN_WIDTH, int(float(MIN_WIDTH) / ASPECT_RATIO)))
-	get_viewport().size_changed.connect(_on_viewport_resized)
-	# 初始布局刷新延迟一帧，等节点尺寸就绪
-	call_deferred("_on_viewport_resized")
+	# 响应式布局初始化：注册 viewport 监听并触发首次布局。
+	ResponsiveLayout.setup(get_viewport(), _on_viewport_resized)
 	var test_config := _load_test_config()
 	_engine = WorldEventEngine.new(_get_test_random_seed(test_config))
 
@@ -985,53 +977,24 @@ func _setup_screen_background() -> void:
 	screen_background.show_behind_parent = true
 
 
-# 功能：响应视口尺寸变化，执行三阶段响应式布局。
-# 说明：
-#   阶段1（比例锁定）：宽度驱动高度，保持 9:16，右栏隐藏。
-#   阶段2（高度触顶）：高度锁定在屏幕最大值，宽度自由增长，右栏出现。
-#   阶段3（超宽居中）：内容区宽度上限 1200px，两侧露出装饰衬底。
+# 功能：响应视口尺寸变化，委托 ResponsiveLayout 计算后应用业务层布局。
+# 说明：三阶段布局计算由工具库完成，本方法只负责业务响应（右栏显隐、衬底显隐）。
 func _on_viewport_resized() -> void:
 	if _resizing:
 		return
 	_resizing = true
 
-	var win_size := DisplayServer.window_get_size()
-	var win_mode := DisplayServer.window_get_mode()
-	var is_free_window := (win_mode == DisplayServer.WINDOW_MODE_WINDOWED)
+	var layout := ResponsiveLayout.calc_layout(get_viewport())
 
-	# 获取当前屏幕可用高度（排除任务栏等系统 UI）
-	var screen_rect := DisplayServer.screen_get_usable_rect(
-		DisplayServer.window_get_current_screen()
-	)
-	var max_height := screen_rect.size.y
-
-	# 根据当前宽度计算 9:16 目标高度
-	var target_height := int(float(win_size.x) / ASPECT_RATIO)
-	# 高度是否已触顶：目标高度超过屏幕可用高度
-	var height_capped := target_height >= max_height
-
-	# 阶段1：比例锁定 — 调整窗口高度保持 9:16
-	if is_free_window and not height_capped:
-		var new_size := Vector2i(win_size.x, target_height)
-		if win_size != new_size:
-			DisplayServer.window_set_size(new_size)
+	# 阶段1：比例锁定
+	ResponsiveLayout.apply_aspect_lock(layout)
 
 	# 阶段2：右栏显隐 — 高度触顶后宽度自由，右栏出现
-	right_column.visible = height_capped
+	right_column.visible = bool(layout.get("height_capped", false))
 
-	# 阶段3：超宽居中 — 内容区上限 1200px，两侧露出装饰衬底
-	var vp_size: Vector2 = get_viewport().get_visible_rect().size
-	if vp_size.x > MAX_CONTENT_WIDTH:
-		var side_margin := int((vp_size.x - MAX_CONTENT_WIDTH) / 2.0)
-		root_margin.offset_left = side_margin
-		root_margin.offset_right = -side_margin
-	else:
-		root_margin.offset_left = BASE_MARGIN
-		root_margin.offset_right = -BASE_MARGIN
-	root_margin.offset_top = BASE_MARGIN
-	root_margin.offset_bottom = -BASE_MARGIN
-
-	screen_background.visible = vp_size.x > MAX_CONTENT_WIDTH
+	# 阶段3：超宽居中 margin + 装饰衬底显隐
+	ResponsiveLayout.apply_margins(root_margin, layout)
+	screen_background.visible = bool(layout.get("is_ultrawide", false))
 
 	_resizing = false
 
