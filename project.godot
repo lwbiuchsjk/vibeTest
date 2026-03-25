@@ -23,6 +23,10 @@ window/size/resizable=true
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
+[gui]
+
+theme/default_font="res://font/SourceHanSansSC-Regular.otf"
+
 [dotnet]
 
 project/assembly_name="VibeTest"
