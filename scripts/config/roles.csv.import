@@ -1,17 +1,3 @@
 [remap]
 
-importer="csv_translation"
-type="Translation"
-uid="uid://do2dsjv2u5tes"
-
-[deps]
-
-files=["res://scripts/config/roles.role.translation", "res://scripts/config/roles.display.translation", "res://scripts/config/roles.location.translation", "res://scripts/config/roles.portrait.translation", "res://scripts/config/roles.aptitude.translation", "res://scripts/config/roles.physique.translation", "res://scripts/config/roles.craft.translation", "res://scripts/config/roles.insight.translation", "res://scripts/config/roles.xinxing.translation", "res://scripts/config/roles.hp.translation", "res://scripts/config/roles.energy.translation", "res://scripts/config/roles.gold.translation"]
-
-source_file="res://scripts/config/roles.csv"
-dest_files=["res://scripts/config/roles.role.translation", "res://scripts/config/roles.display.translation", "res://scripts/config/roles.location.translation", "res://scripts/config/roles.portrait.translation", "res://scripts/config/roles.aptitude.translation", "res://scripts/config/roles.physique.translation", "res://scripts/config/roles.craft.translation", "res://scripts/config/roles.insight.translation", "res://scripts/config/roles.xinxing.translation", "res://scripts/config/roles.hp.translation", "res://scripts/config/roles.energy.translation", "res://scripts/config/roles.gold.translation"]
-
-[params]
-
-compress=true
-delimiter=0
+importer="keep"

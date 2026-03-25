@@ -1,17 +1,3 @@
 [remap]
 
-importer="csv_translation"
-type="Translation"
-uid="uid://bpfasx8r752hi"
-
-[deps]
-
-files=["res://test/config/desperate_gamble_test/event_conditions.condition.translation", "res://test/config/desperate_gamble_test/event_conditions.left.translation", "res://test/config/desperate_gamble_test/event_conditions.op.translation", "res://test/config/desperate_gamble_test/event_conditions.right.translation", "res://test/config/desperate_gamble_test/event_conditions.delta.translation"]
-
-source_file="res://test/config/desperate_gamble_test/event_conditions.csv"
-dest_files=["res://test/config/desperate_gamble_test/event_conditions.condition.translation", "res://test/config/desperate_gamble_test/event_conditions.left.translation", "res://test/config/desperate_gamble_test/event_conditions.op.translation", "res://test/config/desperate_gamble_test/event_conditions.right.translation", "res://test/config/desperate_gamble_test/event_conditions.delta.translation"]
-
-[params]
-
-compress=true
-delimiter=0
+importer="keep"
