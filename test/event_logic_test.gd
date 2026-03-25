@@ -7,10 +7,20 @@ const WorldEndScreen := preload("res://scripts/ui/world_end_screen.gd")
 
 const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
 
+# 响应式布局常量
+const ASPECT_RATIO := 9.0 / 16.0   # 宽高比 9:16（竖屏手机）
+const MIN_WIDTH := 540              # 最小窗口宽度
+const MAX_CONTENT_WIDTH := 1200     # 内容区最大宽度，超出后两侧露出装饰衬底
+const BASE_MARGIN := 24             # 内容区基础边距
+
 var _engine: WorldEventEngine
 var _event_logs: Array[String] = []
 var _current_turn_result: Dictionary = {}
+var _resizing := false              # 防止窗口尺寸调整时递归触发
 
+@onready var screen_background: TextureRect = $ScreenBackground
+@onready var root_margin: MarginContainer = $Root
+@onready var right_column: VSplitContainer = $Root/RootContent/MainSplit/RightColumn
 @onready var status_label: Label = $Root/RootContent/Header/StatusLabel
 @onready var event_background_rect: TextureRect = $Root/RootContent/MainSplit/LeftPanel/LeftStack/EventBackground
 @onready var character_panel: PanelContainer = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/CharacterPanel
@@ -36,6 +46,12 @@ func _ready() -> void:
 	continue_button.pressed.connect(_on_continue_button_pressed)
 	end_root.action_requested.connect(_on_end_action_requested)
 	_setup_overlay_styles()
+	_setup_screen_background()
+	# 限制最小窗口尺寸为 9:16 基准
+	DisplayServer.window_set_min_size(Vector2i(MIN_WIDTH, int(float(MIN_WIDTH) / ASPECT_RATIO)))
+	get_viewport().size_changed.connect(_on_viewport_resized)
+	# 初始布局刷新延迟一帧，等节点尺寸就绪
+	call_deferred("_on_viewport_resized")
 	var test_config := _load_test_config()
 	_engine = WorldEventEngine.new(_get_test_random_seed(test_config))
 
@@ -951,6 +967,73 @@ func _setup_overlay_styles() -> void:
 
 	# 选项区标题
 	option_header_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95, 0.9))
+
+
+# 功能：初始化全屏装饰衬底。
+# 说明：优先加载美术资源作为窗口超宽时的侧边装饰；未找到资源时用深色渐变兜底。
+func _setup_screen_background() -> void:
+	# 尝试加载装饰衬底贴图（可替换为任意美术资源路径）
+	var bg_path := "res://assets/art/environments/backgrounds/town.svg"
+	var bg_res: Variant = ResourceLoader.load(bg_path)
+	if bg_res is Texture2D:
+		screen_background.texture = bg_res
+		screen_background.modulate = Color(0.25, 0.25, 0.30, 1.0)
+	else:
+		# 兜底：无贴图时用纯深色，通过 modulate 控制
+		screen_background.texture = null
+	# 确保衬底始终处于最底层
+	screen_background.show_behind_parent = true
+
+
+# 功能：响应视口尺寸变化，执行三阶段响应式布局。
+# 说明：
+#   阶段1（比例锁定）：宽度驱动高度，保持 9:16，右栏隐藏。
+#   阶段2（高度触顶）：高度锁定在屏幕最大值，宽度自由增长，右栏出现。
+#   阶段3（超宽居中）：内容区宽度上限 1200px，两侧露出装饰衬底。
+func _on_viewport_resized() -> void:
+	if _resizing:
+		return
+	_resizing = true
+
+	var win_size := DisplayServer.window_get_size()
+	var win_mode := DisplayServer.window_get_mode()
+	var is_free_window := (win_mode == DisplayServer.WINDOW_MODE_WINDOWED)
+
+	# 获取当前屏幕可用高度（排除任务栏等系统 UI）
+	var screen_rect := DisplayServer.screen_get_usable_rect(
+		DisplayServer.window_get_current_screen()
+	)
+	var max_height := screen_rect.size.y
+
+	# 根据当前宽度计算 9:16 目标高度
+	var target_height := int(float(win_size.x) / ASPECT_RATIO)
+	# 高度是否已触顶：目标高度超过屏幕可用高度
+	var height_capped := target_height >= max_height
+
+	# 阶段1：比例锁定 — 调整窗口高度保持 9:16
+	if is_free_window and not height_capped:
+		var new_size := Vector2i(win_size.x, target_height)
+		if win_size != new_size:
+			DisplayServer.window_set_size(new_size)
+
+	# 阶段2：右栏显隐 — 高度触顶后宽度自由，右栏出现
+	right_column.visible = height_capped
+
+	# 阶段3：超宽居中 — 内容区上限 1200px，两侧露出装饰衬底
+	var vp_size: Vector2 = get_viewport().get_visible_rect().size
+	if vp_size.x > MAX_CONTENT_WIDTH:
+		var side_margin := int((vp_size.x - MAX_CONTENT_WIDTH) / 2.0)
+		root_margin.offset_left = side_margin
+		root_margin.offset_right = -side_margin
+	else:
+		root_margin.offset_left = BASE_MARGIN
+		root_margin.offset_right = -BASE_MARGIN
+	root_margin.offset_top = BASE_MARGIN
+	root_margin.offset_bottom = -BASE_MARGIN
+
+	screen_background.visible = vp_size.x > MAX_CONTENT_WIDTH
+
+	_resizing = false
 
 
 # 功能：渲染当前事件背景图。

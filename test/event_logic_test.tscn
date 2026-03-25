@@ -1,8 +1,8 @@
-[gd_scene load_steps=3 format=3 uid="uid://ppkmkvydqbfv"]
+[gd_scene load_steps=4 format=3 uid="uid://ppkmkvydqbfv"]
 
 [ext_resource type="Script" uid="uid://cbx22u7e0gipa" path="res://test/event_logic_test.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://scripts/ui/task_summary_card.tscn" id="2_task_summary_card"]
-[ext_resource type="PackedScene" path="res://scripts/ui/world_end_screen.tscn" id="3_world_end_screen"]
+[ext_resource type="PackedScene" uid="uid://cgv3i7k4wqm83" path="res://scripts/ui/world_end_screen.tscn" id="3_world_end_screen"]
 
 [node name="EventLogicTest" type="Control"]
 layout_mode = 3
@@ -12,6 +12,16 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
+
+[node name="ScreenBackground" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 6
 
 [node name="Root" type="MarginContainer" parent="."]
 layout_mode = 1
@@ -32,6 +42,7 @@ size_flags_vertical = 3
 theme_override_constants/separation = 16
 
 [node name="Header" type="VBoxContainer" parent="Root/RootContent"]
+visible = false
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
@@ -47,7 +58,6 @@ text = "Loading..."
 horizontal_alignment = 1
 
 [node name="EndRoot" parent="Root/RootContent" instance=ExtResource("3_world_end_screen")]
-layout_mode = 2
 
 [node name="MainSplit" type="HSplitContainer" parent="Root/RootContent"]
 layout_mode = 2
@@ -99,7 +109,6 @@ size_flags_horizontal = 3
 
 [node name="CharacterLabel" type="Label" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/CharacterPanel"]
 layout_mode = 2
-text = ""
 autowrap_mode = 3
 
 [node name="WorldPanel" type="PanelContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent"]
@@ -108,7 +117,6 @@ size_flags_horizontal = 3
 
 [node name="WorldLabel" type="Label" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/WorldPanel"]
 layout_mode = 2
-text = ""
 autowrap_mode = 3
 
 [node name="TaskSummaryCard" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent" instance=ExtResource("2_task_summary_card")]
@@ -129,11 +137,9 @@ theme_override_constants/separation = 6
 [node name="EventTitle" type="Label" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/NarrativePanel/NarrativeContent"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
-text = ""
 
 [node name="EventDetail" type="Label" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/NarrativePanel/NarrativeContent"]
 layout_mode = 2
-text = ""
 autowrap_mode = 3
 
 [node name="OptionSection" type="VBoxContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent"]
@@ -167,7 +173,7 @@ size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
 [node name="RightColumn" type="VSplitContainer" parent="Root/RootContent/MainSplit"]
-custom_minimum_size = Vector2(420, 0)
+custom_minimum_size = Vector2(320, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
