@@ -5,6 +5,7 @@ const TaskSummaryCard := preload("res://scripts/ui/task_summary_card.gd")
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 const WorldEndScreen := preload("res://scripts/ui/world_end_screen.gd")
 const ResponsiveLayout := preload("res://scripts/ui/responsive_layout.gd")
+const ButtonTheme := preload("res://scripts/ui/button_theme.gd")
 
 const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
 
@@ -169,13 +170,13 @@ func _render_risk_entry_buttons(accept_text: String, reject_text: String) -> voi
 	var accept_button := Button.new()
 	accept_button.text = accept_text
 	accept_button.pressed.connect(_on_option_pressed.bind("accept"))
-	_style_option_button(accept_button, "desperate")
+	ButtonTheme.apply(accept_button, ButtonTheme.PRESET_DESPERATE)
 	option_list.add_child(accept_button)
 
 	var reject_button := Button.new()
 	reject_button.text = reject_text
 	reject_button.pressed.connect(_on_option_pressed.bind("reject"))
-	_style_option_button(reject_button)
+	ButtonTheme.apply(reject_button)
 	option_list.add_child(reject_button)
 
 
@@ -280,7 +281,7 @@ func _render_choice_options(full_options: Array, risk_profile: Dictionary) -> vo
 			option_button.text = _build_option_button_text(option_def)
 			option_button.disabled = state != "selectable"
 			option_button.pressed.connect(_on_option_pressed.bind(option_id))
-			_style_option_button(option_button)
+			ButtonTheme.apply(option_button)
 			option_list.add_child(option_button)
 
 	if visible_count == 0:
@@ -312,7 +313,7 @@ func _render_option_with_bet_toggle(option_def: Dictionary, _risk_profile: Dicti
 		confirm_button.text = "\n".join(lines)
 		confirm_button.disabled = not can_afford
 		confirm_button.pressed.connect(_on_option_with_bet_pressed.bind(option_id, "accept"))
-		_style_option_button(confirm_button, "bet")
+		ButtonTheme.apply(confirm_button, ButtonTheme.PRESET_BET)
 	else:
 		# 默认模式：显示原始选项消耗
 		var lines: Array[String] = [option_text]
@@ -324,15 +325,9 @@ func _render_option_with_bet_toggle(option_def: Dictionary, _risk_profile: Dicti
 		lines.append("    %s" % _build_option_state_text(option_def))
 		confirm_button.text = "\n".join(lines)
 		confirm_button.pressed.connect(_on_option_with_bet_pressed.bind(option_id, "reject"))
-		_style_option_button(confirm_button)
+		ButtonTheme.apply(confirm_button)
 	# 选项按钮右侧留出空间给切换按钮，避免文字被遮挡
-	# 覆盖 StyleBox 右内边距：原始 14 → 88，预留切换按钮宽度（72 + 余量）
-	for state_name in ["normal", "hover", "pressed", "disabled"]:
-		var sb: Variant = confirm_button.get_theme_stylebox(state_name)
-		if sb is StyleBoxFlat:
-			var patched: StyleBoxFlat = sb.duplicate()
-			patched.content_margin_right = 88
-			confirm_button.add_theme_stylebox_override(state_name, patched)
+	ButtonTheme.override_margin_right(confirm_button, 88)
 	confirm_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	confirm_button.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	# 允许按钮高度随内容自适应（取消固定最小高度限制）
@@ -344,7 +339,7 @@ func _render_option_with_bet_toggle(option_def: Dictionary, _risk_profile: Dicti
 	var toggle_text := "默认" if is_bet_mode else "押注"
 	toggle_button.text = toggle_text
 	toggle_button.pressed.connect(_on_bet_toggle_for_option.bind(option_id))
-	_style_bet_toggle_button(toggle_button)
+	ButtonTheme.apply(toggle_button, ButtonTheme.PRESET_TOGGLE)
 
 	# 外层容器：HBoxContainer 让选项按钮自然撑高，切换按钮跟随高度
 	var wrapper := HBoxContainer.new()
@@ -419,31 +414,6 @@ func _on_bet_toggle_for_option(option_id: String) -> void:
 	var current: bool = bool(_bet_mode_options.get(option_id, false))
 	_bet_mode_options[option_id] = not current
 	_render_current_event(_current_turn_result)
-
-
-# 功能：为押注切换按钮施加叠加在选项按钮右侧的紧凑样式。
-# 说明：半透明背景、小字号，视觉上作为选项按钮的附属切换控件。
-func _style_bet_toggle_button(button: Button) -> void:
-	button.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.35, 0.30, 0.45, 0.85)
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_left = 4
-	style.corner_radius_bottom_right = 4
-	style.content_margin_left = 4
-	style.content_margin_right = 4
-	style.content_margin_top = 4
-	style.content_margin_bottom = 4
-	button.add_theme_stylebox_override("normal", style)
-	var hover := style.duplicate()
-	hover.bg_color = Color(0.45, 0.38, 0.55, 0.95)
-	button.add_theme_stylebox_override("hover", hover)
-	var pressed := style.duplicate()
-	pressed.bg_color = Color(0.28, 0.24, 0.38, 0.9)
-	button.add_theme_stylebox_override("pressed", pressed)
-	button.add_theme_color_override("font_color", Color(0.85, 0.82, 0.92, 1.0))
-	button.add_theme_font_size_override("font_size", 12)
 
 
 # 功能：构建鉴定结果摘要文本，用于追加到事件详情区。
@@ -1043,88 +1013,13 @@ func _clear_option_list() -> void:
 		child.queue_free()
 
 
-# 功能：对动态创建的选项按钮施加统一样式。
-# 说明：设置最小高度、自动换行和内边距，确保选项区视觉一致且可读。
-# risk_type 参数：
-#   "" (默认)   — 常规选项，深灰蓝底
-#   "bet"       — 主动押注选项，紫色调 + 左侧紫色边框
-#   "desperate" — 孤注一掷选项，红色调 + 左侧红色边框
-func _style_option_button(button: Button, risk_type: String = "") -> void:
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	button.custom_minimum_size.y = 54
-	# 对齐方式：文本左对齐，更易阅读
-	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-
-	# 根据风险类型选择配色
-	var bg_normal: Color
-	var bg_hover: Color
-	var bg_pressed: Color
-	var border_color: Color = Color.TRANSPARENT
-	var font_color: Color = Color.WHITE
-	if risk_type == "bet":
-		# 主动押注：偏紫色调，饱和度更高
-		bg_normal = Color(0.24, 0.16, 0.36, 1.0)
-		bg_hover = Color(0.32, 0.22, 0.46, 1.0)
-		bg_pressed = Color(0.18, 0.12, 0.28, 1.0)
-		border_color = Color(0.55, 0.35, 0.85, 1.0)
-		font_color = Color(0.90, 0.85, 1.0, 1.0)
-	elif risk_type == "desperate":
-		# 孤注一掷：偏红色调，危险感
-		bg_normal = Color(0.34, 0.14, 0.14, 1.0)
-		bg_hover = Color(0.44, 0.20, 0.18, 1.0)
-		bg_pressed = Color(0.26, 0.10, 0.10, 1.0)
-		border_color = Color(0.85, 0.30, 0.25, 1.0)
-		font_color = Color(1.0, 0.90, 0.88, 1.0)
-	else:
-		# 常规选项
-		bg_normal = Color(0.18, 0.20, 0.25, 1.0)
-		bg_hover = Color(0.26, 0.28, 0.34, 1.0)
-		bg_pressed = Color(0.14, 0.16, 0.20, 1.0)
-
-	# 内边距与圆角
-	var style_normal := StyleBoxFlat.new()
-	style_normal.bg_color = bg_normal
-	style_normal.corner_radius_top_left = 6
-	style_normal.corner_radius_top_right = 6
-	style_normal.corner_radius_bottom_left = 6
-	style_normal.corner_radius_bottom_right = 6
-	style_normal.content_margin_left = 14
-	style_normal.content_margin_right = 14
-	style_normal.content_margin_top = 10
-	style_normal.content_margin_bottom = 10
-	# 风险选项：左侧加 3px 强调色边框
-	if border_color != Color.TRANSPARENT:
-		style_normal.border_width_left = 3
-		style_normal.border_color = border_color
-		style_normal.content_margin_left = 16
-	button.add_theme_stylebox_override("normal", style_normal)
-	# hover 态
-	var style_hover := style_normal.duplicate()
-	style_hover.bg_color = bg_hover
-	button.add_theme_stylebox_override("hover", style_hover)
-	# pressed 态
-	var style_pressed := style_normal.duplicate()
-	style_pressed.bg_color = bg_pressed
-	button.add_theme_stylebox_override("pressed", style_pressed)
-	# disabled 态：更明显的灰暗
-	var style_disabled := style_normal.duplicate()
-	style_disabled.bg_color = Color(0.12, 0.12, 0.14, 0.7)
-	style_disabled.border_color = Color(0.3, 0.3, 0.3, 0.5) if border_color != Color.TRANSPARENT else Color.TRANSPARENT
-	button.add_theme_stylebox_override("disabled", style_disabled)
-	# 风险选项字体颜色
-	if font_color != Color.WHITE:
-		button.add_theme_color_override("font_color", font_color)
-	button.add_theme_color_override("font_disabled_color", Color(0.45, 0.45, 0.50, 1.0))
-
-
 # 功能：在选项列表中动态创建"继续"按钮，复用统一样式。
 # 说明：替代场景中静态 ContinueButton，使继续操作与选项按钮视觉一致。
 func _add_continue_button_to_option_list(label_text: String) -> void:
 	var btn := Button.new()
 	btn.text = label_text
 	btn.pressed.connect(_on_continue_button_pressed)
-	_style_option_button(btn)
+	ButtonTheme.apply(btn)
 	option_list.add_child(btn)
 
 
