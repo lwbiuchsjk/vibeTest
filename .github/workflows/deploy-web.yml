@@ -31,8 +31,15 @@ jobs:
 
       - name: Setup export templates
         run: |
-          mkdir -p /root/.local/share/godot/export_templates/4.5.1.stable
-          mv /root/.local/share/godot/templates/* /root/.local/share/godot/export_templates/4.5.1.stable/ || true
+          # GitHub Actions 容器中 HOME 可能是 /github/home 而非 /root，
+          # 两个路径都写入，确保 Godot 能找到模板。
+          for dest in "$HOME/.local/share/godot/export_templates/4.5.1.stable" "/root/.local/share/godot/export_templates/4.5.1.stable"; do
+            mkdir -p "$dest"
+            cp -r /root/.local/share/godot/templates/* "$dest/" 2>/dev/null || true
+          done
+          # 列出模板文件，便于调试
+          echo "=== Templates in HOME ==="
+          ls -la "$HOME/.local/share/godot/export_templates/4.5.1.stable/" || true
 
       - name: Import project
         run: |
@@ -42,7 +49,7 @@ jobs:
       - name: Export Web
         run: |
           mkdir -p output
-          godot --headless --export-release "Web" output/index.html
+          godot --headless --export-release "Web" output/index.html 2>&1
         timeout-minutes: 5
 
       - name: Add coi-serviceworker
