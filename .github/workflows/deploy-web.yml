@@ -60,7 +60,13 @@ jobs:
         run: |
           # GitHub Pages 不支持自定义响应头，用 service worker 注入
           # Cross-Origin-Isolation 头，使 SharedArrayBuffer 可用。
-          wget -q https://raw.githubusercontent.com/nicolo-ribaudo/coi-serviceworker/master/coi-serviceworker.min.js -O output/coi-serviceworker.min.js
+          # 多源下载兜底，避免单一 CDN 不可达。
+          curl -fsSL --retry 3 \
+            -o output/coi-serviceworker.min.js \
+            "https://cdn.jsdelivr.net/npm/coi-serviceworker/coi-serviceworker.min.js" \
+          || curl -fsSL --retry 3 \
+            -o output/coi-serviceworker.min.js \
+            "https://raw.githubusercontent.com/nicolo-ribaudo/coi-serviceworker/master/coi-serviceworker.min.js"
           sed -i 's|<head>|<head><script src="coi-serviceworker.min.js"></script>|' output/index.html
 
       - name: Upload Pages artifact
