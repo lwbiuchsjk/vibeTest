@@ -12,14 +12,20 @@ var _event_logs: Array[String] = []
 var _current_turn_result: Dictionary = {}
 
 @onready var status_label: Label = $Root/RootContent/Header/StatusLabel
-@onready var event_background_rect: TextureRect = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/EventInfoScroll/EventInfo/EventBackground
-@onready var event_title_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/EventInfoScroll/EventInfo/EventTitle
-@onready var event_detail_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/EventInfoScroll/EventInfo/EventDetail
-@onready var task_summary_card: TaskSummaryCard = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/TaskSummaryCard
+@onready var event_background_rect: TextureRect = $Root/RootContent/MainSplit/LeftPanel/LeftStack/EventBackground
+@onready var character_panel: PanelContainer = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/CharacterPanel
+@onready var character_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/CharacterPanel/CharacterLabel
+@onready var world_panel: PanelContainer = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/WorldPanel
+@onready var world_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/WorldPanel/WorldLabel
+@onready var narrative_panel: PanelContainer = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/NarrativePanel
+@onready var event_title_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/NarrativePanel/NarrativeContent/EventTitle
+@onready var event_detail_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/NarrativePanel/NarrativeContent/EventDetail
+@onready var option_header_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/OptionSection/OptionHeader
+@onready var task_summary_card: TaskSummaryCard = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/TaskSummaryCard
 @onready var main_split: HSplitContainer = $Root/RootContent/MainSplit
 @onready var end_root: WorldEndScreen = $Root/RootContent/EndRoot
-@onready var continue_button: Button = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/OptionSection/ActionBar/ContinueButton
-@onready var option_list: VBoxContainer = $Root/RootContent/MainSplit/LeftPanel/LeftMargin/LeftContent/OptionSection/OptionScroll/OptionList
+@onready var continue_button: Button = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/OptionSection/ActionBar/ContinueButton
+@onready var option_list: VBoxContainer = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/OptionSection/OptionScroll/OptionList
 @onready var world_state_label: RichTextLabel = $Root/RootContent/MainSplit/RightColumn/RightPanel/RightMargin/RightContent/WorldStateValue
 @onready var log_label: RichTextLabel = $Root/RootContent/MainSplit/RightColumn/BottomPanel/BottomMargin/BottomContent/LogValue
 
@@ -29,6 +35,7 @@ var _current_turn_result: Dictionary = {}
 func _ready() -> void:
 	continue_button.pressed.connect(_on_continue_button_pressed)
 	end_root.action_requested.connect(_on_end_action_requested)
+	_setup_overlay_styles()
 	var test_config := _load_test_config()
 	_engine = WorldEventEngine.new(_get_test_random_seed(test_config))
 
@@ -79,34 +86,33 @@ func _render_current_event(turn_result: Dictionary) -> void:
 	var awaiting_choice := phase == "choice"
 
 	_render_event_background(str(turn_result.get("resolved_background_art", "")))
-	event_title_label.text = "%s | %s" % [
-		str(turn_result.get("event_id", "")),
-		str(turn_result.get("title", ""))
-	]
-
-	var detail_text := _build_event_detail_text(turn_result)
-	# 鉴定结果摘要追加到事件详情末尾
-	var check_summary := _build_check_result_summary(turn_result)
-	if not check_summary.is_empty():
-		detail_text += "\n\n" + check_summary
-	event_detail_label.text = detail_text
 	_set_end_screen_visible(false)
 	_update_left_task_panel(turn_result)
+
+	# 叙事面板：标题 + 展示文本 + 鉴定结果摘要
+	event_title_label.text = str(turn_result.get("title", ""))
+	var narrative_parts: Array[String] = []
 	if phase == "presentation":
 		var speaker := str(presentation_item.get("speaker", "")).strip_edges()
 		var body := str(presentation_item.get("text", ""))
 		if speaker.is_empty():
-			event_detail_label.text = "%s\n\n%s" % [body, detail_text]
+			narrative_parts.append(body)
 		else:
-			event_detail_label.text = "%s: %s\n\n%s" % [speaker, body, detail_text]
+			narrative_parts.append("%s: %s" % [speaker, body])
+	var check_summary := _build_check_result_summary(turn_result)
+	if not check_summary.is_empty():
+		narrative_parts.append(check_summary)
+	event_detail_label.text = "\n\n".join(narrative_parts)
+	# 有标题或叙事内容时才显示叙事面板
+	var has_narrative := not event_title_label.text.strip_edges().is_empty() or not narrative_parts.is_empty()
+	narrative_panel.visible = has_narrative
 
 	_clear_option_list()
 	continue_button.visible = false
 	continue_button.disabled = true
 	if phase == "presentation":
 		status_label.text = "当前处于展示阶段，点击继续查看下一条文本。"
-		continue_button.visible = true
-		continue_button.disabled = false
+		_add_continue_button_to_option_list("继续")
 		return
 
 	# 心性风险入口：孤注一掷
@@ -127,8 +133,7 @@ func _render_current_event(turn_result: Dictionary) -> void:
 		status_label.text = "等待选择：点击下方任一可用选项。"
 	else:
 		status_label.text = "当前事件待确认，点击继续后结算并预览下一个事件。"
-		continue_button.visible = true
-		continue_button.disabled = false
+		_add_continue_button_to_option_list("确认结算，进入下一个事件")
 
 	var visible_count := 0
 	for option_variant in options:
@@ -139,11 +144,10 @@ func _render_current_event(turn_result: Dictionary) -> void:
 
 		visible_count += 1
 		var option_button := Button.new()
-		option_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		option_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		option_button.text = _build_option_button_text(option_def)
 		option_button.disabled = state != "selectable"
 		option_button.pressed.connect(_on_option_pressed.bind(str(option_def.get("id", ""))))
+		_style_option_button(option_button)
 		option_list.add_child(option_button)
 
 	if visible_count == 0:
@@ -153,16 +157,18 @@ func _render_current_event(turn_result: Dictionary) -> void:
 # 功能：渲染心性风险入口的接受/放弃按钮对。
 # 说明：两个按钮分别绑定 "accept" 和 "reject"，走正常的 confirm_pending_turn 分流。
 func _render_risk_entry_buttons(accept_text: String, reject_text: String) -> void:
+	_add_option_section_label("— 心性风险入口 —")
+
 	var accept_button := Button.new()
-	accept_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	accept_button.text = accept_text
 	accept_button.pressed.connect(_on_option_pressed.bind("accept"))
+	_style_option_button(accept_button, true)
 	option_list.add_child(accept_button)
 
 	var reject_button := Button.new()
-	reject_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	reject_button.text = reject_text
 	reject_button.pressed.connect(_on_option_pressed.bind("reject"))
+	_style_option_button(reject_button)
 	option_list.add_child(reject_button)
 
 
@@ -209,31 +215,36 @@ func _build_preemptive_bet_info() -> Dictionary:
 	var bias_text := "无" if bias_parts.is_empty() else "、".join(bias_parts)
 
 	# 精力够不够
-	var can_afford := _engine._can_pay_bet_cost(bet_cost)
+	var can_afford: bool = _engine._can_pay_bet_cost(bet_cost)
 
 	return {"can_afford": can_afford, "cost_text": cost_text, "bias_text": bias_text, "total_cost": total_cost, "bet_cost": bet_cost, "bet_bias": bet_bias}
 
 
 # 功能：渲染主动押注的接受/放弃按钮，按钮上显示消耗与调整详情，精力不足时禁用接受按钮。
 func _render_preemptive_bet_buttons(can_afford: bool, bet_info: Dictionary) -> void:
+	_add_option_section_label("— 主动押注 —")
+
 	var cost_text := str(bet_info.get("cost_text", ""))
 	var bias_text := str(bet_info.get("bias_text", ""))
-	var accept_label := "主动押注：接受\n消耗: %s | 调整: %s" % [cost_text, bias_text]
+	# 接受按钮：分行展示消耗和调整，结构更清晰
+	var accept_lines: Array[String] = ["主动押注：接受"]
+	accept_lines.append("    消耗: %s" % cost_text)
+	accept_lines.append("    调整: %s" % bias_text)
 	if not can_afford:
-		accept_label += "\n（精力不足，无法发动）"
+		accept_lines.append("    ⚠ 精力不足，无法发动")
+	var accept_label := "\n".join(accept_lines)
 
 	var accept_button := Button.new()
-	accept_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	accept_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	accept_button.text = accept_label
 	accept_button.disabled = not can_afford
 	accept_button.pressed.connect(_on_option_pressed.bind("accept"))
+	_style_option_button(accept_button, true)
 	option_list.add_child(accept_button)
 
 	var reject_button := Button.new()
-	reject_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	reject_button.text = "主动押注：放弃"
 	reject_button.pressed.connect(_on_option_pressed.bind("reject"))
+	_style_option_button(reject_button)
 	option_list.add_child(reject_button)
 
 
@@ -346,9 +357,9 @@ func _handle_resolved_turn_result(turn_result: Dictionary, resolved_log: String)
 	_preview_next_event()
 
 
-# 功能：构建事件详情文本。
-# 说明：展示背景、route、policy、phase、展示进度与当前 world turn，便于核对“展示后结算”的推进时机。
-func _build_event_detail_text(turn_result: Dictionary) -> String:
+# 功能：构建当前事件的调试元数据文本，用于右侧面板展示。
+# 说明：展示背景、route、policy、phase、展示进度与当前 world turn，便于核对”展示后结算”的推进时机。
+func _build_event_debug_text(turn_result: Dictionary) -> String:
 	var choice: Dictionary = turn_result.get("choice", {})
 	var presentation: Dictionary = turn_result.get("presentation", {})
 	var lines: Array[String] = []
@@ -375,17 +386,14 @@ func _build_event_detail_text(turn_result: Dictionary) -> String:
 
 
 # 功能：生成选项按钮文本。
-# 说明：在按钮上直接标记状态，便于确认选项可选性是否符合预期。
+# 说明：主文本居前，ID 和状态标签放在第二行辅助区，方便一眼看清内容再核对元数据。
 func _build_option_button_text(option_def: Dictionary) -> String:
 	var state := str(option_def.get("state", "disabled"))
-	var state_text := "可选"
-	if state == "disabled":
-		state_text = "不可选"
-	return "%s | %s\n状态：%s" % [
-		str(option_def.get("id", "")),
-		str(option_def.get("text", "")),
-		state_text
-	]
+	var text := str(option_def.get("text", ""))
+	var id := str(option_def.get("id", ""))
+	var state_marker := "● 可选" if state == "selectable" else "○ 不可选"
+	# 主文本 + 辅助信息行
+	return "%s\n    %s    [%s]" % [text, state_marker, id]
 
 
 # 功能：刷新左侧任务摘要面板。
@@ -401,8 +409,8 @@ func _update_left_task_panel(turn_result: Dictionary) -> void:
 	task_summary_card.bind_data(active, task_links, current_turn)
 
 
-# 功能：刷新右侧世界状态与底部日志。
-# 说明：按重要性分组展示：角色 → 关系 → 世界 → 任务 → 历史，核心数据提级到顶部。
+# 功能：刷新左侧角色/世界面板 + 右侧调试面板 + 底部日志。
+# 说明：角色与世界信息展示在左侧背景图上方；右侧只保留调试/参考数据（事件元数据、关系、运行态、任务明细、历史）。
 func _update_side_panels() -> void:
 	var world_state := _engine.world_state
 	var player: Dictionary = world_state.get("player", {})
@@ -415,55 +423,36 @@ func _update_side_panels() -> void:
 	var tasks_state: Dictionary = world_state.get("tasks", {})
 	var xinxing_tracker: Dictionary = world_state.get("xinxingTracker", {})
 
+	# ── 左侧：角色面板 ──
+	_update_character_panel(player, xinxing_tracker)
+	# ── 左侧：世界面板 ──
+	_update_world_panel(world_state, params)
+
+	# ── 右侧：调试/参考信息 ──
 	var lines: Array[String] = []
 
-	# ── 第一组：角色（能力 + 心性 + 资源）──
-	lines.append("═══ 角色 ═══")
-	lines.append(_build_ability_display_text())
-	lines.append(
-		"心性: %s | 稳健=%s  孤注=%s" % [
-			str(player.get("xinxing", 0)),
-			str(xinxing_tracker.get("steady_count", 0)),
-			str(xinxing_tracker.get("gamble_count", 0))
-		]
-	)
-	lines.append(
-		"hp=%s  energy=%s  gold=%s" % [
-			str(player.get("hp", 0)),
-			str(player.get("energy", 0)),
-			str(player.get("gold", 0))
-		]
-	)
+	# 当前事件元数据
+	if not _current_turn_result.is_empty():
+		lines.append("═══ 当前事件 ═══")
+		lines.append(_build_event_debug_text(_current_turn_result))
+		lines.append("")
 
-	# ── 第二组：关系 ──
+	# 关系
 	var affinity_text := _build_affinity_display_text()
 	if not affinity_text.is_empty():
-		lines.append("")
 		lines.append("═══ 关系 ═══")
 		lines.append(affinity_text)
+		lines.append("")
 
-	# ── 第三组：世界 ──
-	lines.append("")
-	lines.append("═══ 世界 ═══")
-	lines.append("回合: %s  地点: %s" % [
-		str(world_state.get("turn", 0)),
-		str(world_state.get("currentLocationId", ""))
-	])
-	lines.append(
-		"danger=%s  prosperity=%s  morale=%s" % [
-			str(params.get("danger", 0)),
-			str(params.get("prosperity", 0)),
-			str(params.get("morale", 0))
-		]
-	)
-	# 标记：遍历所有 flag 键值，避免硬编码
+	# 运行态与标记
+	lines.append("═══ 运行态 ═══")
 	var flag_parts: Array[String] = []
 	for flag_key in flags.keys():
 		flag_parts.append("%s=%s" % [str(flag_key), str(flags[flag_key])])
 	if not flag_parts.is_empty():
 		lines.append("标记: %s" % "  ".join(flag_parts))
 	lines.append(
-		"运行态: status=%s  ending=%s  finished_turn=%s" % [
+		"status=%s  ending=%s  finished_turn=%s" % [
 			str(run_state.get("status", "")),
 			str(run_state.get("endingEventId", "")),
 			str(run_state.get("finishedTurn", 0))
@@ -474,25 +463,56 @@ func _update_side_panels() -> void:
 	if typeof(chain_context) == TYPE_DICTIONARY and chain_context != null:
 		lines.append("链上下文: %s" % JSON.stringify(chain_context))
 
-	# ── 第四组：任务 ──
+	# 任务明细
 	lines.append("")
 	lines.append(_build_task_debug_text(task_config, tasks_state))
 
-	# ── 第五组：历史 ──
+	# 最近历史
 	lines.append("")
 	lines.append("═══ 最近历史 ═══")
 	lines.append(", ".join(_history_to_string_array(history)))
 
 	world_state_label.text = "\n".join(lines)
-	# 说明：文本刷新后延迟一帧再复位滚动，避免 RichTextLabel 重排后覆盖滚动位置。
 	world_state_label.call_deferred("scroll_to_line", 0)
 	log_label.text = "\n".join(_event_logs)
 
 
+# 功能：更新左侧角色面板。
+# 说明：用紧凑的两行展示资源和四维能力，心性单独标注。
+func _update_character_panel(player: Dictionary, xinxing_tracker: Dictionary) -> void:
+	var xinxing := int(player.get("xinxing", 0))
+	var steady := int(xinxing_tracker.get("steady_count", 0))
+	var gamble := int(xinxing_tracker.get("gamble_count", 0))
+	var hp := int(player.get("hp", 0))
+	var energy := int(player.get("energy", 0))
+	var gold := int(player.get("gold", 0))
+
+	var line1 := "生命 %d    精力 %d    金币 %d    ┃    心性 %d（稳健%d / 孤注%d）" % [
+		hp, energy, gold, xinxing, steady, gamble
+	]
+	var line2 := _build_ability_display_text()
+	character_label.text = "%s\n%s" % [line1, line2]
+
+
+# 功能：更新左侧世界面板。
+# 说明：回合、地点与三大参数紧凑排列，一眼可读。
+func _update_world_panel(world_state: Dictionary, params: Dictionary) -> void:
+	var turn := int(world_state.get("turn", 0))
+	var location := str(world_state.get("currentLocationId", ""))
+	var danger := int(params.get("danger", 0))
+	var prosperity := int(params.get("prosperity", 0))
+	var morale := int(params.get("morale", 0))
+
+	world_label.text = "回合 %d    地点 %s    ┃    危险 %d    繁荣 %d    士气 %d" % [
+		turn, location, danger, prosperity, morale
+	]
+
+
 # 功能：构建四大能力的展示文本，包含原始值和鉴定阶段。
+# 说明：用紧凑的 "名称 数值·阶段N" 格式，横向排列四个能力。
 func _build_ability_display_text() -> String:
 	if _engine.player_role_state == null:
-		return "能力: 无 RoleState"
+		return "能力数据缺失"
 	var role: RoleState = _engine.player_role_state
 	var thresholds: Array = _engine.get_assessment_thresholds()
 	var ability_keys := ["aptitude", "physique", "craft", "insight"]
@@ -501,8 +521,8 @@ func _build_ability_display_text() -> String:
 	for key in ability_keys:
 		var value := int(role.get_attribute(key, 0))
 		var stage := RuleEngine.get_ability_stage(value, thresholds)
-		parts.append("%s=%d(阶段%d)" % [str(ability_names.get(key, key)), value, stage])
-	return "  ".join(parts)
+		parts.append("%s %d · 阶段%d" % [str(ability_names.get(key, key)), value, stage])
+	return "    ".join(parts)
 
 
 # 功能：构建关系面板展示文本。
@@ -825,13 +845,112 @@ func _clear_option_list() -> void:
 		child.queue_free()
 
 
+# 功能：对动态创建的选项按钮施加统一样式。
+# 说明：设置最小高度、自动换行和内边距，确保选项区视觉一致且可读。
+func _style_option_button(button: Button, accent: bool = false) -> void:
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	button.custom_minimum_size.y = 54
+	# 对齐方式：文本左对齐，更易阅读
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	# 内边距：通过 StyleBox 覆盖实现
+	var style_normal := StyleBoxFlat.new()
+	style_normal.bg_color = Color(0.18, 0.20, 0.25, 1.0) if not accent else Color(0.22, 0.18, 0.30, 1.0)
+	style_normal.corner_radius_top_left = 6
+	style_normal.corner_radius_top_right = 6
+	style_normal.corner_radius_bottom_left = 6
+	style_normal.corner_radius_bottom_right = 6
+	style_normal.content_margin_left = 14
+	style_normal.content_margin_right = 14
+	style_normal.content_margin_top = 10
+	style_normal.content_margin_bottom = 10
+	button.add_theme_stylebox_override("normal", style_normal)
+	# hover 态
+	var style_hover := style_normal.duplicate()
+	style_hover.bg_color = Color(0.26, 0.28, 0.34, 1.0) if not accent else Color(0.30, 0.24, 0.40, 1.0)
+	button.add_theme_stylebox_override("hover", style_hover)
+	# pressed 态
+	var style_pressed := style_normal.duplicate()
+	style_pressed.bg_color = Color(0.14, 0.16, 0.20, 1.0) if not accent else Color(0.18, 0.14, 0.26, 1.0)
+	button.add_theme_stylebox_override("pressed", style_pressed)
+	# disabled 态：更明显的灰暗
+	var style_disabled := style_normal.duplicate()
+	style_disabled.bg_color = Color(0.12, 0.12, 0.14, 0.7)
+	button.add_theme_stylebox_override("disabled", style_disabled)
+	button.add_theme_color_override("font_disabled_color", Color(0.45, 0.45, 0.50, 1.0))
+
+
+# 功能：在选项列表中动态创建"继续"按钮，复用统一样式。
+# 说明：替代场景中静态 ContinueButton，使继续操作与选项按钮视觉一致。
+func _add_continue_button_to_option_list(label_text: String) -> void:
+	var btn := Button.new()
+	btn.text = label_text
+	btn.pressed.connect(_on_continue_button_pressed)
+	_style_option_button(btn)
+	option_list.add_child(btn)
+
+
+# 功能：在选项列表中插入分隔标签。
+# 说明：用于区分普通选项和特殊入口（押注、孤注一掷等）。
+func _add_option_section_label(text: String) -> void:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 13)
+	label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.65, 1.0))
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	option_list.add_child(label)
+
+
 # 功能：添加选项区域提示文本。
-# 说明：用于展示“无可见选项”等状态说明。
+# 说明：用于展示”无可见选项”等状态说明。
 func _add_option_hint(text: String) -> void:
 	var hint_label := Label.new()
 	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint_label.text = text
+	hint_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.55, 1.0))
 	option_list.add_child(hint_label)
+
+
+# 功能：初始化左侧叠加层各区域的半透明样式。
+# 说明：所有覆盖在背景图上的面板统一使用半透明深色底 + 圆角，确保在图上可读。
+func _setup_overlay_styles() -> void:
+	# 通用半透明面板样式工厂
+	var base_panel_style := StyleBoxFlat.new()
+	base_panel_style.bg_color = Color(0.05, 0.05, 0.08, 0.65)
+	base_panel_style.corner_radius_top_left = 8
+	base_panel_style.corner_radius_top_right = 8
+	base_panel_style.corner_radius_bottom_left = 8
+	base_panel_style.corner_radius_bottom_right = 8
+	base_panel_style.content_margin_left = 14
+	base_panel_style.content_margin_right = 14
+	base_panel_style.content_margin_top = 10
+	base_panel_style.content_margin_bottom = 10
+
+	# 角色面板
+	character_panel.add_theme_stylebox_override("panel", base_panel_style)
+	character_label.add_theme_color_override("font_color", Color(0.92, 0.90, 0.82, 0.95))
+	character_label.add_theme_font_size_override("font_size", 13)
+
+	# 世界面板
+	var world_style: StyleBoxFlat = base_panel_style.duplicate()
+	world_style.bg_color = Color(0.04, 0.06, 0.10, 0.60)
+	world_panel.add_theme_stylebox_override("panel", world_style)
+	world_label.add_theme_color_override("font_color", Color(0.80, 0.85, 0.92, 0.90))
+	world_label.add_theme_font_size_override("font_size", 13)
+
+	# 叙事面板
+	var narrative_style: StyleBoxFlat = base_panel_style.duplicate()
+	narrative_style.bg_color = Color(0.0, 0.0, 0.0, 0.6)
+	narrative_style.content_margin_left = 16
+	narrative_style.content_margin_right = 16
+	narrative_style.content_margin_top = 12
+	narrative_style.content_margin_bottom = 12
+	narrative_panel.add_theme_stylebox_override("panel", narrative_style)
+	event_title_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.95))
+	event_detail_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.90, 0.9))
+
+	# 选项区标题
+	option_header_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95, 0.9))
 
 
 # 功能：渲染当前事件背景图。
