@@ -31,22 +31,26 @@ jobs:
 
       - name: Setup export templates
         run: |
-          # GitHub Actions 容器中 HOME 可能是 /github/home 而非 /root，
-          # 两个路径都写入，确保 Godot 能找到模板。
-          for dest in "$HOME/.local/share/godot/export_templates/4.5.1.stable" "/root/.local/share/godot/export_templates/4.5.1.stable"; do
-            mkdir -p "$dest"
-            cp -r /root/.local/share/godot/templates/* "$dest/" 2>/dev/null || true
-          done
-          # 列出模板文件，便于调试
-          echo "=== Templates in HOME ==="
-          ls -la "$HOME/.local/share/godot/export_templates/4.5.1.stable/" || true
+          # 列出镜像中实际的模板文件位置，便于调试
+          echo "=== /root/.local/share/godot/ ==="
+          find /root/.local/share/godot/ -name "*.zip" 2>/dev/null || echo "(none)"
+          # 确保模板目录结构正确
+          mkdir -p /root/.local/share/godot/export_templates/4.5.1.stable
+          # 镜像可能把模板放在 templates/ 而非 export_templates/4.5.1.stable/
+          cp /root/.local/share/godot/templates/* /root/.local/share/godot/export_templates/4.5.1.stable/ 2>/dev/null || true
+          echo "=== Final templates ==="
+          ls -la /root/.local/share/godot/export_templates/4.5.1.stable/ || true
 
       - name: Import project
+        env:
+          HOME: /root
         run: |
           godot --headless --import 2>&1 || true
         timeout-minutes: 2
 
       - name: Export Web
+        env:
+          HOME: /root
         run: |
           mkdir -p output
           godot --headless --export-release "Web" output/index.html 2>&1
