@@ -12,6 +12,8 @@ var _engine: WorldEventEngine
 var _event_logs: Array[String] = []
 var _current_turn_result: Dictionary = {}
 var _resizing := false              # 防止窗口尺寸调整时递归触发
+# 主动押注切换状态：按选项 ID 记录各选项的押注模式（true=押注，false=默认）。
+var _bet_mode_options: Dictionary = {}
 
 @onready var screen_background: TextureRect = $ScreenBackground
 @onready var root_margin: MarginContainer = $Root
@@ -92,6 +94,9 @@ func _render_current_event(turn_result: Dictionary) -> void:
 	var presentation: Dictionary = turn_result.get("presentation", {})
 	var presentation_item: Dictionary = presentation.get("current_item", {})
 	var awaiting_choice := phase == "choice"
+	# 进入新的选择阶段时重置各选项的押注切换状态
+	if phase != "choice":
+		_bet_mode_options.clear()
 
 	_render_event_background(str(turn_result.get("resolved_background_art", "")))
 	_set_end_screen_visible(false)
@@ -129,40 +134,34 @@ func _render_current_event(turn_result: Dictionary) -> void:
 		_render_risk_entry_buttons("孤注一掷：接受", "孤注一掷：放弃")
 		return
 
-	# 心性风险入口：主动押注
+	# 安全兜底：若引擎意外返回 preemptive_bet phase（正常流程由链式调用处理，不应到达此处），
+	# 自动放弃押注并继续结算，避免 UI 卡死。
 	if phase == "preemptive_bet":
-		var bet_info := _build_preemptive_bet_info()
-		status_label.text = "心性 -2 可发动主动押注。"
-		var can_afford := bool(bet_info.get("can_afford", true))
-		_render_preemptive_bet_buttons(can_afford, bet_info)
+		push_warning("preemptive_bet phase 未被链式调用消费，自动放弃押注。")
+		var fallback_result := _engine.confirm_pending_turn("reject")
+		_handle_resolved_turn_result(fallback_result, "自动放弃押注（兜底）")
 		return
 
 	if awaiting_choice:
-		status_label.text = "等待选择：点击下方任一可用选项。"
+		# 获取完整选项定义（含 check/cost/preemptiveBet）和心性风险配置。
+		var risk_profile: Dictionary = turn_result.get("xinxing_risk_profile", {})
+		var full_options := _get_full_option_defs_for_current_event()
+		var any_bet_available := false
+		for opt in full_options:
+			if _can_option_trigger_bet(opt, risk_profile):
+				any_bet_available = true
+				break
+		if any_bet_available:
+			status_label.text = "等待选择：可切换主动押注模式获得额外鉴定骰。"
+		else:
+			status_label.text = "等待选择：点击下方任一可用选项。"
+		_render_choice_options(full_options, risk_profile)
 	else:
 		status_label.text = "当前事件待确认，点击继续后结算并预览下一个事件。"
 		_add_continue_button_to_option_list("确认结算，进入下一个事件")
 
-	var visible_count := 0
-	for option_variant in options:
-		var option_def: Dictionary = option_variant
-		var state := str(option_def.get("state", "disabled"))
-		if state == "invisible":
-			continue
 
-		visible_count += 1
-		var option_button := Button.new()
-		option_button.text = _build_option_button_text(option_def)
-		option_button.disabled = state != "selectable"
-		option_button.pressed.connect(_on_option_pressed.bind(str(option_def.get("id", ""))))
-		_style_option_button(option_button)
-		option_list.add_child(option_button)
-
-	if visible_count == 0:
-		_add_option_hint("当前事件没有可见选项。")
-
-
-# 功能：渲染心性风险入口的接受/放弃按钮对。
+# 功能：渲染心性风险入口的接受/放弃按钮对（孤注一掷专用）。
 # 说明：两个按钮分别绑定 "accept" 和 "reject"，走正常的 confirm_pending_turn 分流。
 func _render_risk_entry_buttons(accept_text: String, reject_text: String) -> void:
 	_add_option_section_label("— 心性风险入口 —")
@@ -180,16 +179,47 @@ func _render_risk_entry_buttons(accept_text: String, reject_text: String) -> voi
 	option_list.add_child(reject_button)
 
 
-# 功能：构建主动押注的完整信息摘要（消耗、调整、是否可负担）。
-# 说明：合并选项原有 cost 与押注额外 cost，同名字段累加显示总消耗。
-func _build_preemptive_bet_info() -> Dictionary:
-	var pending := _engine._pending_turn_context
-	var selected_option: Dictionary = pending.get("selected_option", {})
-	var option_cost: Dictionary = selected_option.get("cost", {})
-	var option_bet_cfg: Dictionary = selected_option.get("preemptiveBet", {})
-	if typeof(option_bet_cfg) != TYPE_DICTIONARY:
-		option_bet_cfg = {}
-	var effective_bet: Dictionary = _engine._merge_preemptive_bet_config(option_bet_cfg)
+# 功能：从引擎内部获取当前事件的完整选项定义列表（含 check/cost/preemptiveBet）。
+# 说明：UI 展示消耗与押注信息需要这些字段，公开 API 的简版结构不包含。
+func _get_full_option_defs_for_current_event() -> Array:
+	var event_id := str(_current_turn_result.get("event_id", ""))
+	var event_def: Dictionary = _engine._event_map.get(event_id, {})
+	var choice_point_id := str(event_def.get("choicePointId", "")).strip_edges()
+	if choice_point_id.is_empty():
+		return []
+	var choice_point_def: Dictionary = _engine._choice_point_map.get(choice_point_id, {})
+	if choice_point_def.is_empty():
+		return []
+	return _engine._build_option_set(choice_point_def)
+
+
+# 功能：判断某个选项是否满足主动押注触发条件。
+# 说明：条件与引擎 _apply_option_resolution 中一致：心性允许、选项含鉴定、未被 disabled。
+func _can_option_trigger_bet(option_def: Dictionary, risk_profile: Dictionary) -> bool:
+	if not bool(risk_profile.get("allow_preemptive_bet", false)):
+		return false
+	var check_raw: Variant = option_def.get("check", null)
+	if typeof(check_raw) != TYPE_DICTIONARY or (check_raw as Dictionary).is_empty():
+		return false
+	var bet_cfg: Variant = option_def.get("preemptiveBet", null)
+	var bet_disabled: bool = (typeof(bet_cfg) == TYPE_DICTIONARY and bool(bet_cfg.get("disabled", false)))
+	if bet_disabled:
+		return false
+	if str(option_def.get("state", "disabled")) != "selectable":
+		return false
+	return true
+
+
+# 功能：为指定选项构建主动押注信息（消耗、调整、是否可负担）。
+# 说明：在 choice 阶段调用，读取选项定义和引擎全局默认合并后返回展示数据。
+func _build_bet_info_for_option(option_def: Dictionary) -> Dictionary:
+	var option_cost_raw: Variant = option_def.get("cost", null)
+	var option_cost: Dictionary = option_cost_raw if typeof(option_cost_raw) == TYPE_DICTIONARY else {}
+	var option_bet_cfg: Variant = option_def.get("preemptiveBet", null)
+	var bet_cfg_dict: Dictionary = {}
+	if typeof(option_bet_cfg) == TYPE_DICTIONARY:
+		bet_cfg_dict = option_bet_cfg
+	var effective_bet: Dictionary = _engine._merge_preemptive_bet_config(bet_cfg_dict)
 	var bet_cost: Dictionary = effective_bet.get("cost", {})
 	var bet_bias: Dictionary = effective_bet.get("bias", {})
 
@@ -222,38 +252,183 @@ func _build_preemptive_bet_info() -> Dictionary:
 		bias_parts.append("+%d 鉴定骰" % success_bias if success_bias > 0 else "%d 鉴定骰" % success_bias)
 	var bias_text := "无" if bias_parts.is_empty() else "、".join(bias_parts)
 
-	# 精力够不够
 	var can_afford: bool = _engine._can_pay_bet_cost(bet_cost)
 
-	return {"can_afford": can_afford, "cost_text": cost_text, "bias_text": bias_text, "total_cost": total_cost, "bet_cost": bet_cost, "bet_bias": bet_bias}
+	return {"can_afford": can_afford, "cost_text": cost_text, "bias_text": bias_text}
 
 
-# 功能：渲染主动押注的接受/放弃按钮，按钮上显示消耗与调整详情，精力不足时禁用接受按钮。
-func _render_preemptive_bet_buttons(can_afford: bool, bet_info: Dictionary) -> void:
-	_add_option_section_label("— 主动押注 —")
+# 功能：渲染选择阶段的选项列表，含鉴定选项支持默认/押注模式切换。
+# 说明：遍历完整选项定义，对满足押注条件的选项渲染切换组件，其余渲染普通按钮。
+func _render_choice_options(full_options: Array, risk_profile: Dictionary) -> void:
+	var visible_count := 0
+	for option_variant in full_options:
+		var option_def: Dictionary = option_variant
+		var state := str(option_def.get("state", "disabled"))
+		if state == "invisible":
+			continue
 
-	var cost_text := str(bet_info.get("cost_text", ""))
-	var bias_text := str(bet_info.get("bias_text", ""))
-	# 接受按钮：分行展示消耗和调整，结构更清晰
-	var accept_lines: Array[String] = ["主动押注：接受"]
-	accept_lines.append("    消耗: %s" % cost_text)
-	accept_lines.append("    调整: %s" % bias_text)
-	if not can_afford:
-		accept_lines.append("    ⚠ 精力不足，无法发动")
-	var accept_label := "\n".join(accept_lines)
+		visible_count += 1
+		var option_id := str(option_def.get("id", ""))
+		var can_bet := _can_option_trigger_bet(option_def, risk_profile)
 
-	var accept_button := Button.new()
-	accept_button.text = accept_label
-	accept_button.disabled = not can_afford
-	accept_button.pressed.connect(_on_option_pressed.bind("accept"))
-	_style_option_button(accept_button, true)
-	option_list.add_child(accept_button)
+		if can_bet:
+			# 该选项支持主动押注，渲染带切换的选项组
+			_render_option_with_bet_toggle(option_def, risk_profile)
+		else:
+			# 普通选项按钮
+			var option_button := Button.new()
+			option_button.text = _build_option_button_text(option_def)
+			option_button.disabled = state != "selectable"
+			option_button.pressed.connect(_on_option_pressed.bind(option_id))
+			_style_option_button(option_button)
+			option_list.add_child(option_button)
 
-	var reject_button := Button.new()
-	reject_button.text = "主动押注：放弃"
-	reject_button.pressed.connect(_on_option_pressed.bind("reject"))
-	_style_option_button(reject_button)
-	option_list.add_child(reject_button)
+	if visible_count == 0:
+		_add_option_hint("当前事件没有可见选项。")
+
+
+# 功能：渲染单个支持主动押注的选项 — 根据当前切换状态显示默认或押注版本。
+# 说明：选项按钮和切换按钮作为一组，切换时只重新渲染整个选项列表。
+func _render_option_with_bet_toggle(option_def: Dictionary, _risk_profile: Dictionary) -> void:
+	var option_id := str(option_def.get("id", ""))
+	var option_text := str(option_def.get("text", ""))
+	var cost_raw: Variant = option_def.get("cost", null)
+	var option_cost: Dictionary = cost_raw if typeof(cost_raw) == TYPE_DICTIONARY else {}
+	var is_bet_mode: bool = bool(_bet_mode_options.get(option_id, false))
+
+	if is_bet_mode:
+		# 押注模式：显示合并消耗和调整
+		var bet_info := _build_bet_info_for_option(option_def)
+		var can_afford := bool(bet_info.get("can_afford", true))
+		var cost_text := str(bet_info.get("cost_text", ""))
+		var bias_text := str(bet_info.get("bias_text", ""))
+		var lines: Array[String] = [option_text]
+		lines.append("    消耗: %s" % cost_text)
+		lines.append("    调整: %s" % bias_text)
+		if not can_afford:
+			lines.append("    精力不足，无法发动押注")
+
+		var confirm_button := Button.new()
+		confirm_button.text = "\n".join(lines)
+		confirm_button.disabled = not can_afford
+		confirm_button.pressed.connect(_on_option_with_bet_pressed.bind(option_id, "accept"))
+		_style_option_button(confirm_button, true)
+		option_list.add_child(confirm_button)
+
+		# 切换按钮：回到默认模式
+		var toggle_button := Button.new()
+		toggle_button.text = "切换为默认鉴定"
+		toggle_button.pressed.connect(_on_bet_toggle_for_option.bind(option_id))
+		_style_bet_toggle_button(toggle_button)
+		option_list.add_child(toggle_button)
+	else:
+		# 默认模式：显示原始选项消耗
+		var lines: Array[String] = [option_text]
+		if not option_cost.is_empty():
+			var cost_parts: Array[String] = []
+			for key in option_cost.keys():
+				cost_parts.append("%s %d" % [str(key), int(option_cost[key])])
+			lines.append("    消耗: %s" % "、".join(cost_parts))
+		lines.append("    %s" % _build_option_state_text(option_def))
+
+		var confirm_button := Button.new()
+		confirm_button.text = "\n".join(lines)
+		confirm_button.pressed.connect(_on_option_with_bet_pressed.bind(option_id, "reject"))
+		_style_option_button(confirm_button)
+		option_list.add_child(confirm_button)
+
+		# 切换按钮：进入押注模式
+		var toggle_button := Button.new()
+		toggle_button.text = "切换为主动押注"
+		toggle_button.pressed.connect(_on_bet_toggle_for_option.bind(option_id))
+		_style_bet_toggle_button(toggle_button)
+		option_list.add_child(toggle_button)
+
+
+# 功能：构建选项状态辅助文本（可选/不可选 + ID）。
+func _build_option_state_text(option_def: Dictionary) -> String:
+	var state := str(option_def.get("state", "disabled"))
+	var id := str(option_def.get("id", ""))
+	var state_marker := "● 可选" if state == "selectable" else "○ 不可选"
+	return "%s    [%s]" % [state_marker, id]
+
+
+# 功能：处理带押注决策的选项点击。
+# 说明：链式调用引擎 — 先提交选项选择，引擎挂起到 preemptive_bet phase 后
+#       立即自动提交押注决策（accept/reject），一步完成选项结算。
+func _on_option_with_bet_pressed(option_id: String, bet_decision: String) -> void:
+	if _current_turn_result.is_empty():
+		status_label.text = "当前没有待处理的事件选择。"
+		return
+
+	# 第一步：提交选项选择 → 引擎扣 cost、挂起到 preemptive_bet phase
+	var mid_result := _engine.confirm_pending_turn(option_id)
+	if not mid_result.get("ok", false):
+		status_label.text = "选项结算失败: %s" % str(mid_result.get("error", "unknown"))
+		_update_side_panels()
+		return
+
+	# 确认引擎已进入 preemptive_bet phase
+	var mid_phase := str(mid_result.get("phase", ""))
+	if mid_phase != "preemptive_bet":
+		# 未挂起（可能条件不满足），直接按普通结算处理
+		var choice: Dictionary = mid_result.get("choice", {})
+		var resolved_log := "已选择 %s -> %s | %s" % [
+			str(choice.get("selected_option_id", "")),
+			str(mid_result.get("event_id", "")),
+			str(mid_result.get("title", ""))
+		]
+		_handle_resolved_turn_result(mid_result, resolved_log)
+		return
+
+	# 第二步：立即提交押注决策 → 引擎执行检定并完成结算
+	var turn_result := _engine.confirm_pending_turn(bet_decision)
+	if not turn_result.get("ok", false):
+		status_label.text = "押注结算失败: %s" % str(turn_result.get("error", "unknown"))
+		_update_side_panels()
+		return
+
+	var choice: Dictionary = turn_result.get("choice", {})
+	var bet_label := "押注" if bet_decision == "accept" else "默认"
+	var resolved_log := "已选择 %s [%s] -> %s | %s" % [
+		str(choice.get("selected_option_id", "")),
+		bet_label,
+		str(turn_result.get("event_id", "")),
+		str(turn_result.get("title", ""))
+	]
+	_handle_resolved_turn_result(turn_result, resolved_log)
+
+
+# 功能：处理单个选项的押注模式切换按钮点击。
+# 说明：翻转该选项的 _bet_mode_options 状态后重新渲染当前事件界面。
+func _on_bet_toggle_for_option(option_id: String) -> void:
+	var current: bool = bool(_bet_mode_options.get(option_id, false))
+	_bet_mode_options[option_id] = not current
+	_render_current_event(_current_turn_result)
+
+
+# 功能：为押注切换按钮施加区别于普通选项的样式。
+# 说明：较小高度、次要色调，视觉上与主操作按钮区分。
+func _style_bet_toggle_button(button: Button) -> void:
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.custom_minimum_size.y = 36
+	button.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.25, 0.25, 0.30, 0.8)
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.content_margin_top = 6
+	style.content_margin_bottom = 6
+	button.add_theme_stylebox_override("normal", style)
+	var hover := style.duplicate()
+	hover.bg_color = Color(0.30, 0.30, 0.38, 0.9)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_color_override("font_color", Color(0.75, 0.75, 0.80, 1.0))
+	button.add_theme_font_size_override("font_size", 14)
 
 
 # 功能：构建鉴定结果摘要文本，用于追加到事件详情区。
