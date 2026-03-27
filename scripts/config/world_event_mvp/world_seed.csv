@@ -27,3 +27,7 @@ affinity,player->npc_mentor,,score,20
 affinity,npc_mentor->player,,score,15
 affinity,player->npc_rival,,score,-10
 affinity,npc_rival->player,,score,-30
+reflection_config,,,op_limit,1
+reflection_config,,,trust_delta_positive,5
+reflection_config,,,trust_delta_negative,-5
+reflection_config,,,recommend_count,3

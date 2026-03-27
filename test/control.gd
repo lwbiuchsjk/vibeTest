@@ -10,6 +10,7 @@ const WorldEndMilestone3SmokeTest := preload("res://test/smoke/world_end_milesto
 const WorldEndMilestone4SmokeTest := preload("res://test/smoke/world_end_milestone_4_smoke_test.gd")
 const XinxingPhase2SmokeTest := preload("res://test/smoke/xinxing_phase2_smoke_test.gd")
 const RelationshipPhase3SmokeTest := preload("res://test/smoke/relationship_phase3_smoke_test.gd")
+const ReflectionPhase4SmokeTest := preload("res://test/smoke/reflection_phase4_smoke_test.gd")
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 
 
@@ -69,6 +70,10 @@ func _ready() -> void:
 	# 功能：输出第三阶段关系接入鉴定冒烟测试结果。
 	var relationship_phase3_result: Dictionary = RelationshipPhase3SmokeTest.run_all()
 	print("[RelationshipPhase3] %s" % JSON.stringify(relationship_phase3_result))
+
+	# 功能：输出第四阶段玩家自省与关系调整冒烟测试结果。
+	var reflection_phase4_result: Dictionary = ReflectionPhase4SmokeTest.run_all()
+	print("[ReflectionPhase4] %s" % JSON.stringify(reflection_phase4_result))
 
 	# 说明：执行 MVP 世界事件回归测试并输出摘要。
 	var mvp_result: Dictionary = MvpWorldEventSmokeTest.run_from_csv()

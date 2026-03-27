@@ -210,6 +210,11 @@ static func _assemble_world_state(tables: Dictionary) -> Dictionary:
 				var affinity_config: Dictionary = world_state.get("affinityConfig", {})
 				affinity_config[key] = _to_int(value_text, 0)
 				world_state["affinityConfig"] = affinity_config
+			"reflection_config":
+				# 说明：自省系统配置（操作限额、调整刻度、推荐数量），写入 reflectionConfig 字典。
+				var reflection_config: Dictionary = world_state.get("reflectionConfig", {})
+				reflection_config[key] = _to_int(value_text, 0)
+				world_state["reflectionConfig"] = reflection_config
 			"affinity":
 				# 说明：初始关系分值配置。scope_a 为 "from->to" 格式，key 固定为 "score"。
 				if scope_a.is_empty() or key != "score":

@@ -12,6 +12,8 @@ var location_id: String
 var portrait_file: String
 var attributes: Dictionary
 var resources: Dictionary
+# 玩家关注的 NPC ID 列表。空列表视为关注所有 NPC。仅玩家角色使用。
+var focusing_npcs: Array = []
 
 # 初始化角色数据。字典会深拷贝，避免外部引用污染内部状态。
 func _init(
@@ -30,6 +32,7 @@ func _init(
 	portrait_file = p_portrait_file.strip_edges()
 	attributes = p_attributes.duplicate(true)
 	resources = p_resources.duplicate(true)
+	focusing_npcs = []
 
 func has_portrait() -> bool:
 	return not portrait_file.is_empty()
@@ -59,6 +62,29 @@ func get_xinxing() -> int:
 # xinxing 的值域约束属于数据不变量，由数据模型自身负责维护。
 func set_xinxing(value: int) -> void:
 	attributes["xinxing"] = clampi(value, -2, 2)
+
+# 功能：初始化关注列表。
+# 说明：抽象为独立方法，便于后续扩展初始化策略。当前默认传入空列表。
+func init_focusing_npcs(npc_list: Array = []) -> void:
+	focusing_npcs = npc_list.duplicate()
+
+# 功能：判断玩家是否关注指定 NPC。
+# 说明：空列表视为关注所有 NPC，保持向后兼容。
+func is_focusing(npc_id: String) -> bool:
+	if focusing_npcs.is_empty():
+		return true
+	return focusing_npcs.has(npc_id)
+
+# 功能：切换指定 NPC 的关注状态。
+# 说明：已关注则取消，未关注则添加。返回切换后的关注状态。
+func toggle_focus(npc_id: String) -> bool:
+	var idx := focusing_npcs.find(npc_id)
+	if idx >= 0:
+		focusing_npcs.remove_at(idx)
+		return false
+	else:
+		focusing_npcs.append(npc_id)
+		return true
 
 # 获取属性值；当键不存在时返回默认值（默认1）。
 func get_attribute(key: String, default_value: int = 1) -> int:
@@ -118,12 +144,13 @@ func to_dict() -> Dictionary:
 		"location_id": location_id,
 		"portrait_file": portrait_file,
 		"attributes": attributes.duplicate(true),
-		"resources": resources.duplicate(true)
+		"resources": resources.duplicate(true),
+		"focusing_npcs": focusing_npcs.duplicate()
 	}
 
 # 从 Dictionary 快照反序列化为 RoleState。
 static func from_dict(data: Dictionary) -> RoleState:
-	return RoleState.new(
+	var state := RoleState.new(
 		str(data.get("role_id", "")),
 		str(data.get("role_type", "npc")),
 		str(data.get("display_name", "")),
@@ -132,6 +159,10 @@ static func from_dict(data: Dictionary) -> RoleState:
 		data.get("attributes", {}),
 		data.get("resources", {})
 	)
+	# 还原关注列表；缺省时保持空列表（视为关注所有 NPC）
+	var focusing: Array = data.get("focusing_npcs", [])
+	state.init_focusing_npcs(focusing)
+	return state
 
 static func _load_texture_from_file(path: String) -> Texture2D:
 	if not FileAccess.file_exists(path):

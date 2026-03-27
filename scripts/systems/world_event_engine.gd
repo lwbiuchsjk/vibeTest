@@ -37,6 +37,12 @@ var _affinity_thresholds: Dictionary = {}
 var _last_check_result: Dictionary = {}
 # 最近一次结算的关系变化记录，供 payload 透传给 UI 消费。
 var _last_affinity_changes: Array = []
+# 周期级累积关系变动记录，跨事件保留，仅在自省结算后清空。
+var _cycle_affinity_changes: Array = []
+# 自省系统配置（操作限额、调整刻度、推荐数量），从 world_seed reflectionConfig 加载。
+var _reflection_config: Dictionary = {}
+# 自省操作已使用次数，自省开始时重置为0。
+var _reflection_ops_used: int = 0
 # 最近一次心性转移记录（{old_value, new_value}），无转移时为空字典。
 var _last_xinxing_transition: Dictionary = {}
 # 主动押注全局默认配置：cost 为额外代价（叠加在选项 cost 之上），bias 为鉴定加骰。
@@ -180,6 +186,8 @@ func load_from_data(data: Dictionary, location_graph: Variant = null, role_state
 	_ensure_xinxing_tracker()
 	# 初始化关系系统：加载五档阈值配置和初始关系分值。
 	_init_affinity_system()
+	# 初始化自省系统配置。
+	_init_reflection_config()
 	return {"ok": true}
 
 # 功能：预览下一回合事件，但不立即结算。
@@ -1823,14 +1831,22 @@ func _apply_affinity_deltas(deltas: Array) -> void:
 			"delta": delta_value, "old_score": current,
 			"new_score": new_score, "new_tier": new_tier
 		})
+		# 同步追加到周期级累积记录，供自省系统汇总推荐。
+		_cycle_affinity_changes.append({
+			"from": from_id, "to": to_id,
+			"delta": delta_value, "old_score": current,
+			"new_score": new_score, "new_tier": new_tier
+		})
 		print("[关系] %s->%s: %d → %d (delta: %+d, tier: %s)" % [
 			from_id, to_id, current, new_score, delta_value, new_tier
 		])
 
 # 功能：判断玩家是否关注指定 NPC。
-# 说明：当前版本默认返回 true（关注所有 NPC），后续可接入关注列表或事件上下文。
+# 说明：读取玩家关注列表；player_role_state 为 null 时兜底返回 true（全部关注）。
 func _is_player_focusing(npc_id: String) -> bool:
-	return true
+	if player_role_state == null:
+		return true
+	return player_role_state.is_focusing(npc_id)
 
 # 功能：检查并触发 -2 阶段关系回响。
 # 说明：遍历 check_result 中的 relationship_details，对每个 NPC 调用 _apply_relationship_echo。
@@ -1890,9 +1906,17 @@ func _apply_relationship_echo(
 	# 执行 NPC→玩家关系变化
 	var current := _affinity_map.get_score(npc_id, "player")
 	var result := RuleEngine.apply_affinity_delta(current, echo_delta, _affinity_thresholds)
-	_affinity_map.set_score(npc_id, "player", int(result.get("score", 0)))
+	var echo_new_score: int = int(result.get("score", 0))
+	var echo_new_tier: String = str(result.get("tier", ""))
+	_affinity_map.set_score(npc_id, "player", echo_new_score)
+	# 追加到周期级累积记录，供自省系统汇总推荐。
+	_cycle_affinity_changes.append({
+		"from": npc_id, "to": "player",
+		"delta": echo_delta, "old_score": current,
+		"new_score": echo_new_score, "new_tier": echo_new_tier
+	})
 	print("[关系回响] -2阶段 %s->player: %d → %d (echo_delta: %+d, tier: %s)" % [
-		npc_id, current, int(result.get("score", 0)), echo_delta, str(result.get("tier", ""))
+		npc_id, current, echo_new_score, echo_delta, echo_new_tier
 	])
 
 # 功能：应用 resolution，并衔接执行锁更新。
@@ -2589,3 +2613,128 @@ func _array_or_empty(value: Variant) -> Array:
 	if typeof(value) == TYPE_ARRAY and value != null:
 		return value
 	return []
+
+# ── 自省与关系调整系统 ──────────────────────────────────────────
+
+# 功能：初始化自省系统配置，从 world_state.reflectionConfig 加载。
+# 说明：缺省时使用默认值，保证系统在无配置时也能正常运行。
+func _init_reflection_config() -> void:
+	var raw: Dictionary = _dict_or_empty(world_state.get("reflectionConfig", {}))
+	_reflection_config = {
+		"op_limit": int(raw.get("op_limit", 1)),
+		"trust_delta_positive": int(raw.get("trust_delta_positive", 5)),
+		"trust_delta_negative": int(raw.get("trust_delta_negative", -5)),
+		"recommend_count": int(raw.get("recommend_count", 3)),
+	}
+	_reflection_ops_used = 0
+	print("[自省] reflectionConfig 已加载: %s" % str(_reflection_config))
+
+# 功能：清空周期级关系变动记录。
+# 说明：自省结算后调用。扩展预留：后续可支持部分保留、衰减等策略。
+func clear_cycle_affinity_changes() -> void:
+	_cycle_affinity_changes.clear()
+
+# 功能：获取自省推荐 NPC 列表。
+# 说明：从周期内累积变动中统计各 NPC 出现次数，按次数降序取前 recommend_count 个。
+#       "player" 本身不计入推荐。
+func get_reflection_recommended_npcs() -> Array:
+	# 统计各 NPC 涉及变动的次数（双向均计入）
+	var count_map: Dictionary = {}
+	for change_variant in _cycle_affinity_changes:
+		var change: Dictionary = change_variant
+		var from_id: String = str(change.get("from", ""))
+		var to_id: String = str(change.get("to", ""))
+		if not from_id.is_empty() and from_id != "player":
+			count_map[from_id] = int(count_map.get(from_id, 0)) + 1
+		if not to_id.is_empty() and to_id != "player":
+			count_map[to_id] = int(count_map.get(to_id, 0)) + 1
+	# 转换为数组，按次数降序排序
+	var npc_list: Array = []
+	for npc_id in count_map.keys():
+		npc_list.append({"npc_id": npc_id, "change_count": int(count_map[npc_id])})
+	npc_list.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a["change_count"]) > int(b["change_count"])
+	)
+	# 截断至推荐数量
+	var recommend_count := int(_reflection_config.get("recommend_count", 3))
+	if npc_list.size() > recommend_count:
+		npc_list = npc_list.slice(0, recommend_count)
+	return npc_list
+
+# 功能：获取关注切换候选 NPC 列表。
+# 说明：当前委托推荐方法，后续可独立筛选逻辑。
+func get_focus_candidates() -> Array:
+	return get_reflection_recommended_npcs()
+
+# 功能：获取信任调整候选 NPC 列表。
+# 说明：当前委托推荐方法，后续可独立筛选逻辑。
+func get_trust_adjust_candidates() -> Array:
+	return get_reflection_recommended_npcs()
+
+# 功能：获取玩家当前关注的 NPC ID 列表。
+# 说明：空列表表示关注所有 NPC。player_role_state 为 null 时返回空列表。
+func get_player_focusing_npcs() -> Array:
+	if player_role_state == null:
+		return []
+	return player_role_state.focusing_npcs.duplicate()
+
+# 功能：查询自省剩余操作次数。
+func get_reflection_ops_remaining() -> int:
+	var op_limit := int(_reflection_config.get("op_limit", 1))
+	return maxi(0, op_limit - _reflection_ops_used)
+
+# 功能：执行关注切换操作。
+# 说明：校验操作次数上限，切换玩家对指定 NPC 的关注状态，消耗 1 次操作次数。
+func reflection_toggle_focus(npc_id: String) -> Dictionary:
+	if get_reflection_ops_remaining() <= 0:
+		return {"success": false, "reason": "ops_limit_reached", "ops_remaining": 0}
+	if player_role_state == null:
+		return {"success": false, "reason": "no_player_role_state", "ops_remaining": 0}
+	var is_now_focusing: bool = player_role_state.toggle_focus(npc_id)
+	_reflection_ops_used += 1
+	print("[自省] 关注切换 %s → is_focusing=%s, ops_remaining=%d" % [
+		npc_id, str(is_now_focusing), get_reflection_ops_remaining()
+	])
+	return {
+		"success": true,
+		"npc_id": npc_id,
+		"is_focusing": is_now_focusing,
+		"ops_remaining": get_reflection_ops_remaining()
+	}
+
+# 功能：执行信任/警戒调整操作（玩家→NPC 方向）。
+# 说明：positive=true 正向信任，false 负向警戒。消耗 1 次操作次数。
+func reflection_adjust_trust(npc_id: String, positive: bool) -> Dictionary:
+	if get_reflection_ops_remaining() <= 0:
+		return {"success": false, "reason": "ops_limit_reached", "ops_remaining": 0}
+	if _affinity_map == null:
+		return {"success": false, "reason": "no_affinity_map", "ops_remaining": get_reflection_ops_remaining()}
+	# 根据方向选取刻度
+	var delta: int
+	if positive:
+		delta = int(_reflection_config.get("trust_delta_positive", 5))
+	else:
+		delta = int(_reflection_config.get("trust_delta_negative", -5))
+	var current := _affinity_map.get_score("player", npc_id)
+	var result := RuleEngine.apply_affinity_delta(current, delta, _affinity_thresholds)
+	var new_score: int = int(result.get("score", 0))
+	var new_tier: String = str(result.get("tier", ""))
+	_affinity_map.set_score("player", npc_id, new_score)
+	_reflection_ops_used += 1
+	print("[自省] 调整 player->%s: %d → %d (delta: %+d, tier: %s), ops_remaining=%d" % [
+		npc_id, current, new_score, delta, new_tier, get_reflection_ops_remaining()
+	])
+	return {
+		"success": true,
+		"npc_id": npc_id,
+		"delta": delta,
+		"new_score": new_score,
+		"new_tier": new_tier,
+		"ops_remaining": get_reflection_ops_remaining()
+	}
+
+# 功能：自省结算，清空周期累积记录并重置操作次数。
+func reflection_settle() -> void:
+	clear_cycle_affinity_changes()
+	_reflection_ops_used = 0
+	print("[自省] 结算完成：累积记录已清空，操作次数已重置")
