@@ -1,0 +1,4 @@
+option_id,rule_type,branch,target,left,op,right,key,value
+opt_patrol,resolution,default,params,,add,,morale,2
+opt_patrol,resolution,default,affinity,,,,affinityDeltas,player_001->npc_001:+5;npc_001->player_001:+3
+opt_rest,resolution,default,params,,add,,morale,3

@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://bfskj313pjwno"
+
+[deps]
+
+files=["res://test/config/reflection_dispatch_test/option_rules.rule.translation", "res://test/config/reflection_dispatch_test/option_rules.branch.translation", "res://test/config/reflection_dispatch_test/option_rules.target.translation", "res://test/config/reflection_dispatch_test/option_rules.left.translation", "res://test/config/reflection_dispatch_test/option_rules.op.translation", "res://test/config/reflection_dispatch_test/option_rules.right.translation", "res://test/config/reflection_dispatch_test/option_rules.key.translation", "res://test/config/reflection_dispatch_test/option_rules.value.translation"]
+
+source_file="res://test/config/reflection_dispatch_test/option_rules.csv"
+dest_files=["res://test/config/reflection_dispatch_test/option_rules.rule.translation", "res://test/config/reflection_dispatch_test/option_rules.branch.translation", "res://test/config/reflection_dispatch_test/option_rules.target.translation", "res://test/config/reflection_dispatch_test/option_rules.left.translation", "res://test/config/reflection_dispatch_test/option_rules.op.translation", "res://test/config/reflection_dispatch_test/option_rules.right.translation", "res://test/config/reflection_dispatch_test/option_rules.key.translation", "res://test/config/reflection_dispatch_test/option_rules.value.translation"]
+
+[params]
+
+compress=true
+delimiter=0

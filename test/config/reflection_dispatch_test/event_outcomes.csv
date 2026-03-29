@@ -1,0 +1,3 @@
+event_id,branch,target,op,key,value
+evt_daily_001,default,params,add,morale,1
+evt_daily_001,default,affinity,,affinityDeltas,npc_001->player_001:+3;player_001->npc_002:+2

@@ -1,0 +1,3 @@
+option_id,choice_point_id,text,display_order
+opt_patrol,cp_daily,四处看看,1
+opt_rest,cp_daily,休息一下,2

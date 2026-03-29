@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://b20mbmyvitv4i"
+
+[deps]
+
+files=["res://test/config/reflection_dispatch_test/world_seed.scope.translation", "res://test/config/reflection_dispatch_test/world_seed.scope.translation", "res://test/config/reflection_dispatch_test/world_seed.key.translation", "res://test/config/reflection_dispatch_test/world_seed.value.translation"]
+
+source_file="res://test/config/reflection_dispatch_test/world_seed.csv"
+dest_files=["res://test/config/reflection_dispatch_test/world_seed.scope.translation", "res://test/config/reflection_dispatch_test/world_seed.scope.translation", "res://test/config/reflection_dispatch_test/world_seed.key.translation", "res://test/config/reflection_dispatch_test/world_seed.value.translation"]
+
+[params]
+
+compress=true
+delimiter=0

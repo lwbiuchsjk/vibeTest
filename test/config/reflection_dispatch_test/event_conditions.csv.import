@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://cskelafkyu3n8"
+
+[deps]
+
+files=["res://test/config/reflection_dispatch_test/event_conditions.condition.translation", "res://test/config/reflection_dispatch_test/event_conditions.left.translation", "res://test/config/reflection_dispatch_test/event_conditions.op.translation", "res://test/config/reflection_dispatch_test/event_conditions.right.translation", "res://test/config/reflection_dispatch_test/event_conditions.delta.translation"]
+
+source_file="res://test/config/reflection_dispatch_test/event_conditions.csv"
+dest_files=["res://test/config/reflection_dispatch_test/event_conditions.condition.translation", "res://test/config/reflection_dispatch_test/event_conditions.left.translation", "res://test/config/reflection_dispatch_test/event_conditions.op.translation", "res://test/config/reflection_dispatch_test/event_conditions.right.translation", "res://test/config/reflection_dispatch_test/event_conditions.delta.translation"]
+
+[params]
+
+compress=true
+delimiter=0

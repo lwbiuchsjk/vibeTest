@@ -143,6 +143,11 @@ func _render_current_event(turn_result: Dictionary) -> void:
 		_handle_resolved_turn_result(fallback_result, "自动放弃押注（兜底）")
 		return
 
+	# 自省事件：渲染自省交互界面。
+	if phase == "reflection":
+		_render_reflection_phase(turn_result)
+		return
+
 	if awaiting_choice:
 		# 获取完整选项定义（含 check/cost/preemptiveBet）和心性风险配置。
 		var risk_profile: Dictionary = turn_result.get("xinxing_risk_profile", {})
@@ -179,6 +184,132 @@ func _render_risk_entry_buttons(accept_text: String, reject_text: String) -> voi
 	ButtonTheme.apply(reject_button)
 	option_list.add_child(reject_button)
 
+
+# ── 自省事件 UI ──────────────────────────────────────────────────
+
+# 功能：渲染自省交互界面。
+# 说明：根据 reflection_state 和 reflection_actions 渲染操作按钮列表。
+func _render_reflection_phase(turn_result: Dictionary) -> void:
+	var ref_state := str(turn_result.get("reflection_state", ""))
+	var ref_actions: Array = turn_result.get("reflection_actions", [])
+	var ops_remaining := int(turn_result.get("reflection_ops_remaining", 0))
+	var ref_extra: Dictionary = turn_result.get("reflection_extra", {})
+
+	# 状态机尚未启动（preview 阶段），显示入口按钮。
+	if ref_state.is_empty():
+		event_detail_label.text = "闭上眼，回想最近发生的事……"
+		narrative_panel.visible = true
+		status_label.text = "自省事件，点击开始进入自省。"
+		var start_btn := Button.new()
+		start_btn.text = "开始自省"
+		start_btn.pressed.connect(_on_reflection_action_pressed.bind(""))
+		ButtonTheme.apply(start_btn)
+		option_list.add_child(start_btn)
+		return
+
+	# 叙事区：根据状态显示不同说明文本。
+	var narrative_parts: Array[String] = []
+	match ref_state:
+		"EMPTY_REFLECTION":
+			narrative_parts.append(str(ref_extra.get("text", "一切如常，没有特别值得回顾的事。")))
+		"MAIN_MENU":
+			narrative_parts.append("静下心来回顾最近发生的事情。")
+			narrative_parts.append("剩余操作次数: %d" % ops_remaining)
+		"ADJUST_RELATION":
+			narrative_parts.append("回想与他人的交往，重新审视自己的态度。")
+			narrative_parts.append("剩余操作次数: %d" % ops_remaining)
+		"FOCUS_SELECT":
+			narrative_parts.append("有些人值得更多关注。")
+		"FOCUS_REMOVE":
+			var pending := str(ref_extra.get("pending_add", ""))
+			narrative_parts.append("关注已满，需要先移除一位已关注的人，才能关注 %s。" % pending)
+		_:
+			narrative_parts.append("自省中...")
+
+	# 查询结果追加到叙事区。
+	if ref_extra.has("query_result"):
+		var qr: Dictionary = ref_extra["query_result"]
+		narrative_parts.append("\n【查询结果】%s: 分值 %d, 档位 %s" % [
+			str(qr.get("npc_id", "")),
+			int(qr.get("current_score", 0)),
+			str(qr.get("current_tier", ""))
+		])
+
+	# 操作结果追加到叙事区。
+	if ref_extra.has("op_result"):
+		var op_r: Dictionary = ref_extra["op_result"]
+		narrative_parts.append("\n【操作结果】%s: %d → %s (%s)" % [
+			str(op_r.get("npc_id", "")),
+			int(op_r.get("new_score", 0)),
+			str(op_r.get("new_tier", "")),
+			"%+d" % int(op_r.get("delta", 0))
+		])
+
+	event_detail_label.text = "\n".join(narrative_parts)
+	narrative_panel.visible = true
+
+	# 状态栏。
+	match ref_state:
+		"EMPTY_REFLECTION":
+			status_label.text = "空自省，点击确认继续。"
+		"MAIN_MENU":
+			status_label.text = "自省主菜单 | 剩余操作: %d" % ops_remaining
+		"ADJUST_RELATION":
+			status_label.text = "选择要调整关系的对象 | 剩余操作: %d" % ops_remaining
+		"FOCUS_SELECT":
+			status_label.text = "选择要关注的人"
+		"FOCUS_REMOVE":
+			status_label.text = "关注已满，选择要移除的人"
+		_:
+			status_label.text = "自省中"
+
+	# 操作按钮。
+	for action_variant in ref_actions:
+		var action_def: Dictionary = action_variant
+		var action_id := str(action_def.get("action", ""))
+		var label_text := str(action_def.get("label", action_id))
+		var enabled := bool(action_def.get("enabled", true))
+		var target := str(action_def.get("target", ""))
+
+		var encoded := "%s:%s" % [action_id, target]
+		var btn := Button.new()
+		btn.text = label_text
+		btn.disabled = not enabled
+		btn.pressed.connect(_on_reflection_action_pressed.bind(encoded))
+		ButtonTheme.apply(btn)
+		option_list.add_child(btn)
+
+
+# 功能：处理自省操作按钮点击。
+# 说明：将编码后的 "action:target" 传入 confirm_pending_turn，根据返回的 phase 分流。
+func _on_reflection_action_pressed(encoded_action: String) -> void:
+	var turn_result := _engine.confirm_pending_turn(encoded_action)
+	if not turn_result.get("ok", false):
+		status_label.text = "自省操作失败: %s" % str(turn_result.get("error", "unknown"))
+		_update_side_panels()
+		return
+
+	# 解码操作信息用于日志。
+	var parts: Array = encoded_action.split(":", true, 1)
+	var action_name := str(parts[0]) if parts.size() > 0 else ""
+	var action_target := str(parts[1]) if parts.size() > 1 else ""
+	var log_text := "自省: %s" % action_name
+	if not action_target.is_empty():
+		log_text += " -> %s" % action_target
+	_append_log(log_text)
+
+	var phase := str(turn_result.get("phase", ""))
+	if phase == "reflection":
+		# 自省尚未结算，刷新界面继续交互。
+		_current_turn_result = (turn_result as Dictionary).duplicate(true)
+		_render_current_event(turn_result)
+		_update_side_panels()
+	else:
+		# 自省已结算（phase = resolved），走统一结算后分流。
+		_handle_resolved_turn_result(turn_result, "自省结算完成")
+
+
+# ── 选项与押注 UI ────────────────────────────────────────────────
 
 # 功能：从引擎内部获取当前事件的完整选项定义列表（含 check/cost/preemptiveBet）。
 # 说明：UI 展示消耗与押注信息需要这些字段，公开 API 的简版结构不包含。
@@ -486,8 +617,12 @@ func _on_continue_button_pressed() -> void:
 	if _current_turn_result.is_empty():
 		_preview_next_event()
 		return
-	if str(_current_turn_result.get("phase", "confirm")) == "choice":
+	var current_phase := str(_current_turn_result.get("phase", "confirm"))
+	if current_phase == "choice":
 		status_label.text = "当前事件需要先完成选项选择。"
+		return
+	if current_phase == "reflection":
+		status_label.text = "自省进行中，请通过自省操作按钮交互。"
 		return
 
 	var turn_result := _engine.confirm_pending_turn()
@@ -550,6 +685,10 @@ func _build_event_debug_text(turn_result: Dictionary) -> String:
 	lines.append("world_ended=%s" % str(turn_result.get("world_ended", false)))
 	lines.append("ending_event_id=%s" % str(turn_result.get("ending_event_id", "")))
 	lines.append("finished_turn=%s" % str(turn_result.get("finished_turn", 0)))
+	# 自省调试信息。
+	if turn_result.has("reflection_state"):
+		lines.append("reflection_state=%s" % str(turn_result.get("reflection_state", "")))
+		lines.append("reflection_ops_remaining=%s" % str(turn_result.get("reflection_ops_remaining", 0)))
 	return "\n".join(lines)
 
 
