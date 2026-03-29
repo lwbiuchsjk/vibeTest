@@ -1,2 +1,4 @@
 event_id,presentation_id,display_order,item_type,speaker,text
 evt_daily_001,pre_daily_001,1,text,,今天在城镇中四处走了走，遇到了一些熟悉的面孔。
+evt_daily_002,pre_market_001,1,text,,市集热闹非凡，各种商品琳琅满目，人来人往好不热闹。
+evt_encounter_001,pre_encounter_001,1,text,,一阵骚动从前方传来，似乎发生了什么意外状况。

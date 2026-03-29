@@ -1,3 +1,7 @@
 option_id,choice_point_id,text,display_order
 opt_patrol,cp_daily,四处看看,1
 opt_rest,cp_daily,休息一下,2
+opt_browse,cp_market,随便逛逛,1
+opt_haggle,cp_market,讨价还价,2
+opt_fight,cp_encounter,迎面而上,1
+opt_flee,cp_encounter,转身就跑,2

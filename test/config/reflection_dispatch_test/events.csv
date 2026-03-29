@@ -1,3 +1,5 @@
 event_id,title,background_art,base_weight,continuation_policy,choice_point_id,tags,task_links,is_ending_event,type
-evt_daily_001,日常巡视,,60,ReturnToScheduler,cp_daily,daily,,FALSE,
+evt_daily_001,日常巡视,,50,ReturnToScheduler,cp_daily,daily,,FALSE,
+evt_daily_002,市集见闻,,50,ReturnToScheduler,cp_market,daily,,FALSE,
+evt_encounter_001,意外遭遇,,40,ReturnToScheduler,cp_encounter,encounter,,FALSE,
 sys_reflection,自省,,30,ReturnToScheduler,,system;reflection,,FALSE,reflection

@@ -1,3 +1,7 @@
 event_id,branch,target,op,key,value
 evt_daily_001,default,params,add,morale,1
 evt_daily_001,default,affinity,,affinityDeltas,npc_001->player_001:+3;player_001->npc_002:+2
+evt_daily_002,default,params,add,prosperity,1
+evt_daily_002,default,affinity,,affinityDeltas,npc_003->player_001:+4;player_001->npc_004:+2;npc_002->npc_003:+1
+evt_encounter_001,default,params,add,danger,-2
+evt_encounter_001,default,affinity,,affinityDeltas,npc_005->player_001:+5;player_001->npc_003:+3

@@ -2,3 +2,11 @@ option_id,rule_type,branch,target,left,op,right,key,value
 opt_patrol,resolution,default,params,,add,,morale,2
 opt_patrol,resolution,default,affinity,,,,affinityDeltas,player_001->npc_001:+5;npc_001->player_001:+3
 opt_rest,resolution,default,params,,add,,morale,3
+opt_browse,resolution,default,params,,add,,prosperity,2
+opt_browse,resolution,default,affinity,,,,affinityDeltas,player_001->npc_003:+3;npc_004->player_001:+2
+opt_haggle,resolution,default,params,,add,,prosperity,4
+opt_haggle,resolution,default,affinity,,,,affinityDeltas,player_001->npc_004:+4;npc_003->player_001:+2
+opt_fight,resolution,default,params,,add,,danger,-3
+opt_fight,resolution,default,affinity,,,,affinityDeltas,player_001->npc_005:+6;npc_005->player_001:+4
+opt_flee,resolution,default,params,,add,,morale,-1
+opt_flee,resolution,default,affinity,,,,affinityDeltas,npc_005->player_001:-2
