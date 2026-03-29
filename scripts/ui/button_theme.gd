@@ -9,6 +9,8 @@ const PRESET_BET := "bet"                  # 主动押注：紫色调 + 左侧�
 const PRESET_DESPERATE := "desperate"      # 孤注一掷：红色调 + 左侧红边框
 const PRESET_TOGGLE := "toggle"            # 切换按钮：紧凑半透明
 const PRESET_SECTION_HINT := "section_hint" # 分区提示标签风格（非按钮，但共享配色体系）
+const PRESET_RELATION_TRUST := "relation_trust"       # 自省关系调整：+信任 小按钮
+const PRESET_RELATION_DISTRUST := "relation_distrust"  # 自省关系调整：+警惕 小按钮
 
 # ── 预设配置表 ──
 # 每个预设是一个 Dictionary，包含以下可选字段：
@@ -86,6 +88,40 @@ static var _presets: Dictionary = {
 		"corner_radius": 4,
 		"margin_left": 4, "margin_right": 4,
 		"margin_top": 4, "margin_bottom": 4,
+		"min_height": 0,
+		"autowrap": false,
+		"alignment": HORIZONTAL_ALIGNMENT_CENTER,
+		"expand_horizontal": false,
+	},
+	PRESET_RELATION_TRUST: {
+		"bg_normal": Color(0.15, 0.30, 0.22, 0.90),
+		"bg_hover": Color(0.20, 0.40, 0.30, 0.95),
+		"bg_pressed": Color(0.12, 0.24, 0.18, 0.95),
+		"bg_disabled": Color(0.15, 0.15, 0.18, 0.7),
+		"border_color": Color.TRANSPARENT,
+		"font_color": Color(0.75, 1.0, 0.85, 1.0),
+		"font_disabled_color": Color(0.45, 0.45, 0.50, 1.0),
+		"font_size": 12,
+		"corner_radius": 4,
+		"margin_left": 6, "margin_right": 6,
+		"margin_top": 2, "margin_bottom": 2,
+		"min_height": 0,
+		"autowrap": false,
+		"alignment": HORIZONTAL_ALIGNMENT_CENTER,
+		"expand_horizontal": false,
+	},
+	PRESET_RELATION_DISTRUST: {
+		"bg_normal": Color(0.32, 0.18, 0.15, 0.90),
+		"bg_hover": Color(0.42, 0.24, 0.20, 0.95),
+		"bg_pressed": Color(0.25, 0.14, 0.12, 0.95),
+		"bg_disabled": Color(0.15, 0.15, 0.18, 0.7),
+		"border_color": Color.TRANSPARENT,
+		"font_color": Color(1.0, 0.82, 0.78, 1.0),
+		"font_disabled_color": Color(0.45, 0.45, 0.50, 1.0),
+		"font_size": 12,
+		"corner_radius": 4,
+		"margin_left": 6, "margin_right": 6,
+		"margin_top": 2, "margin_bottom": 2,
 		"min_height": 0,
 		"autowrap": false,
 		"alignment": HORIZONTAL_ALIGNMENT_CENTER,

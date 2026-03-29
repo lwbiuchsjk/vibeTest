@@ -162,29 +162,36 @@ func _get_adjust_relation_npcs() -> Array:
 	return npc_ids
 
 # 功能：构建调整关系扁平操作列表。
-# 说明：每个NPC生成三个操作：+信任、+警惕、查询。
+# 说明：每个NPC生成三个操作：查看信息（base）、+信任（overlay）、+警惕（overlay）。
+#       group 字段标识同一NPC的操作组，role 字段区分按钮用途，供 UI 做分组布局。
 func _build_adjust_relation_actions() -> Array:
 	var actions: Array = []
 	var npcs: Array = _get_adjust_relation_npcs()
 	for npc_id_variant in npcs:
 		var npc_id: String = str(npc_id_variant)
 		actions.append({
+			"action": "query",
+			"target": npc_id,
+			"label": "%s 查看信息" % npc_id,
+			"enabled": true,
+			"group": npc_id,
+			"role": "base",
+		})
+		actions.append({
 			"action": "trust",
 			"target": npc_id,
-			"label": "%s +信任" % npc_id,
+			"label": "+信任",
 			"enabled": true,
+			"group": npc_id,
+			"role": "overlay",
 		})
 		actions.append({
 			"action": "distrust",
 			"target": npc_id,
-			"label": "%s +警惕" % npc_id,
+			"label": "+警惕",
 			"enabled": true,
-		})
-		actions.append({
-			"action": "query",
-			"target": npc_id,
-			"label": "%s 查询" % npc_id,
-			"enabled": true,
+			"group": npc_id,
+			"role": "overlay",
 		})
 	return actions
 

@@ -264,20 +264,100 @@ func _render_reflection_phase(turn_result: Dictionary) -> void:
 			status_label.text = "自省中"
 
 	# 操作按钮。
+	# ADJUST_RELATION 状态下按 group 分组渲染复合按钮行；其他状态逐条渲染。
+	if ref_state == "ADJUST_RELATION":
+		_render_adjust_relation_actions(ref_actions)
+	else:
+		for action_variant in ref_actions:
+			var action_def: Dictionary = action_variant
+			var action_id := str(action_def.get("action", ""))
+			var label_text := str(action_def.get("label", action_id))
+			var enabled := bool(action_def.get("enabled", true))
+			var target := str(action_def.get("target", ""))
+
+			var encoded := "%s:%s" % [action_id, target]
+			var btn := Button.new()
+			btn.text = label_text
+			btn.disabled = not enabled
+			btn.pressed.connect(_on_reflection_action_pressed.bind(encoded))
+			ButtonTheme.apply(btn)
+			option_list.add_child(btn)
+
+
+# 功能：渲染 ADJUST_RELATION 状态下的复合按钮行。
+# 说明：同一 NPC 的 query（查看信息）、trust（+信任）、distrust（+警惕）三个操作
+#       合并为一行：查看信息按钮垫底撑满宽度，+信任 / +警惕 两个小按钮竖排叠在右侧。
+#       布局参考选项的"主动押注 / 切换默认"按钮组。
+func _render_adjust_relation_actions(ref_actions: Array) -> void:
+	# 按 group（NPC ID）收集同组操作。
+	var groups: Dictionary = {}
+	var group_order: Array[String] = []
 	for action_variant in ref_actions:
 		var action_def: Dictionary = action_variant
-		var action_id := str(action_def.get("action", ""))
-		var label_text := str(action_def.get("label", action_id))
-		var enabled := bool(action_def.get("enabled", true))
-		var target := str(action_def.get("target", ""))
+		var group_id := str(action_def.get("group", ""))
+		if group_id.is_empty():
+			group_id = str(action_def.get("target", ""))
+		if not groups.has(group_id):
+			groups[group_id] = {}
+			group_order.append(group_id)
+		var role := str(action_def.get("role", ""))
+		var action := str(action_def.get("action", ""))
+		# 用 action 名做 key（query / trust / distrust）
+		groups[group_id][action] = action_def
 
-		var encoded := "%s:%s" % [action_id, target]
-		var btn := Button.new()
-		btn.text = label_text
-		btn.disabled = not enabled
-		btn.pressed.connect(_on_reflection_action_pressed.bind(encoded))
-		ButtonTheme.apply(btn)
-		option_list.add_child(btn)
+	for group_id in group_order:
+		var defs: Dictionary = groups[group_id]
+		var base_def: Dictionary = defs.get("query", {})
+		var trust_def: Dictionary = defs.get("trust", {})
+		var distrust_def: Dictionary = defs.get("distrust", {})
+
+		# ── 底层：查看信息按钮，撑满宽度 ──
+		var base_btn := Button.new()
+		base_btn.text = str(base_def.get("label", group_id))
+		base_btn.disabled = not bool(base_def.get("enabled", true))
+		var base_target := str(base_def.get("target", group_id))
+		base_btn.pressed.connect(_on_reflection_action_pressed.bind("query:%s" % base_target))
+		ButtonTheme.apply(base_btn)
+		# 右侧预留空间给叠加按钮
+		ButtonTheme.override_margin_right(base_btn, 136)
+		base_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		base_btn.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		base_btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		base_btn.custom_minimum_size.y = 0
+
+		# ── 右侧叠加：+信任 / +警惕 横排 ──
+		var trust_btn := Button.new()
+		trust_btn.text = str(trust_def.get("label", "+信任"))
+		trust_btn.disabled = not bool(trust_def.get("enabled", true))
+		var trust_target := str(trust_def.get("target", group_id))
+		trust_btn.pressed.connect(_on_reflection_action_pressed.bind("trust:%s" % trust_target))
+		ButtonTheme.apply(trust_btn, ButtonTheme.PRESET_RELATION_TRUST)
+		trust_btn.custom_minimum_size.x = 64
+		trust_btn.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+		var distrust_btn := Button.new()
+		distrust_btn.text = str(distrust_def.get("label", "+警惕"))
+		distrust_btn.disabled = not bool(distrust_def.get("enabled", true))
+		var distrust_target := str(distrust_def.get("target", group_id))
+		distrust_btn.pressed.connect(_on_reflection_action_pressed.bind("distrust:%s" % distrust_target))
+		ButtonTheme.apply(distrust_btn, ButtonTheme.PRESET_RELATION_DISTRUST)
+		distrust_btn.custom_minimum_size.x = 64
+		distrust_btn.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+		# 右侧横排容器
+		var right_row := HBoxContainer.new()
+		right_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		right_row.add_theme_constant_override("separation", 2)
+		right_row.add_child(trust_btn)
+		right_row.add_child(distrust_btn)
+
+		# 外层容器
+		var wrapper := HBoxContainer.new()
+		wrapper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		wrapper.add_theme_constant_override("separation", 0)
+		wrapper.add_child(base_btn)
+		wrapper.add_child(right_row)
+		option_list.add_child(wrapper)
 
 
 # 功能：处理自省操作按钮点击。
