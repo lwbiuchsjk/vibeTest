@@ -144,6 +144,10 @@ func load_from_json_text(
 	_rebuild_task_def_map()
 	_rebuild_task_evaluation_index()
 	_ensure_xinxing_tracker()
+	# 功能：初始化关系系统和自省系统配置。
+	# 说明：JSON 路径也需要加载这些配置，否则自省事件的 reflectionConfig 不会被读取。
+	_init_affinity_system()
+	_init_reflection_config()
 	return {"ok": true}
 
 # 功能：从内存对象加载数据。
@@ -282,6 +286,11 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 	if phase == "desperate_gamble":
 		return _resolve_desperate_gamble_phase(selected_option_id)
 
+	# 功能：自省事件分支——将 confirm_pending_turn 的调用转发给自省状态机。
+	# 说明：自省期间持续占据 pending_turn，每次 confirm 推进一步；SETTLED 后清除并推进回合。
+	if phase == "reflection":
+		return _resolve_reflection_phase(selected_option_id, event_id, route, expected_forced, event_def)
+
 	var choice_result := pending_choice.duplicate(true)
 	if resolution_mode == "choice_resolution":
 		var choice_point_id := str(event_def.get("choicePointId", "")).strip_edges()
@@ -406,6 +415,13 @@ func _create_pending_turn_context(
 	var resolution_mode := "event_effects"
 	var has_choice := false
 	var phase := "confirm"
+
+	# 功能：自省事件使用独立的 resolution_mode，跳过 choice / effects 流程。
+	var event_type := str(event_def.get("type", "")).strip_edges()
+	if event_type == "reflection":
+		resolution_mode = "reflection"
+		phase = "reflection"
+
 	var choice_point_id := str(event_def.get("choicePointId", "")).strip_edges()
 	if not choice_point_id.is_empty():
 		has_choice = true
@@ -442,14 +458,17 @@ func _create_pending_turn_context(
 
 
 # 功能：在展示阶段结束后切换到下一个可交互阶段。
-# 说明：优先进入 choice；若当前事件没有可交互选项，则退回到 confirm。
+# 说明：优先检测 reflection 模式；其次进入 choice；最后退回 confirm。
 func _advance_pending_phase_after_presentation(event_def: Dictionary) -> void:
+	var rm := str(_pending_turn_context.get("resolution_mode", "event_effects"))
 	var next_phase := "confirm"
-	if str(_pending_turn_context.get("resolution_mode", "event_effects")) == "choice_resolution":
+	if rm == "reflection":
+		next_phase = "reflection"
+	elif rm == "choice_resolution":
 		next_phase = "choice"
-	var choice_result: Dictionary = _dict_or_empty(_pending_turn_context.get("choice", {}))
-	if next_phase == "choice" and choice_result.is_empty():
-		next_phase = "confirm"
+		var choice_result: Dictionary = _dict_or_empty(_pending_turn_context.get("choice", {}))
+		if choice_result.is_empty():
+			next_phase = "confirm"
 	_pending_turn_context["phase"] = next_phase
 	_pending_turn_context["presentation_index"] = 0
 
@@ -495,8 +514,8 @@ func _build_pending_turn_response(pending_context: Dictionary) -> Dictionary:
 		return {"ok": false, "error": "pending event not found: %s" % event_id}
 
 	var choice_result: Dictionary = _dict_or_empty(pending_context.get("choice", {})).duplicate(true)
-	# 说明：心性风险入口阶段也视为等待外部决策。
-	var awaiting_choice := (phase == "choice" and resolution_mode == "choice_resolution") or phase == "preemptive_bet" or phase == "desperate_gamble"
+	# 说明：心性风险入口阶段和自省阶段也视为等待外部决策。
+	var awaiting_choice := (phase == "choice" and resolution_mode == "choice_resolution") or phase == "preemptive_bet" or phase == "desperate_gamble" or phase == "reflection"
 	if awaiting_choice and choice_result.is_empty():
 		choice_result = {
 			"choice_point_id": str(event_def.get("choicePointId", "")),
@@ -534,7 +553,7 @@ func _build_result_payload(
 	elif awaiting_choice:
 		phase = "choice"
 	var presentation_state := _build_presentation_state(event_def, phase)
-	return {
+	var result: Dictionary = {
 		"ok": true,
 		"phase": phase,
 		"awaiting_choice": awaiting_choice,
@@ -560,6 +579,20 @@ func _build_result_payload(
 		"ending_event_id": str(run_state_payload.get("ending_event_id", "")),
 		"finished_turn": int(run_state_payload.get("finished_turn", 0))
 	}
+	# 功能：自省阶段附加状态机信息，供 UI 渲染自省交互界面。
+	if phase == "reflection" and not _pending_turn_context.is_empty():
+		var ref_result: Dictionary = _dict_or_empty(_pending_turn_context.get("reflection_result", {}))
+		result["reflection_state"] = str(ref_result.get("state", ""))
+		result["reflection_actions"] = ref_result.get("available_actions", [])
+		result["reflection_ops_remaining"] = int(ref_result.get("ops_remaining", 0))
+		# 透传状态机返回的附加数据（query_result、op_result 等）。
+		var extra_keys: Array = ["query_result", "op_result", "added_focus", "removed_focus", "pending_add", "text", "skipped", "settled"]
+		for key in extra_keys:
+			if ref_result.has(key):
+				if not result.has("reflection_extra"):
+					result["reflection_extra"] = {}
+				result["reflection_extra"][key] = ref_result[key]
+	return result
 
 # 功能：确保世界运行态结构完整。
 # 说明：兼容旧存档、旧测试数据与未包含 runState 的输入，统一补齐 ended 所需字段。
@@ -1682,6 +1715,77 @@ func _resolve_desperate_gamble_phase(selected_option_id: String) -> Dictionary:
 	if xinxing_after != xinxing_before:
 		_last_xinxing_transition = {"old_value": xinxing_before, "new_value": xinxing_after}
 	return _finalize_option_turn(event_def)
+
+# 功能：处理自省事件阶段。
+# 说明：解码 "action:target" 格式的操作编码，委托给自省状态机执行。
+#       状态机返回 SETTLED 时消费 forcedNextEventId、推进回合；否则返回 pending 响应。
+func _resolve_reflection_phase(
+	selected_option_id: String,
+	event_id: String,
+	route: String,
+	expected_forced: String,
+	event_def: Dictionary
+) -> Dictionary:
+	# 首次进入自省 phase 时启动状态机。
+	if not _reflection_sm.is_active():
+		var start_result: Dictionary = _reflection_sm.start(self)
+		print("[自省调度] 状态机已启动: %s" % str(start_result.get("state", "")))
+		# 启动后如果已经直接 SETTLED（如空自省 confirm），走结算。
+		if str(start_result.get("state", "")) == "SETTLED":
+			return _finalize_reflection_turn(event_id, route, expected_forced, event_def)
+		# 首次进入时如果没有传入操作，返回 pending 响应让 UI 获取初始状态。
+		if selected_option_id.strip_edges().is_empty():
+			_pending_turn_context["reflection_result"] = start_result
+			return _build_pending_turn_response(_pending_turn_context)
+
+	# 解码 "action:target" 格式。
+	var parts: Array = selected_option_id.split(":", true, 1)
+	var action := str(parts[0]).strip_edges() if parts.size() > 0 else ""
+	var target := str(parts[1]).strip_edges() if parts.size() > 1 else ""
+
+	if action.is_empty():
+		return _build_pending_turn_response(_pending_turn_context)
+
+	# 委托状态机执行操作。
+	var act_result: Dictionary = _reflection_sm.act(action, target)
+	print("[自省调度] act(%s, %s) → state=%s" % [action, target, str(act_result.get("state", ""))])
+	_pending_turn_context["reflection_result"] = act_result
+
+	# 状态机 SETTLED → 清除 pending_turn，推进回合。
+	if str(act_result.get("state", "")) == "SETTLED":
+		return _finalize_reflection_turn(event_id, route, expected_forced, event_def)
+
+	# 未结算，返回 pending 响应继续等待下一步操作。
+	return _build_pending_turn_response(_pending_turn_context)
+
+
+# 功能：自省结算后完成回合推进。
+# 说明：复用与普通事件相同的回合末尾逻辑（历史记录、任务推进、turn +1）。
+func _finalize_reflection_turn(
+	event_id: String,
+	route: String,
+	expected_forced: String,
+	event_def: Dictionary
+) -> Dictionary:
+	# 消费 forcedNextEventId，与其他事件结算一致。
+	world_state["forcedNextEventId"] = ""
+	_apply_continuation_policy(event_def)
+	_eval_complete_when_after_settlement()
+	_record_history(event_id)
+	_tick_tasks_after_turn()
+	world_state["turn"] = int(world_state.get("turn", 0)) + 1
+	_pending_turn_context.clear()
+	print("[自省调度] 结算完成，turn=%d" % int(world_state.get("turn", 0)))
+	return _build_result_payload(
+		route,
+		event_id,
+		event_def,
+		expected_forced,
+		false,
+		false,
+		{}
+	)
+
 
 # 功能：风险入口结算后完成回合推进。
 # 说明：抽取自 _resolve_pending_turn 的回合末尾逻辑，避免风险入口与主流程重复编写。

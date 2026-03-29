@@ -12,6 +12,7 @@ const XinxingPhase2SmokeTest := preload("res://test/smoke/xinxing_phase2_smoke_t
 const RelationshipPhase3SmokeTest := preload("res://test/smoke/relationship_phase3_smoke_test.gd")
 const ReflectionPhase4SmokeTest := preload("res://test/smoke/reflection_phase4_smoke_test.gd")
 const ReflectionSmSmokeTest := preload("res://test/smoke/reflection_sm_smoke_test.gd")
+const ReflectionDispatchSmokeTest := preload("res://test/smoke/reflection_dispatch_smoke_test.gd")
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 
 
@@ -43,57 +44,59 @@ func _ready() -> void:
 
 	# ── 冒烟测试已全部通过，注释掉以减少运行时冗余输出 ──
 	#var milestone_result: Dictionary = MilestoneASmokeTest.run_with_context(context)
-	##print(“[MilestoneA]”, milestone_result)
+	##print("[MilestoneA]", milestone_result)
 	#var milestone_c_result: Dictionary = MilestoneCSmokeTest.run_from_csv()
-	#print(“[MilestoneC] %s” % JSON.stringify(milestone_c_result))
+	#print("[MilestoneC] %s" % JSON.stringify(milestone_c_result))
 	#var milestone_3_result: Dictionary = Milestone3SmokeTest.run_from_csv()
-	#print(“[Milestone3] %s” % JSON.stringify(milestone_3_result))
+	#print("[Milestone3] %s" % JSON.stringify(milestone_3_result))
 	#var world_end_m1_result: Dictionary = WorldEndMilestone1SmokeTest.run_from_csv()
-	#print(“[WorldEnd-M1] %s” % JSON.stringify(world_end_m1_result))
+	#print("[WorldEnd-M1] %s" % JSON.stringify(world_end_m1_result))
 	#var world_end_m2_result: Dictionary = WorldEndMilestone2SmokeTest.run()
-	#print(“[WorldEnd-M2] %s” % JSON.stringify(world_end_m2_result))
+	#print("[WorldEnd-M2] %s" % JSON.stringify(world_end_m2_result))
 	#var world_end_m3_result: Dictionary = WorldEndMilestone3SmokeTest.run()
-	#print(“[WorldEnd-M3] %s” % JSON.stringify(world_end_m3_result))
+	#print("[WorldEnd-M3] %s" % JSON.stringify(world_end_m3_result))
 	#var world_end_m4_result: Dictionary = WorldEndMilestone4SmokeTest.run()
-	#print(“[WorldEnd-M4] %s” % JSON.stringify(world_end_m4_result))
+	#print("[WorldEnd-M4] %s" % JSON.stringify(world_end_m4_result))
 	#var xinxing_phase2_result: Dictionary = XinxingPhase2SmokeTest.run_all()
-	#print(“[XinxingPhase2] %s” % JSON.stringify(xinxing_phase2_result))
+	#print("[XinxingPhase2] %s" % JSON.stringify(xinxing_phase2_result))
 	#var relationship_phase3_result: Dictionary = RelationshipPhase3SmokeTest.run_all()
-	#print(“[RelationshipPhase3] %s” % JSON.stringify(relationship_phase3_result))
+	#print("[RelationshipPhase3] %s" % JSON.stringify(relationship_phase3_result))
 	#var reflection_phase4_result: Dictionary = ReflectionPhase4SmokeTest.run_all()
-	#print(“[ReflectionPhase4] %s” % JSON.stringify(reflection_phase4_result))
+	#print("[ReflectionPhase4] %s" % JSON.stringify(reflection_phase4_result))
 	#var reflection_sm_result: Dictionary = ReflectionSmSmokeTest.run_all()
-	#print(“[ReflectionSM] %s” % JSON.stringify(reflection_sm_result))
+	#print("[ReflectionSM] ok=%s" % str(reflection_sm_result.get("ok", false)))
+	#var reflection_dispatch_result: Dictionary = ReflectionDispatchSmokeTest.run_all()
+	#print("[ReflectionDispatch] ok=%s" % str(reflection_dispatch_result.get("ok", false)))
 	#var mvp_result: Dictionary = MvpWorldEventSmokeTest.run_from_csv()
-	##print(“[MVP-WorldEvent]”, mvp_result)
-	#if mvp_result.get(“ok”, false):
-	#	var turns: Array = mvp_result.get(“turns”, [])
-	#	print(“[MVP-WorldEvent] Triggered Events Summary (ordered):”)
+	##print("[MVP-WorldEvent]", mvp_result)
+	#if mvp_result.get("ok", false):
+	#	var turns: Array = mvp_result.get("turns", [])
+	#	print("[MVP-WorldEvent] Triggered Events Summary (ordered):")
 	#	for turn_variant in turns:
 	#		var turn_detail: Dictionary = turn_variant
-	#		var event: Dictionary = turn_detail.get(“event”, {})
-	#		var choice_text := “无”
-	#		var choice: Dictionary = event.get(“choice”, {})
-	#		var selected_option_id := str(choice.get(“selected_option_id”, “”))
+	#		var event: Dictionary = turn_detail.get("event", {})
+	#		var choice_text := "无"
+	#		var choice: Dictionary = event.get("choice", {})
+	#		var selected_option_id := str(choice.get("selected_option_id", ""))
 	#		if not selected_option_id.is_empty():
-	#			var selected_option_label := “”
-	#			var options: Array = choice.get(“options”, [])
+	#			var selected_option_label := ""
+	#			var options: Array = choice.get("options", [])
 	#			for option_variant in options:
 	#				var option_def: Dictionary = option_variant
-	#				if str(option_def.get(“id”, “”)) == selected_option_id:
-	#					selected_option_label = str(option_def.get(“text”, “”))
+	#				if str(option_def.get("id", "")) == selected_option_id:
+	#					selected_option_label = str(option_def.get("text", ""))
 	#					break
 	#			if selected_option_label.is_empty():
 	#				choice_text = selected_option_id
 	#			else:
-	#				choice_text = “%s (%s)” % [selected_option_id, selected_option_label]
+	#				choice_text = "%s (%s)" % [selected_option_id, selected_option_label]
 	#		print(
-	#			“  - Turn %s | event_id=%s | title=%s | route=%s | policy=%s | 本次选择=%s” % [
-	#				str(turn_detail.get(“turn_index”, “”)),
-	#				str(event.get(“event_id”, “”)),
-	#				str(event.get(“title”, “”)),
-	#				str(event.get(“route”, “”)),
-	#				str(event.get(“policy”, “”)),
+	#			"  - Turn %s | event_id=%s | title=%s | route=%s | policy=%s | 本次选择=%s" % [
+	#				str(turn_detail.get("turn_index", "")),
+	#				str(event.get("event_id", "")),
+	#				str(event.get("title", "")),
+	#				str(event.get("route", "")),
+	#				str(event.get("policy", "")),
 	#				choice_text
 	#			]
 	#		)

@@ -588,6 +588,9 @@ static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -
 		if event_map.has(event_id):
 			return {"ok": false, "error": "duplicate event id: %s" % event_id}
 
+		# 功能：解析事件类型字段。
+		# 说明：type 为空或缺省时视为普通事件；"reflection" 表示自省事件，结算时路由到状态机。
+		var event_type := str(row.get("type", "")).strip_edges()
 		var event_def = {
 			"id": event_id,
 			"title": str(row.get("title", "")),
@@ -604,6 +607,9 @@ static func _assemble_events(tables: Dictionary, choice_point_ids: Dictionary) -
 			"effects": {},
 			"presentation": []
 		}
+		# 功能：仅在 type 非空时写入 event_def，避免普通事件携带多余字段。
+		if not event_type.is_empty():
+			event_def["type"] = event_type
 
 		var cp_id := str(row.get("choice_point_id", "")).strip_edges()
 		if not cp_id.is_empty():
