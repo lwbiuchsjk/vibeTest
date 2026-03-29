@@ -12,6 +12,7 @@ const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 const LocationGraph := preload("res://scripts/models/location_graph.gd")
 # 说明：RuleEngine 已通过 class_name 全局注册，无需 preload。
 const AffinityMapClass := preload("res://scripts/models/affinity_map.gd")
+const ReflectionStateMachine := preload("res://scripts/systems/reflection_state_machine.gd")
 
 var world_state: Dictionary = {}
 var events: Array = []
@@ -43,6 +44,8 @@ var _cycle_affinity_changes: Array = []
 var _reflection_config: Dictionary = {}
 # 自省操作已使用次数，自省开始时重置为0。
 var _reflection_ops_used: int = 0
+# 自省状态机实例，管理自省事件的完整交互流程。
+var _reflection_sm: ReflectionStateMachine = ReflectionStateMachine.new()
 # 最近一次心性转移记录（{old_value, new_value}），无转移时为空字典。
 var _last_xinxing_transition: Dictionary = {}
 # 主动押注全局默认配置：cost 为额外代价（叠加在选项 cost 之上），bias 为鉴定加骰。
@@ -1941,6 +1944,33 @@ func _apply_resolution(resolution: Dictionary, event_def: Dictionary) -> void:
 	if not affinity_deltas.is_empty() and _affinity_map != null:
 		_apply_affinity_deltas(affinity_deltas)
 
+	# 关注列表修改：执行 focusPatch 配置驱动的关注列表变更。
+	if resolution.has("focusPatch") and player_role_state != null:
+		_apply_focus_patch(resolution.get("focusPatch", {}))
+
+
+# 功能：应用关注列表修改补丁。
+# 说明：支持 add（添加）、remove（移除）、set（替换）三种操作。
+func _apply_focus_patch(patch: Dictionary) -> void:
+	var op: String = str(patch.get("op", ""))
+	var npcs: Array = patch.get("npcs", [])
+	match op:
+		"add":
+			for npc_id_variant in npcs:
+				var npc_id: String = str(npc_id_variant)
+				player_role_state.add_focus(npc_id)
+			print("[关注] add: %s → 当前关注列表: %s" % [str(npcs), str(player_role_state.focusing_npcs)])
+		"remove":
+			for npc_id_variant in npcs:
+				var npc_id: String = str(npc_id_variant)
+				player_role_state.remove_focus(npc_id)
+			print("[关注] remove: %s → 当前关注列表: %s" % [str(npcs), str(player_role_state.focusing_npcs)])
+		"set":
+			player_role_state.init_focusing_npcs(npcs)
+			print("[关注] set: %s" % str(player_role_state.focusing_npcs))
+		_:
+			print("[关注] 未知 focusPatch op: %s" % op)
+
 
 # 功能：确保任务运行时结构完整。
 # 说明：兼容旧存档或缺省配置，保证任务系统逻辑始终有稳定结构可写。
@@ -2625,8 +2655,17 @@ func _init_reflection_config() -> void:
 		"trust_delta_positive": int(raw.get("trust_delta_positive", 5)),
 		"trust_delta_negative": int(raw.get("trust_delta_negative", -5)),
 		"recommend_count": int(raw.get("recommend_count", 3)),
+		"focus_limit": int(raw.get("focus_limit", -1)),
 	}
 	_reflection_ops_used = 0
+	# 将关注上限写入 player_role_state。
+	if player_role_state != null:
+		player_role_state.focus_limit = int(_reflection_config.get("focus_limit", -1))
+		# 从 world_seed 初始化关注列表（仅当当前关注列表为空时执行，避免覆盖存档数据）。
+		var initial_npcs: Array = raw.get("initial_focus_npcs", [])
+		if not initial_npcs.is_empty() and player_role_state.focusing_npcs.is_empty():
+			player_role_state.init_focusing_npcs(initial_npcs)
+			print("[自省] 初始关注列表已加载: %s" % str(player_role_state.focusing_npcs))
 	print("[自省] reflectionConfig 已加载: %s" % str(_reflection_config))
 
 # 功能：清空周期级关系变动记录。
@@ -2648,9 +2687,15 @@ func get_reflection_recommended_npcs() -> Array:
 			count_map[from_id] = int(count_map.get(from_id, 0)) + 1
 		if not to_id.is_empty() and to_id != "player":
 			count_map[to_id] = int(count_map.get(to_id, 0)) + 1
+	# 排除已在关注列表中的 NPC，避免"刚移除又被推荐"。
+	var focusing_list: Array = []
+	if player_role_state != null:
+		focusing_list = player_role_state.focusing_npcs
 	# 转换为数组，按次数降序排序
 	var npc_list: Array = []
 	for npc_id in count_map.keys():
+		if focusing_list.has(npc_id):
+			continue
 		npc_list.append({"npc_id": npc_id, "change_count": int(count_map[npc_id])})
 	npc_list.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return int(a["change_count"]) > int(b["change_count"])
@@ -2738,3 +2783,21 @@ func reflection_settle() -> void:
 	clear_cycle_affinity_changes()
 	_reflection_ops_used = 0
 	print("[自省] 结算完成：累积记录已清空，操作次数已重置")
+
+# ── 自省状态机代理接口 ─────────────────────────────────────────────
+
+# 功能：启动自省状态机，返回初始状态和可用操作。
+func start_reflection() -> Dictionary:
+	return _reflection_sm.start(self)
+
+# 功能：在自省状态机中执行操作，驱动状态转移。
+func reflection_act(action: String, target: String = "") -> Dictionary:
+	return _reflection_sm.act(action, target)
+
+# 功能：确认空自省演出，触发结算。
+func reflection_confirm() -> Dictionary:
+	return _reflection_sm.confirm()
+
+# 功能：查询自省状态机是否处于活跃状态。
+func is_reflection_active() -> bool:
+	return _reflection_sm.is_active()

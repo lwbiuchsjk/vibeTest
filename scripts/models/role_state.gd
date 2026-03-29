@@ -14,6 +14,8 @@ var attributes: Dictionary
 var resources: Dictionary
 # 玩家关注的 NPC ID 列表。空列表视为关注所有 NPC。仅玩家角色使用。
 var focusing_npcs: Array = []
+# 玩家关注 NPC 数量上限。-1 表示无限制。由 world_seed 的 reflection_config.focus_limit 初始化。
+var focus_limit: int = -1
 
 # 初始化角色数据。字典会深拷贝，避免外部引用污染内部状态。
 func _init(
@@ -74,6 +76,30 @@ func is_focusing(npc_id: String) -> bool:
 	if focusing_npcs.is_empty():
 		return true
 	return focusing_npcs.has(npc_id)
+
+# 功能：判断关注列表是否已满。
+# 说明：focus_limit <= 0 时视为无限制，永远返回 false。
+func is_focus_full() -> bool:
+	if focus_limit <= 0:
+		return false
+	return focusing_npcs.size() >= focus_limit
+
+# 功能：从关注列表移除指定 NPC。
+# 说明：返回是否移除成功（NPC 不在列表中时返回 false）。
+func remove_focus(npc_id: String) -> bool:
+	var idx := focusing_npcs.find(npc_id)
+	if idx >= 0:
+		focusing_npcs.remove_at(idx)
+		return true
+	return false
+
+# 功能：向关注列表添加指定 NPC。
+# 说明：已存在时不重复添加，返回 false。
+func add_focus(npc_id: String) -> bool:
+	if focusing_npcs.has(npc_id):
+		return false
+	focusing_npcs.append(npc_id)
+	return true
 
 # 功能：切换指定 NPC 的关注状态。
 # 说明：已关注则取消，未关注则添加。返回切换后的关注状态。
@@ -145,7 +171,8 @@ func to_dict() -> Dictionary:
 		"portrait_file": portrait_file,
 		"attributes": attributes.duplicate(true),
 		"resources": resources.duplicate(true),
-		"focusing_npcs": focusing_npcs.duplicate()
+		"focusing_npcs": focusing_npcs.duplicate(),
+		"focus_limit": focus_limit
 	}
 
 # 从 Dictionary 快照反序列化为 RoleState。
@@ -162,6 +189,8 @@ static func from_dict(data: Dictionary) -> RoleState:
 	# 还原关注列表；缺省时保持空列表（视为关注所有 NPC）
 	var focusing: Array = data.get("focusing_npcs", [])
 	state.init_focusing_npcs(focusing)
+	# 还原关注上限；缺省为 -1（无限制）
+	state.focus_limit = int(data.get("focus_limit", -1))
 	return state
 
 static func _load_texture_from_file(path: String) -> Texture2D:

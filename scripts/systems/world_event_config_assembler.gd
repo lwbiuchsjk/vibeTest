@@ -211,9 +211,19 @@ static func _assemble_world_state(tables: Dictionary) -> Dictionary:
 				affinity_config[key] = _to_int(value_text, 0)
 				world_state["affinityConfig"] = affinity_config
 			"reflection_config":
-				# 说明：自省系统配置（操作限额、调整刻度、推荐数量），写入 reflectionConfig 字典。
+				# 说明：自省系统配置（操作限额、调整刻度、推荐数量、关注上限、初始关注列表），写入 reflectionConfig 字典。
 				var reflection_config: Dictionary = world_state.get("reflectionConfig", {})
-				reflection_config[key] = _to_int(value_text, 0)
+				if key == "initial_focus_npcs":
+					# initial_focus_npcs 为分号分隔的 NPC ID 字符串，转换为 Array。
+					var npcs: Array = []
+					if not value_text.is_empty():
+						for npc_id in value_text.split(";"):
+							var trimmed: String = npc_id.strip_edges()
+							if not trimmed.is_empty():
+								npcs.append(trimmed)
+					reflection_config[key] = npcs
+				else:
+					reflection_config[key] = _to_int(value_text, 0)
 				world_state["reflectionConfig"] = reflection_config
 			"affinity":
 				# 说明：初始关系分值配置。scope_a 为 "from->to" 格式，key 固定为 "score"。
@@ -991,6 +1001,19 @@ static func _apply_effect_or_resolution_action(container: Dictionary, target: St
 		var chain_patch: Dictionary = container.get("chainContextPatch", {})
 		_apply_chain_patch_item(chain_patch, key, value_text)
 		container["chainContextPatch"] = chain_patch
+		return
+
+	if target == "focus":
+		# 说明：关注列表修改动作。op 为 add/remove/set，value_text 为分号分隔的 NPC ID。
+		var focus_patch: Dictionary = {"op": op}
+		var npcs: Array = []
+		if not value_text.is_empty():
+			for npc_id in value_text.split(";"):
+				var trimmed: String = npc_id.strip_edges()
+				if not trimmed.is_empty():
+					npcs.append(trimmed)
+		focus_patch["npcs"] = npcs
+		container["focusPatch"] = focus_patch
 		return
 
 	if target == "task":

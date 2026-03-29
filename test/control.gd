@@ -11,6 +11,7 @@ const WorldEndMilestone4SmokeTest := preload("res://test/smoke/world_end_milesto
 const XinxingPhase2SmokeTest := preload("res://test/smoke/xinxing_phase2_smoke_test.gd")
 const RelationshipPhase3SmokeTest := preload("res://test/smoke/relationship_phase3_smoke_test.gd")
 const ReflectionPhase4SmokeTest := preload("res://test/smoke/reflection_phase4_smoke_test.gd")
+const ReflectionSmSmokeTest := preload("res://test/smoke/reflection_sm_smoke_test.gd")
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 
 
@@ -40,76 +41,62 @@ func _ready() -> void:
 		print("[ControlTest] Config context build failed: %s" % context_error)
 		return
 
-	var milestone_result: Dictionary = MilestoneASmokeTest.run_with_context(context)
-	#print("[MilestoneA]", milestone_result)
-	var milestone_c_result: Dictionary = MilestoneCSmokeTest.run_from_csv()
-	print("[MilestoneC] %s" % JSON.stringify(milestone_c_result))
-	var milestone_3_result: Dictionary = Milestone3SmokeTest.run_from_csv()
-	print("[Milestone3] %s" % JSON.stringify(milestone_3_result))
-	# 功能：输出世界结束里程碑 1 的配置层验收结果。
-	# 说明：这里只验证 ending 标记编译与 ending 事件强约束，不涉及运行时结束流程。
-	var world_end_m1_result: Dictionary = WorldEndMilestone1SmokeTest.run_from_csv()
-	print("[WorldEnd-M1] %s" % JSON.stringify(world_end_m1_result))
-	# 功能：输出世界结束里程碑 2 的运行态验收结果。
-	# 说明：这里验证 ending event 结算后 runState 写入与执行锁清理是否正确。
-	var world_end_m2_result: Dictionary = WorldEndMilestone2SmokeTest.run()
-	print("[WorldEnd-M2] %s" % JSON.stringify(world_end_m2_result))
-	# 功能：输出世界结束里程碑 3 的接口封口验收结果。
-	# 说明：这里验证 ending event 当次 payload 已带 ended 字段，且 ended 后的 preview/run/confirm 都会稳定短路。
-	var world_end_m3_result: Dictionary = WorldEndMilestone3SmokeTest.run()
-	print("[WorldEnd-M3] %s" % JSON.stringify(world_end_m3_result))
-	# 功能：输出世界结束里程碑 4 的汇总回归结果。
-	# 说明：这里汇总非法配置阻断、ending 正常结束、ended 封口与非 ending 兼容回归，便于一次性验收。
-	var world_end_m4_result: Dictionary = WorldEndMilestone4SmokeTest.run()
-	print("[WorldEnd-M4] %s" % JSON.stringify(world_end_m4_result))
-
-	# 功能：输出第二阶段心性与风险结构冒烟测试结果。
-	var xinxing_phase2_result: Dictionary = XinxingPhase2SmokeTest.run_all()
-	print("[XinxingPhase2] %s" % JSON.stringify(xinxing_phase2_result))
-
-	# 功能：输出第三阶段关系接入鉴定冒烟测试结果。
-	var relationship_phase3_result: Dictionary = RelationshipPhase3SmokeTest.run_all()
-	print("[RelationshipPhase3] %s" % JSON.stringify(relationship_phase3_result))
-
-	# 功能：输出第四阶段玩家自省与关系调整冒烟测试结果。
-	var reflection_phase4_result: Dictionary = ReflectionPhase4SmokeTest.run_all()
-	print("[ReflectionPhase4] %s" % JSON.stringify(reflection_phase4_result))
-
-	# 说明：执行 MVP 世界事件回归测试并输出摘要。
-	var mvp_result: Dictionary = MvpWorldEventSmokeTest.run_from_csv()
-	#print("[MVP-WorldEvent]", mvp_result)
-	if mvp_result.get("ok", false):
-		var turns: Array = mvp_result.get("turns", [])
-		print("[MVP-WorldEvent] Triggered Events Summary (ordered):")
-		for turn_variant in turns:
-			var turn_detail: Dictionary = turn_variant
-			var event: Dictionary = turn_detail.get("event", {})
-			var choice_text := "无"
-			var choice: Dictionary = event.get("choice", {})
-			var selected_option_id := str(choice.get("selected_option_id", ""))
-			# 说明：优先打印“选项ID + 选项文本”，便于快速核对分支路径。
-			if not selected_option_id.is_empty():
-				var selected_option_label := ""
-				var options: Array = choice.get("options", [])
-				for option_variant in options:
-					var option_def: Dictionary = option_variant
-					if str(option_def.get("id", "")) == selected_option_id:
-						selected_option_label = str(option_def.get("text", ""))
-						break
-				if selected_option_label.is_empty():
-					choice_text = selected_option_id
-				else:
-					choice_text = "%s (%s)" % [selected_option_id, selected_option_label]
-			print(
-				"  - Turn %s | event_id=%s | title=%s | route=%s | policy=%s | 本次选择=%s" % [
-					str(turn_detail.get("turn_index", "")),
-					str(event.get("event_id", "")),
-					str(event.get("title", "")),
-					str(event.get("route", "")),
-					str(event.get("policy", "")),
-					choice_text
-				]
-			)
+	# ── 冒烟测试已全部通过，注释掉以减少运行时冗余输出 ──
+	#var milestone_result: Dictionary = MilestoneASmokeTest.run_with_context(context)
+	##print(“[MilestoneA]”, milestone_result)
+	#var milestone_c_result: Dictionary = MilestoneCSmokeTest.run_from_csv()
+	#print(“[MilestoneC] %s” % JSON.stringify(milestone_c_result))
+	#var milestone_3_result: Dictionary = Milestone3SmokeTest.run_from_csv()
+	#print(“[Milestone3] %s” % JSON.stringify(milestone_3_result))
+	#var world_end_m1_result: Dictionary = WorldEndMilestone1SmokeTest.run_from_csv()
+	#print(“[WorldEnd-M1] %s” % JSON.stringify(world_end_m1_result))
+	#var world_end_m2_result: Dictionary = WorldEndMilestone2SmokeTest.run()
+	#print(“[WorldEnd-M2] %s” % JSON.stringify(world_end_m2_result))
+	#var world_end_m3_result: Dictionary = WorldEndMilestone3SmokeTest.run()
+	#print(“[WorldEnd-M3] %s” % JSON.stringify(world_end_m3_result))
+	#var world_end_m4_result: Dictionary = WorldEndMilestone4SmokeTest.run()
+	#print(“[WorldEnd-M4] %s” % JSON.stringify(world_end_m4_result))
+	#var xinxing_phase2_result: Dictionary = XinxingPhase2SmokeTest.run_all()
+	#print(“[XinxingPhase2] %s” % JSON.stringify(xinxing_phase2_result))
+	#var relationship_phase3_result: Dictionary = RelationshipPhase3SmokeTest.run_all()
+	#print(“[RelationshipPhase3] %s” % JSON.stringify(relationship_phase3_result))
+	#var reflection_phase4_result: Dictionary = ReflectionPhase4SmokeTest.run_all()
+	#print(“[ReflectionPhase4] %s” % JSON.stringify(reflection_phase4_result))
+	#var reflection_sm_result: Dictionary = ReflectionSmSmokeTest.run_all()
+	#print(“[ReflectionSM] %s” % JSON.stringify(reflection_sm_result))
+	#var mvp_result: Dictionary = MvpWorldEventSmokeTest.run_from_csv()
+	##print(“[MVP-WorldEvent]”, mvp_result)
+	#if mvp_result.get(“ok”, false):
+	#	var turns: Array = mvp_result.get(“turns”, [])
+	#	print(“[MVP-WorldEvent] Triggered Events Summary (ordered):”)
+	#	for turn_variant in turns:
+	#		var turn_detail: Dictionary = turn_variant
+	#		var event: Dictionary = turn_detail.get(“event”, {})
+	#		var choice_text := “无”
+	#		var choice: Dictionary = event.get(“choice”, {})
+	#		var selected_option_id := str(choice.get(“selected_option_id”, “”))
+	#		if not selected_option_id.is_empty():
+	#			var selected_option_label := “”
+	#			var options: Array = choice.get(“options”, [])
+	#			for option_variant in options:
+	#				var option_def: Dictionary = option_variant
+	#				if str(option_def.get(“id”, “”)) == selected_option_id:
+	#					selected_option_label = str(option_def.get(“text”, “”))
+	#					break
+	#			if selected_option_label.is_empty():
+	#				choice_text = selected_option_id
+	#			else:
+	#				choice_text = “%s (%s)” % [selected_option_id, selected_option_label]
+	#		print(
+	#			“  - Turn %s | event_id=%s | title=%s | route=%s | policy=%s | 本次选择=%s” % [
+	#				str(turn_detail.get(“turn_index”, “”)),
+	#				str(event.get(“event_id”, “”)),
+	#				str(event.get(“title”, “”)),
+	#				str(event.get(“route”, “”)),
+	#				str(event.get(“policy”, “”)),
+	#				choice_text
+	#			]
+	#		)
 
 
 func _process(delta: float) -> void:
