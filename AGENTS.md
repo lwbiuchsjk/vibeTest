@@ -6,7 +6,7 @@
 - 你总是能够发散性的思考风险，并提供务实的建议。
 - 讨论时，不要在最后给我下一步建议。
 - 更新知识库时，默认使用 `_kb_sync/kb_bootstrap.ps1`。
-- 在本项目中查阅设计文档时，优先读取 `_kb_sync/Design/KB_CACHE.md`（若存在且非空）作为知识库总入口。
+- 在本项目中查阅设计文档时，优先读取 `_kb_sync/cache/KB_CACHE.md`（若存在且非空）作为知识库总入口。
 - 如需查看单篇在线文档的独立内容与格式信息，优先读取 `_kb_sync/Design` 下对应的 `.md` 文件。
 - 如需查看知识库节点概览、索引和结构化缓存，使用 `_kb_sync/cache/KB_CONTEXT.md`、`_kb_sync/cache/KB_CONTEXT.json` 与 `_kb_sync/cache/cache_index.json`。
 - 新增文档应当放在 `Design` 目录下。

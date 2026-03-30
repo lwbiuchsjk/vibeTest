@@ -14,7 +14,7 @@ Godot 4.5，GDScript，Git 版本控制
 - test/         测试文件
 - Design/       本地设计文件。创建文档时优先放在这里
 - _kb_sync/     本地在线知识库缓存功能。更新知识库中通常使用本路径下的方法
-- _kb_sync/Design/KB_CACHE.md   在线知识库缓存主入口。这里可以看到所有在线知识库的缓存。
+- _kb_sync/cache/KB_CACHE.md   在线知识库缓存主入口。这里可以看到所有在线知识库的缓存。
 - _kb_sync/Design/              在线知识库缓存的单个md文件。查询文件指定文件时，可以优先在这里查找文件。
 
 # 开发规范
@@ -39,7 +39,10 @@ Godot 4.5，GDScript，Git 版本控制
 
 ## 工作流程
 
+- 更新知识库时，默认使用 `_kb_sync/kb_bootstrap.ps1`。
+- 如需查看单篇在线文档的独立内容与格式信息，优先读取 `_kb_sync/Design` 下对应的 `.md` 文件。
 - 如需查看知识库节点概览、索引和结构化缓存，使用 `_kb_sync/cache/KB_CONTEXT.md`、`_kb_sync/cache/KB_CONTEXT.json` 与 `_kb_sync/cache/cache_index.json`。
+- 新增文档应当放在 `Design` 目录下。
 
 ## 测试流程
 
