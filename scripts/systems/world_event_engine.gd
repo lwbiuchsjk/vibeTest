@@ -13,6 +13,7 @@ const LocationGraph := preload("res://scripts/models/location_graph.gd")
 # 说明：RuleEngine 已通过 class_name 全局注册，无需 preload。
 const AffinityMapClass := preload("res://scripts/models/affinity_map.gd")
 const ReflectionStateMachine := preload("res://scripts/systems/reflection_state_machine.gd")
+const CreationStateMachine := preload("res://scripts/systems/creation_state_machine.gd")
 
 var world_state: Dictionary = {}
 var events: Array = []
@@ -46,6 +47,10 @@ var _reflection_config: Dictionary = {}
 var _reflection_ops_used: int = 0
 # 自省状态机实例，管理自省事件的完整交互流程。
 var _reflection_sm: ReflectionStateMachine = ReflectionStateMachine.new()
+# 开局选择状态机实例，管理角色创建的逐题交互流程。
+var _creation_sm: CreationStateMachine = CreationStateMachine.new()
+# 开局选择配置数据，从 CSV 加载后暂存，供 start_creation() 使用。
+var _creation_config: Array = []
 # 最近一次心性转移记录（{old_value, new_value}），无转移时为空字典。
 var _last_xinxing_transition: Dictionary = {}
 # 主动押注全局默认配置：cost 为额外代价（叠加在选项 cost 之上），bias 为鉴定加骰。
@@ -107,7 +112,12 @@ func load_from_csv_dir(csv_dir_path: String) -> Dictionary:
 		if role_variant != null and role_variant.role_type == "player":
 			p_role_state = role_variant
 			break
-	return load_from_data(world_event_data, _location_graph, p_role_state)
+	var load_result_final := load_from_data(world_event_data, _location_graph, p_role_state)
+	if not load_result_final.get("ok", false):
+		return load_result_final
+	# 加载开局选择配置（可选，文件不存在时静默跳过）。
+	_load_creation_config(csv_dir_path)
+	return load_result_final
 
 # 功能：从 JSON 文本加载数据。
 # 说明：适合测试与热重载，成功后会重建事件与选择点索引。
@@ -137,6 +147,8 @@ func load_from_json_text(
 	task_evaluation = {}
 	# JSON 路径不携带 RoleState，清空避免上一轮残留脏状态。
 	player_role_state = null
+	# 清空开局选择配置，避免上一轮残留。
+	_creation_config = []
 	_ensure_run_state()
 	_ensure_task_runtime_state()
 	_rebuild_event_map()
@@ -187,6 +199,8 @@ func load_from_data(data: Dictionary, location_graph: Variant = null, role_state
 	# 每次加载时无条件重置 player_role_state，避免上一轮残留脏状态。
 	# 若传入了 role_state 则注入并同步到 world_state。
 	player_role_state = role_state
+	# 清空开局选择配置，避免上一轮残留。由 load_from_csv_dir 或外部调用方负责重新加载。
+	_creation_config = []
 	if player_role_state != null:
 		_sync_role_to_world_state()
 	# 初始化心性 tracker，记录孤注一掷使用次数与稳健连续回合数。
@@ -2905,3 +2919,44 @@ func reflection_confirm() -> Dictionary:
 # 功能：查询自省状态机是否处于活跃状态。
 func is_reflection_active() -> bool:
 	return _reflection_sm.is_active()
+
+# ── 开局选择状态机代理接口 ──────────────────────────────────────────
+
+# 功能：启动开局选择状态机，返回初始状态和当前问题。
+# 说明：传入非空 config 时使用传入配置；传入空数组时使用引擎预加载的 _creation_config。
+#       若需要测试空配置场景，应直接调用 _creation_sm.start(self, [])。
+func start_creation(config: Array = []) -> Dictionary:
+	var use_config: Array = config if not config.is_empty() else _creation_config
+	return _creation_sm.start(self, use_config)
+
+# 功能：在开局选择状态机中执行选项操作，驱动流程推进。
+func creation_act(option_id: String) -> Dictionary:
+	return _creation_sm.act(option_id)
+
+# 功能：查询开局选择状态机是否处于活跃状态。
+func is_creation_active() -> bool:
+	return _creation_sm.is_active()
+
+# 功能：查询是否有开局选择配置可用。
+func has_creation_config() -> bool:
+	return not _creation_config.is_empty()
+
+# 功能：条件判定代理，供外部模块（如 CreationStateMachine）调用。
+func evaluate_condition(expr: String) -> bool:
+	return _evaluate_condition(expr)
+
+# 功能：加载开局选择配置。
+# 说明：配置文件与 roles.csv 同级，固定在 res://scripts/config/ 下。
+#       文件不存在时静默跳过，不影响引擎正常启动。
+func _load_creation_config(_csv_dir_path: String = "") -> void:
+	var config_path := "res://scripts/config/creation_questions.csv"
+	if not FileAccess.file_exists(config_path):
+		_creation_config = []
+		return
+	var result: Dictionary = ConfigLoader.load_creation_config(config_path)
+	if result.get("ok", false):
+		_creation_config = result.get("data", [])
+		print("[开局选择] 配置已加载，共 %d 个问题" % _creation_config.size())
+	else:
+		_creation_config = []
+		print("[开局选择] 配置加载失败: %s" % str(result.get("error", "")))

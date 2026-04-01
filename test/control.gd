@@ -13,6 +13,7 @@ const RelationshipPhase3SmokeTest := preload("res://test/smoke/relationship_phas
 const ReflectionPhase4SmokeTest := preload("res://test/smoke/reflection_phase4_smoke_test.gd")
 const ReflectionSmSmokeTest := preload("res://test/smoke/reflection_sm_smoke_test.gd")
 const ReflectionDispatchSmokeTest := preload("res://test/smoke/reflection_dispatch_smoke_test.gd")
+const CreationSmSmokeTest := preload("res://test/smoke/creation_sm_smoke_test.gd")
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 
 
@@ -67,6 +68,8 @@ func _ready() -> void:
 	#print("[ReflectionSM] ok=%s" % str(reflection_sm_result.get("ok", false)))
 	#var reflection_dispatch_result: Dictionary = ReflectionDispatchSmokeTest.run_all()
 	#print("[ReflectionDispatch] ok=%s" % str(reflection_dispatch_result.get("ok", false)))
+	#var creation_sm_result: Dictionary = CreationSmSmokeTest.run_all()
+	#print("[CreationSM] ok=%s" % str(creation_sm_result.get("ok", false)))
 	#var mvp_result: Dictionary = MvpWorldEventSmokeTest.run_from_csv()
 	##print("[MVP-WorldEvent]", mvp_result)
 	#if mvp_result.get("ok", false):

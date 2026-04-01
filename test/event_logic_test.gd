@@ -55,6 +55,13 @@ func _ready() -> void:
 		status_label.text = "加载失败: %s" % str(load_result.get("error", "unknown"))
 		return
 
+	# 开局选择阶段：如果有创建配置，先进入角色创建流程。
+	if _engine.has_creation_config():
+		var creation_result: Dictionary = _engine.start_creation()
+		if creation_result.get("state", "") == "PRESENTING":
+			_append_log("进入开局选择阶段。")
+			_render_creation_phase(creation_result)
+			return
 	_append_log("测试环境启动，开始预览第一个事件。")
 	_preview_next_event()
 
@@ -183,6 +190,58 @@ func _render_risk_entry_buttons(accept_text: String, reject_text: String) -> voi
 	reject_button.pressed.connect(_on_option_pressed.bind("reject"))
 	ButtonTheme.apply(reject_button)
 	option_list.add_child(reject_button)
+
+
+# ── 开局选择 UI ──────────────────────────────────────────────────
+
+# 功能：渲染开局选择阶段界面。
+# 说明：使用 narrative_panel 展示问题文本，option_list 展示选项按钮。
+func _render_creation_phase(result: Dictionary) -> void:
+	var question_text := str(result.get("question_text", ""))
+	var question_index: int = int(result.get("question_index", 0))
+	var question_total: int = int(result.get("question_total", 0))
+	var actions: Array = result.get("available_actions", [])
+
+	# 更新状态栏进度提示。
+	status_label.text = "角色创建 (%d/%d)" % [question_index + 1, question_total]
+
+	# 渲染问题文本到叙事面板。
+	event_title_label.text = "开局选择"
+	event_detail_label.text = question_text
+
+	# 清空选项列表并渲染选项按钮。
+	_clear_option_list()
+	for action_variant in actions:
+		var action: Dictionary = action_variant
+		var btn := Button.new()
+		btn.text = str(action.get("label", ""))
+		btn.disabled = not bool(action.get("enabled", true))
+		var option_id := str(action.get("action", ""))
+		btn.pressed.connect(_on_creation_option_pressed.bind(option_id))
+		ButtonTheme.apply(btn)
+		option_list.add_child(btn)
+
+	_update_side_panels()
+
+
+# 功能：处理开局选择的选项按钮点击。
+# 说明：调用引擎代理执行选择，根据返回状态决定渲染下一题或进入事件流程。
+func _on_creation_option_pressed(option_id: String) -> void:
+	var result := _engine.creation_act(option_id)
+	if not result.get("ok", false):
+		status_label.text = "开局选择操作失败: %s" % str(result.get("error", "unknown"))
+		return
+
+	_append_log("开局选择: %s" % option_id)
+
+	var state := str(result.get("state", ""))
+	if state == "PRESENTING":
+		# 还有下一题，渲染。
+		_render_creation_phase(result)
+	else:
+		# 全部完成，进入正常事件流程。
+		_append_log("开局选择完成，开始预览第一个事件。")
+		_preview_next_event()
 
 
 # ── 自省事件 UI ──────────────────────────────────────────────────
@@ -1428,4 +1487,10 @@ func _load_world_event_test_config(test_config: Dictionary) -> Dictionary:
 			p_role_state = role_variant
 			break
 
-	return _engine.load_from_data(world_event_data, location_graph, p_role_state)
+	var data_result: Dictionary = _engine.load_from_data(world_event_data, location_graph, p_role_state)
+	if not data_result.get("ok", false):
+		return data_result
+	# 补充加载开局选择配置（load_from_data 路径不经过 load_from_csv_dir，需手动触发）。
+	var creation_csv_dir := str(test_config.get("world_event_csv_dir", "res://scripts/config/world_event_mvp")).strip_edges()
+	_engine._load_creation_config(creation_csv_dir)
+	return data_result

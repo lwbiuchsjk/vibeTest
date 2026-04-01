@@ -138,6 +138,74 @@ static func load_affinity_map(path: String) -> Dictionary:
 
 	return {"ok": true, "affinity": affinity}
 
+# 从 creation_questions.csv 加载开局选择配置，解析为结构化问题-选项树。
+# 返回：
+# - {"ok": true, "data": Array} — data 为按行序排列的问题数组
+# - {"ok": false, "error": String}
+static func load_creation_config(path: String) -> Dictionary:
+	var table_result := load_csv_table(path)
+	if not table_result.get("ok", false):
+		return table_result
+
+	var rows: Array = table_result["rows"]
+	# 按行序收集问题和选项，同 question_id 的行合并为一个问题。
+	var questions: Array = []
+	# 当前正在构建的问题 ID → questions 数组中的索引。
+	var question_index_map: Dictionary = {}
+	# 当前问题内的选项 ID → options 数组中的索引。
+	var option_index_maps: Dictionary = {}
+
+	for row_variant in rows:
+		var row: Dictionary = row_variant
+		var qid := str(row.get("question_id", "")).strip_edges()
+		if qid.is_empty():
+			continue
+
+		# 若该问题尚未出现，创建新问题条目。
+		if not question_index_map.has(qid):
+			var question: Dictionary = {
+				"question_id": qid,
+				"question_text": str(row.get("question_text", "")),
+				"condition": str(row.get("condition", "")),
+				"options": []
+			}
+			question_index_map[qid] = questions.size()
+			option_index_maps[qid] = {}
+			questions.append(question)
+
+		var q_idx: int = int(question_index_map[qid])
+		var question: Dictionary = questions[q_idx]
+		var options: Array = question["options"]
+		var oid := str(row.get("option_id", "")).strip_edges()
+		if oid.is_empty():
+			continue
+
+		# 构建 effect 条目。
+		var effect: Dictionary = {
+			"target": str(row.get("effect_target", "")),
+			"key": str(row.get("effect_key", "")),
+			"value": str(row.get("effect_value", ""))
+		}
+
+		# 若该选项已存在，追加 effect；否则创建新选项。
+		var opt_map: Dictionary = option_index_maps[qid]
+		if opt_map.has(oid):
+			var o_idx: int = int(opt_map[oid])
+			var existing_option: Dictionary = options[o_idx]
+			var effects: Array = existing_option["effects"]
+			effects.append(effect)
+		else:
+			var new_option: Dictionary = {
+				"option_id": oid,
+				"option_text": str(row.get("option_text", "")),
+				"effects": [effect]
+			}
+			opt_map[oid] = options.size()
+			options.append(new_option)
+
+	return {"ok": true, "data": questions}
+
+
 static func _to_int(value: Variant, default_value: int) -> int:
 	var text := str(value).strip_edges()
 	if text.is_empty():
