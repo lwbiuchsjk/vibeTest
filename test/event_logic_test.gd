@@ -962,12 +962,11 @@ func _build_ability_display_text() -> String:
 	var role: RoleState = _engine.player_role_state
 	var thresholds: Array = _engine.get_assessment_thresholds()
 	var ability_keys := ["aptitude", "physique", "craft", "insight"]
-	var ability_names := {"aptitude": "资质", "physique": "体魄", "craft": "技艺", "insight": "见识"}
 	var parts: Array[String] = []
 	for key in ability_keys:
 		var value := int(role.get_attribute(key, 0))
 		var stage := RuleEngine.get_ability_stage(value, thresholds)
-		parts.append("%s %d · 阶段%d" % [str(ability_names.get(key, key)), value, stage])
+		parts.append("%s %d · 阶段%d" % [RoleState.get_display_name(key), value, stage])
 	return "    ".join(parts)
 
 

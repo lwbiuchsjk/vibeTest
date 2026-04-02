@@ -17,6 +17,7 @@ const DEFAULT_PATHS := {
 	"roles": "res://scripts/config/roles.csv",
 	"location_graph": "res://scripts/config/location_graph.csv",
 	"affinity": "res://scripts/config/affinity.csv",
+	"attribute_names": "res://scripts/config/attribute_names.csv",
 	"world_event_csv_dir": "res://scripts/config/world_event_mvp"
 }
 
@@ -86,6 +87,19 @@ func ensure_loaded(paths: Dictionary = {}, force_reload: bool = false) -> Dictio
 	_world_event_data = (world_event_result.get("data", {}) as Dictionary).duplicate(true)
 	_source_paths = resolved_paths
 	_loaded = true
+
+	# 所有核心配置加载成功后，再初始化属性名称翻译表（纯展示用途，失败不阻断）。
+	# 放在写入缓存之后，确保重载时不会出现翻译表与配置数据不一致的状态。
+	var attr_names_path := str(resolved_paths.get("attribute_names", ""))
+	if attr_names_path.is_empty():
+		RoleState.init_attribute_names({})
+	else:
+		var attr_names_result := ConfigLoader.load_attribute_names(attr_names_path)
+		if attr_names_result.get("ok", false):
+			RoleState.init_attribute_names(attr_names_result["names"])
+		else:
+			RoleState.init_attribute_names({})
+
 	return {"ok": true}
 
 # 返回角色数据副本，避免调用方直接修改运行时缓存。

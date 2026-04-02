@@ -4,6 +4,13 @@ class_name RoleState
 # 角色形象资源固定目录：配置中只填写文件名（如 icon.svg）。
 const PORTRAIT_BASE_DIR := "res://assets/art/characters/portraits"
 
+# 属性名称映射表（从 attribute_names.csv 加载）。
+# 格式：{internal_key: {display_name, category, value_range, description}}
+# 由 init_attribute_names() 初始化；未初始化时 get_display_name() 返回原始 key。
+static var _attribute_names: Dictionary = {}
+# 设计文档名称 → 内部功能名称的反向映射表。由 init_attribute_names() 构建。
+static var _reverse_display_names: Dictionary = {}
+
 # 玩家与 NPC 共用的角色状态模型。
 var role_id: String
 var role_type: String
@@ -43,6 +50,32 @@ func get_portrait_path() -> String:
 	if not has_portrait():
 		return ""
 	return "%s/%s" % [PORTRAIT_BASE_DIR, portrait_file]
+
+# 从外部加载的映射数据初始化属性名称表。由 ConfigRuntime 启动时调用。
+# names 格式：{internal_key: {display_name, category, value_range, description}}
+static func init_attribute_names(names: Dictionary) -> void:
+	_attribute_names = names.duplicate(true)
+	_reverse_display_names = {}
+	for key in _attribute_names.keys():
+		var entry: Dictionary = _attribute_names[key]
+		var dn: String = str(entry.get("display_name", key))
+		_reverse_display_names[dn] = key
+
+# 获取属性的设计文档显示名称；未初始化或无映射时返回原始 key。
+static func get_display_name(key: String) -> String:
+	if _attribute_names.has(key):
+		return str((_attribute_names[key] as Dictionary).get("display_name", key))
+	return key
+
+# 将设计文档名称转换为内部功能名称；无映射时返回原始名称。
+static func get_internal_key(design_name: String) -> String:
+	return str(_reverse_display_names.get(design_name, design_name))
+
+# 获取属性的完整元信息字典；无映射时返回空字典。
+static func get_attribute_meta(key: String) -> Dictionary:
+	if _attribute_names.has(key):
+		return (_attribute_names[key] as Dictionary).duplicate(true)
+	return {}
 
 func load_portrait_texture() -> Texture2D:
 	if not has_portrait():

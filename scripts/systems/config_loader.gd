@@ -79,6 +79,7 @@ static func load_roles(path: String) -> Dictionary:
 			{
 				"hp": _to_int(row.get("hp", "0"), 0),
 				"energy": _to_int(row.get("energy", "0"), 0),
+				"spirit": _to_int(row.get("spirit", "2"), 2),
 				"gold": _to_int(row.get("gold", "0"), 0)
 			}
 		)
@@ -204,6 +205,32 @@ static func load_creation_config(path: String) -> Dictionary:
 			options.append(new_option)
 
 	return {"ok": true, "data": questions}
+
+
+# 从 attribute_names.csv 加载属性名称映射表。
+# 返回：
+# - {"ok": true, "names": Dictionary}  — names 格式为 {internal_key: {display_name, category, value_range, description}}
+# - {"ok": false, "error": String}
+static func load_attribute_names(path: String) -> Dictionary:
+	var table_result := load_csv_table(path)
+	if not table_result.get("ok", false):
+		return table_result
+
+	var names: Dictionary = {}
+	var rows: Array = table_result["rows"]
+	for row_variant in rows:
+		var row: Dictionary = row_variant
+		var internal_key := str(row.get("internal_key", "")).strip_edges()
+		if internal_key.is_empty():
+			continue
+		names[internal_key] = {
+			"display_name": str(row.get("display_name", internal_key)),
+			"category": str(row.get("category", "")),
+			"value_range": str(row.get("value_range", "")),
+			"description": str(row.get("description", ""))
+		}
+
+	return {"ok": true, "names": names}
 
 
 static func _to_int(value: Variant, default_value: int) -> int:
