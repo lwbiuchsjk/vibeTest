@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dcoo0kv5b6wjk"
+
+[deps]
+
+files=["res://scripts/config/attribute_names.display.translation", "res://scripts/config/attribute_names.category.translation", "res://scripts/config/attribute_names.value.translation", "res://scripts/config/attribute_names.description.translation"]
+
+source_file="res://scripts/config/attribute_names.csv"
+dest_files=["res://scripts/config/attribute_names.display.translation", "res://scripts/config/attribute_names.category.translation", "res://scripts/config/attribute_names.value.translation", "res://scripts/config/attribute_names.description.translation"]
+
+[params]
+
+compress=true
+delimiter=0
