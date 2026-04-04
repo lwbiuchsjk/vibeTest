@@ -1,14 +1,19 @@
+## 事件配置展示测试场景
+## 用途：可视化验证 world_event 配置数据的加载与渲染流程。
+## 流程：ConfigRuntime 加载配置 → 提取 events 和 choice_points → 逐事件实例化 EventCard 展示。
+## 依赖：ConfigRuntime（配置加载与缓存）、EventCard/EventCardScene（单事件卡片 UI）。
 extends Control
 
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 const EventCard := preload("res://scripts/ui/event_card.gd")
 const EventCardScene := preload("res://scripts/ui/event_card.tscn")
 
-@onready var status_label: Label = $Root/StatusLabel
-@onready var event_list: HBoxContainer = $Root/EventScroll/EventList
+@onready var status_label: Label = $Root/StatusLabel   ## 顶部状态提示，显示加载结果或错误信息
+@onready var event_list: HBoxContainer = $Root/EventScroll/EventList  ## 水平滚动容器，承载所有事件卡片
 
-# 功能：加载配置并渲染事件配置列表。
-# 说明：统一通过 ConfigRuntime 获取 world_event 快照，列表展示由 EventCard 预制组件负责。
+# 功能：场景入口，加载配置并渲染事件列表。
+# 流程：ensure_loaded() 初始化配置 → 取 world_event 数据 → 构建 choice_point 索引 → 渲染卡片。
+# 错误处理：加载失败、数据类型异常、事件为空均会在 status_label 中给出提示。
 func _ready() -> void:
 	var runtime := ConfigRuntime.shared()
 	var load_result := runtime.ensure_loaded({}, true)
@@ -33,7 +38,8 @@ func _ready() -> void:
 
 
 # 功能：渲染所有事件卡片。
-# 说明：每个事件占一列，具体内容由 EventCard 组件内部处理。
+# 说明：先清空旧子节点，再逐条实例化 EventCard 并通过 bind_data() 绑定数据。
+# 参数：events — 事件定义数组；choice_point_map — {choice_point_id: 定义} 索引，传递给卡片用于关联选项。
 func _render_events(events: Array, choice_point_map: Dictionary) -> void:
 	for child in event_list.get_children():
 		child.queue_free()
@@ -49,6 +55,8 @@ func _render_events(events: Array, choice_point_map: Dictionary) -> void:
 
 # 功能：构建 choice point 索引。
 # 说明：将 choice_points 数组映射为 {choice_point_id: choice_point_def}，供 EventCard 关联选项。
+# 参数：choice_points_variant — 来自 world_event_data 的原始 choice_points，类型不确定需校验。
+# 返回：Dictionary，键为 choice_point id（String），值为完整的 choice_point 定义（Dictionary）。
 func _build_choice_point_map(choice_points_variant: Variant) -> Dictionary:
 	var cp_map: Dictionary = {}
 	if typeof(choice_points_variant) != TYPE_ARRAY:
