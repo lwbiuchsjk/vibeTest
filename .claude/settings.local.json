@@ -8,7 +8,9 @@
       "WebFetch(domain:api.github.com)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:hub.docker.com)"
+      "WebFetch(domain:hub.docker.com)",
+      "mcp__plugin_discord_discord__fetch_messages",
+      "mcp__plugin_discord_discord__reply"
     ]
   }
 }
