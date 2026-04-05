@@ -239,6 +239,9 @@ func confirm_outcome() -> Dictionary:
 	var extra: Dictionary = _outcome_extra.duplicate()
 	_outcome_text = ""
 	_outcome_extra = {}
+	# 清除 act() 暂存的 outcome 阶段专属字段，避免覆盖下一题的 phase。
+	extra.erase("phase")
+	extra.erase("outcome_text")
 	print("[开局选择] outcome 确认，推进")
 	return _advance_to_next_question(extra)
 
