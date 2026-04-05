@@ -32,6 +32,12 @@ static func run_all() -> Dictionary:
 	_test_d3_no_check_backward_compat(checks, failed)
 	_test_d4_csv_check_parse(checks, failed)
 
+	# E：叙事分段
+	_test_e1_single_line_backward_compat(checks, failed)
+	_test_e2_multi_line_narrating_flow(checks, failed)
+	_test_e3_advance_to_choosing(checks, failed)
+	_test_e4_csv_narrative_lines_parse(checks, failed)
+
 	return {
 		"ok": failed.is_empty(),
 		"checks": checks,
@@ -189,6 +195,134 @@ static func _test_d4_csv_check_parse(checks: Array, failed: Array) -> void:
 		_fail(checks, failed, label, "effects_success should not be empty")
 		return
 	_pass(checks, label)
+
+
+# ── E：叙事分段 ──────────────────────────────────────────────────
+
+# 场景 E1：单段文字（无 |）时 phase 直接为 choosing，行为向后兼容。
+static func _test_e1_single_line_backward_compat(checks: Array, failed: Array) -> void:
+	var label := "E1: single line -> phase=choosing (backward compat)"
+	var engine := _build_engine()
+	var config := _build_test_config()
+
+	var result: Dictionary = engine.start_creation(config)
+	var phase := str(result.get("phase", ""))
+	if phase != "choosing":
+		_fail(checks, failed, label, "expected phase=choosing, got %s" % phase)
+		return
+	# 单段时 available_actions 应正常返回。
+	var actions: Array = result.get("available_actions", [])
+	if actions.is_empty():
+		_fail(checks, failed, label, "available_actions should not be empty in choosing phase")
+		return
+	_pass(checks, label)
+
+
+# 场景 E2：多段文字时，start() 返回 phase=narrating，available_actions 为空。
+static func _test_e2_multi_line_narrating_flow(checks: Array, failed: Array) -> void:
+	var label := "E2: multi-line -> phase=narrating, advance steps through lines"
+	var engine := _build_engine()
+	var config: Array = [_build_narrative_question()]
+
+	var result: Dictionary = engine.start_creation(config)
+	var phase := str(result.get("phase", ""))
+	if phase != "narrating":
+		_fail(checks, failed, label, "start: expected phase=narrating, got %s" % phase)
+		return
+	# narrating 阶段不应展示选项。
+	var actions: Array = result.get("available_actions", [])
+	if not actions.is_empty():
+		_fail(checks, failed, label, "narrating phase should have empty available_actions")
+		return
+	# 应返回第一段文字。
+	var line := str(result.get("narrative_line", ""))
+	if line != "第一段文字":
+		_fail(checks, failed, label, "first line expected '第一段文字', got '%s'" % line)
+		return
+	if int(result.get("narrative_index", -1)) != 0:
+		_fail(checks, failed, label, "narrative_index should be 0")
+		return
+	if int(result.get("narrative_total", -1)) != 3:
+		_fail(checks, failed, label, "narrative_total should be 3")
+		return
+
+	# advance 第二段。
+	result = engine.creation_advance_narrative()
+	phase = str(result.get("phase", ""))
+	line = str(result.get("narrative_line", ""))
+	if phase != "narrating":
+		_fail(checks, failed, label, "second advance: expected narrating, got %s" % phase)
+		return
+	if line != "第二段文字":
+		_fail(checks, failed, label, "second line expected '第二段文字', got '%s'" % line)
+		return
+	_pass(checks, label)
+
+
+# 场景 E3：advance 到最后一段后，phase 切换为 choosing，选项出现。
+static func _test_e3_advance_to_choosing(checks: Array, failed: Array) -> void:
+	var label := "E3: advance to last line -> phase=choosing, actions appear"
+	var engine := _build_engine()
+	var config: Array = [_build_narrative_question()]
+
+	engine.start_creation(config)
+	# 推进到第二段。
+	engine.creation_advance_narrative()
+	# 推进到最后一段（第三段），应切换到 choosing。
+	var result: Dictionary = engine.creation_advance_narrative()
+	var phase := str(result.get("phase", ""))
+	if phase != "choosing":
+		_fail(checks, failed, label, "expected phase=choosing after last advance, got %s" % phase)
+		return
+	var line := str(result.get("narrative_line", ""))
+	if line != "第三段文字":
+		_fail(checks, failed, label, "last line expected '第三段文字', got '%s'" % line)
+		return
+	var actions: Array = result.get("available_actions", [])
+	if actions.is_empty():
+		_fail(checks, failed, label, "choosing phase should have available_actions")
+		return
+	# choosing 后应能正常 act。
+	result = engine.creation_act("opt_narr_a")
+	if result.get("state", "") != "SETTLED":
+		_fail(checks, failed, label, "expected SETTLED after act, got %s" % result.get("state", ""))
+		return
+	_pass(checks, label)
+
+
+# 场景 E4：从 CSV 加载时，含 | 的 question_text 正确解析为 narrative_lines。
+static func _test_e4_csv_narrative_lines_parse(checks: Array, failed: Array) -> void:
+	var label := "E4: CSV narrative_lines parsed from | separator"
+	var result: Dictionary = ConfigLoader.load_creation_config("res://scripts/config/creation_questions.csv")
+	if not result.get("ok", false):
+		_fail(checks, failed, label, "CSV load failed: %s" % str(result.get("error", "")))
+		return
+	var questions: Array = result.get("data", [])
+	# 验证所有问题都有 narrative_lines 字段。
+	for q_variant in questions:
+		var q: Dictionary = q_variant
+		var lines: Array = q.get("narrative_lines", [])
+		if lines.is_empty():
+			_fail(checks, failed, label, "question %s missing narrative_lines" % str(q.get("question_id", "")))
+			return
+	_pass(checks, label)
+
+
+# 构建带多段叙事的测试问题配置。
+static func _build_narrative_question() -> Dictionary:
+	return {
+		"question_id": "q_narrative_test",
+		"question_text": "第一段文字|第二段文字|第三段文字",
+		"narrative_lines": ["第一段文字", "第二段文字", "第三段文字"],
+		"condition": "",
+		"options": [
+			{
+				"option_id": "opt_narr_a",
+				"option_text": "叙事选项A",
+				"effects": [{"target": "attribute", "key": "craft", "value": "+1"}]
+			}
+		]
+	}
 
 
 # 构建带检定的测试问题配置。

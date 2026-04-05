@@ -164,9 +164,19 @@ static func load_creation_config(path: String) -> Dictionary:
 
 		# 若该问题尚未出现，创建新问题条目。
 		if not question_index_map.has(qid):
+			var raw_text := str(row.get("question_text", ""))
+			# 按 | 分段符拆分叙事段落；无 | 时为单元素数组，行为向后兼容。
+			var narrative_lines: Array = []
+			for seg in raw_text.split("|"):
+				var trimmed := seg.strip_edges()
+				if not trimmed.is_empty():
+					narrative_lines.append(trimmed)
+			if narrative_lines.is_empty():
+				narrative_lines.append(raw_text)
 			var question: Dictionary = {
 				"question_id": qid,
-				"question_text": str(row.get("question_text", "")),
+				"question_text": raw_text,
+				"narrative_lines": narrative_lines,
 				"condition": str(row.get("condition", "")),
 				"options": []
 			}

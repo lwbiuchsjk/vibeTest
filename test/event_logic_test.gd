@@ -195,33 +195,54 @@ func _render_risk_entry_buttons(accept_text: String, reject_text: String) -> voi
 # ── 开局选择 UI ──────────────────────────────────────────────────
 
 # 功能：渲染开局选择阶段界面。
-# 说明：使用 narrative_panel 展示问题文本，option_list 展示选项按钮。
+# 说明：根据 phase 字段分支渲染：narrating 展示文字+继续按钮，choosing 展示文字+选项。
 func _render_creation_phase(result: Dictionary) -> void:
-	var question_text := str(result.get("question_text", ""))
 	var question_index: int = int(result.get("question_index", 0))
 	var question_total: int = int(result.get("question_total", 0))
-	var actions: Array = result.get("available_actions", [])
+	var phase := str(result.get("phase", "choosing"))
+	var narrative_line := str(result.get("narrative_line", result.get("question_text", "")))
 
 	# 更新状态栏进度提示。
 	status_label.text = "角色创建 (%d/%d)" % [question_index + 1, question_total]
 
-	# 渲染问题文本到叙事面板。
+	# 渲染当前叙事段落到叙事面板。
 	event_title_label.text = "开局选择"
-	event_detail_label.text = question_text
+	event_detail_label.text = narrative_line
 
-	# 清空选项列表并渲染选项按钮。
+	# 清空选项列表。
 	_clear_option_list()
-	for action_variant in actions:
-		var action: Dictionary = action_variant
+
+	if phase == "narrating":
+		# narrating 阶段：仅展示【继续】按钮，不渲染选项。
 		var btn := Button.new()
-		btn.text = str(action.get("label", ""))
-		btn.disabled = not bool(action.get("enabled", true))
-		var option_id := str(action.get("action", ""))
-		btn.pressed.connect(_on_creation_option_pressed.bind(option_id))
+		btn.text = "继续"
+		btn.pressed.connect(_on_creation_continue_pressed)
 		ButtonTheme.apply(btn)
 		option_list.add_child(btn)
+	else:
+		# choosing 阶段：渲染选项按钮（当前逻辑）。
+		var actions: Array = result.get("available_actions", [])
+		for action_variant in actions:
+			var action: Dictionary = action_variant
+			var btn := Button.new()
+			btn.text = str(action.get("label", ""))
+			btn.disabled = not bool(action.get("enabled", true))
+			var option_id := str(action.get("action", ""))
+			btn.pressed.connect(_on_creation_option_pressed.bind(option_id))
+			ButtonTheme.apply(btn)
+			option_list.add_child(btn)
 
 	_update_side_panels()
+
+
+# 功能：处理开局选择叙事阶段的【继续】按钮点击。
+# 说明：调用引擎代理推进叙事段落，根据返回的 phase 刷新界面。
+func _on_creation_continue_pressed() -> void:
+	var result: Dictionary = _engine.creation_advance_narrative()
+	if not result.get("ok", false):
+		status_label.text = "叙事推进失败: %s" % str(result.get("error", "unknown"))
+		return
+	_render_creation_phase(result)
 
 
 # 功能：处理开局选择的选项按钮点击。

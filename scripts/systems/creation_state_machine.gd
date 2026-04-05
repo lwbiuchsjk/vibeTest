@@ -23,6 +23,10 @@ var _current_index: int = 0
 var _valid_indices: Array = []
 # 已回答的问题数量（用于进度计算）。
 var _answered_count: int = 0
+# 当前问题的叙事段落列表（按 | 拆分）。
+var _narrative_lines: Array = []
+# 当前展示到的叙事段索引。
+var _narrative_index: int = 0
 
 
 # ── 对外接口 ──────────────────────────────────────────────────────
@@ -50,6 +54,7 @@ func start(engine: RefCounted, config: Array) -> Dictionary:
 
 	_current_index = int(_valid_indices[0])
 	_state = State.PRESENTING
+	_init_narrative()
 	print("[开局选择] 开始，第一题: %s" % _get_current_question_id())
 	return _build_response()
 
@@ -69,6 +74,9 @@ func is_active() -> bool:
 func get_available_actions() -> Array:
 	if _state != State.PRESENTING:
 		return []
+	# narrating 阶段选项尚未出现，返回空。
+	if _is_narrating():
+		return []
 	var question: Dictionary = _questions[_current_index]
 	var options: Array = question.get("options", [])
 	var actions: Array = []
@@ -86,6 +94,9 @@ func get_available_actions() -> Array:
 func act(option_id: String) -> Dictionary:
 	if _state != State.PRESENTING:
 		return {"ok": false, "error": "not_presenting", "state": get_state()}
+	# narrating 阶段不允许选择选项，需先 advance_narrative() 推进到 choosing。
+	if _is_narrating():
+		return {"ok": false, "error": "still_narrating", "state": get_state()}
 
 	var question: Dictionary = _questions[_current_index]
 	var selected_option: Dictionary = _find_option(question, option_id)
@@ -156,8 +167,49 @@ func act(option_id: String) -> Dictionary:
 
 	_current_index = next_valid
 	_answered_count += 1
+	_init_narrative()
 	print("[开局选择] 下一题: %s" % _get_current_question_id())
 	return _build_response(extra)
+
+
+# ── 叙事分段 ─────────────────────────────────────────────────────
+
+# 功能：推进叙事段落，返回下一段文字或切换到 choosing 阶段。
+# 说明：仅在 narrating 阶段有效；最后一段展示完毕后自动切换到 choosing。
+func advance_narrative() -> Dictionary:
+	if _state != State.PRESENTING:
+		return {"ok": false, "error": "not_presenting", "state": get_state()}
+	if not _is_narrating():
+		return {"ok": false, "error": "not_narrating", "state": get_state()}
+
+	_narrative_index += 1
+	if _is_narrating():
+		print("[开局选择] 叙事推进 %d/%d" % [_narrative_index + 1, _narrative_lines.size()])
+	else:
+		print("[开局选择] 叙事完毕，进入 choosing")
+	return _build_response()
+
+
+# 功能：初始化当前问题的叙事段落状态。
+func _init_narrative() -> void:
+	if _current_index < _questions.size():
+		var question: Dictionary = _questions[_current_index]
+		_narrative_lines = question.get("narrative_lines", [str(question.get("question_text", ""))])
+	else:
+		_narrative_lines = []
+	_narrative_index = 0
+
+
+# 功能：判断当前是否处于 narrating 阶段（多段且尚未展示到最后一段）。
+func _is_narrating() -> bool:
+	return _narrative_lines.size() > 1 and _narrative_index < _narrative_lines.size() - 1
+
+
+# 功能：获取当前叙事阶段名称。
+func _get_narrative_phase() -> String:
+	if _is_narrating():
+		return "narrating"
+	return "choosing"
 
 
 # ── Effect Apply ─────────────────────────────────────────────────
@@ -392,13 +444,19 @@ func _build_response(extra: Dictionary = {}) -> Dictionary:
 		"state": get_state(),
 		"available_actions": get_available_actions(),
 	}
-	# PRESENTING 状态下附加问题信息。
+	# PRESENTING 状态下附加问题信息和叙事分段状态。
 	if _state == State.PRESENTING and _current_index < _questions.size():
 		var question: Dictionary = _questions[_current_index]
 		response["question_id"] = str(question.get("question_id", ""))
 		response["question_text"] = str(question.get("question_text", ""))
 		response["question_index"] = _answered_count
 		response["question_total"] = _answered_count + _valid_indices.size()
+		# 叙事分段字段：phase 标识当前阶段，narrative_line 为当前段文字。
+		response["phase"] = _get_narrative_phase()
+		var line_idx := mini(_narrative_index, _narrative_lines.size() - 1)
+		response["narrative_line"] = str(_narrative_lines[line_idx]) if not _narrative_lines.is_empty() else ""
+		response["narrative_index"] = _narrative_index
+		response["narrative_total"] = _narrative_lines.size()
 	for key in extra.keys():
 		response[key] = extra[key]
 	return response

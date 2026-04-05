@@ -2933,6 +2933,10 @@ func start_creation(config: Array = []) -> Dictionary:
 func creation_act(option_id: String) -> Dictionary:
 	return _creation_sm.act(option_id)
 
+# 功能：推进开局选择的叙事段落，切换到下一段或进入选项阶段。
+func creation_advance_narrative() -> Dictionary:
+	return _creation_sm.advance_narrative()
+
 # 功能：查询开局选择状态机是否处于活跃状态。
 func is_creation_active() -> bool:
 	return _creation_sm.is_active()
