@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://b11te0qh5u0ld"
+
+[deps]
+
+files=["res://scripts/config/effect_magnitude.direction.translation", "res://scripts/config/effect_magnitude.effect.translation", "res://scripts/config/effect_magnitude.effect.translation", "res://scripts/config/effect_magnitude.small.translation", "res://scripts/config/effect_magnitude.large.translation", "res://scripts/config/effect_magnitude.note.translation"]
+
+source_file="res://scripts/config/effect_magnitude.csv"
+dest_files=["res://scripts/config/effect_magnitude.direction.translation", "res://scripts/config/effect_magnitude.effect.translation", "res://scripts/config/effect_magnitude.effect.translation", "res://scripts/config/effect_magnitude.small.translation", "res://scripts/config/effect_magnitude.large.translation", "res://scripts/config/effect_magnitude.note.translation"]
+
+[params]
+
+compress=true
+delimiter=0
