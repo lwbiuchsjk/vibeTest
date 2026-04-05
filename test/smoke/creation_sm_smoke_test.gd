@@ -155,6 +155,7 @@ static func _test_d3_no_check_backward_compat(checks: Array, failed: Array) -> v
 
 
 # 场景 D4：从 CSV 加载的配置正确解析 check 字段和 effect_branch。
+# 说明：验证导入阶段配置（q_intro_1_opt_1）的检定和分支效果解析。
 static func _test_d4_csv_check_parse(checks: Array, failed: Array) -> void:
 	var label := "D4: CSV check fields parsed correctly"
 	var result: Dictionary = ConfigLoader.load_creation_config("res://scripts/config/creation_questions.csv")
@@ -167,22 +168,26 @@ static func _test_d4_csv_check_parse(checks: Array, failed: Array) -> void:
 		_fail(checks, failed, label, "no questions loaded")
 		return
 
-	# 第一个问题的 bg_artisan 选项应有 check 配置。
+	# 第一个问题（q_intro_1）的第一个选项应有 check 配置。
 	var q0: Dictionary = questions[0]
+	if str(q0.get("question_id", "")) != "q_intro_1":
+		_fail(checks, failed, label, "first question should be q_intro_1, got %s" % str(q0.get("question_id", "")))
+		return
 	var options: Array = q0.get("options", [])
-	var artisan_opt: Dictionary = {}
+	var opt1: Dictionary = {}
 	for opt_variant in options:
 		var opt: Dictionary = opt_variant
-		if str(opt.get("option_id", "")) == "bg_artisan":
-			artisan_opt = opt
+		if str(opt.get("option_id", "")) == "q_intro_1_opt_1":
+			opt1 = opt
 			break
-	if artisan_opt.is_empty():
-		_fail(checks, failed, label, "bg_artisan option not found")
+	if opt1.is_empty():
+		_fail(checks, failed, label, "q_intro_1_opt_1 option not found")
 		return
 
-	var check: Dictionary = artisan_opt.get("check", {})
+	# 验证 check 配置。
+	var check: Dictionary = opt1.get("check", {})
 	if check.is_empty():
-		_fail(checks, failed, label, "bg_artisan check is empty")
+		_fail(checks, failed, label, "q_intro_1_opt_1 check is empty")
 		return
 	if str(check.get("type", "")) != "assessment":
 		_fail(checks, failed, label, "check type: expected assessment, got %s" % str(check.get("type", "")))
@@ -191,15 +196,23 @@ static func _test_d4_csv_check_parse(checks: Array, failed: Array) -> void:
 	if items.is_empty():
 		_fail(checks, failed, label, "check items is empty")
 		return
-
-	# 检查 effect_branch 分组：应有 effects_default 和 effects_success。
-	var defaults: Array = artisan_opt.get("effects_default", [])
-	var successes: Array = artisan_opt.get("effects_success", [])
-	if defaults.size() < 2:
-		_fail(checks, failed, label, "effects_default should have >=2 entries (craft+2, aptitude-1), got %d" % defaults.size())
+	var first_item: Dictionary = items[0]
+	if str(first_item.get("key", "")) != "craft":
+		_fail(checks, failed, label, "check item key: expected craft, got %s" % str(first_item.get("key", "")))
 		return
-	if successes.is_empty():
-		_fail(checks, failed, label, "effects_success should not be empty")
+
+	# 验证 effect_branch 分组：default（energy + affinity）、success（craft + insight）、fail（craft）。
+	var defaults: Array = opt1.get("effects_default", [])
+	var successes: Array = opt1.get("effects_success", [])
+	var fails: Array = opt1.get("effects_fail", [])
+	if defaults.size() < 2:
+		_fail(checks, failed, label, "effects_default should have >=2 entries (energy + affinity), got %d" % defaults.size())
+		return
+	if successes.size() < 2:
+		_fail(checks, failed, label, "effects_success should have >=2 entries (craft + insight), got %d" % successes.size())
+		return
+	if fails.is_empty():
+		_fail(checks, failed, label, "effects_fail should not be empty")
 		return
 	_pass(checks, label)
 

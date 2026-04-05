@@ -68,8 +68,8 @@ func _ready() -> void:
 	#print("[ReflectionSM] ok=%s" % str(reflection_sm_result.get("ok", false)))
 	#var reflection_dispatch_result: Dictionary = ReflectionDispatchSmokeTest.run_all()
 	#print("[ReflectionDispatch] ok=%s" % str(reflection_dispatch_result.get("ok", false)))
-	#var creation_sm_result: Dictionary = CreationSmSmokeTest.run_all()
-	#print("[CreationSM] ok=%s" % str(creation_sm_result.get("ok", false)))
+	var creation_sm_result: Dictionary = CreationSmSmokeTest.run_all()
+	print("[CreationSM] ok=%s" % str(creation_sm_result.get("ok", false)))
 	#var mvp_result: Dictionary = MvpWorldEventSmokeTest.run_from_csv()
 	##print("[MVP-WorldEvent]", mvp_result)
 	#if mvp_result.get("ok", false):
