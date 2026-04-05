@@ -209,6 +209,8 @@ static func load_creation_config(path: String) -> Dictionary:
 			_append_creation_effect(existing_option, effect, branch)
 			# 检定配置只在首次出现时写入，后续同选项行不覆盖。
 			_try_parse_creation_check(existing_option, row)
+			# 叙事后果按分支写入，已有内容不覆盖。
+			_try_parse_creation_outcome(existing_option, row)
 		else:
 			var new_option: Dictionary = {
 				"option_id": oid,
@@ -218,10 +220,15 @@ static func load_creation_config(path: String) -> Dictionary:
 				"effects_fail": [],
 				# 向后兼容：保留 effects 字段，指向 effects_default。
 				"effects": [],
-				"check": {}
+				"check": {},
+				# 叙事后果文本，按检定分支区分。
+				"outcome_default": "",
+				"outcome_success": "",
+				"outcome_fail": "",
 			}
 			_append_creation_effect(new_option, effect, branch)
 			_try_parse_creation_check(new_option, row)
+			_try_parse_creation_outcome(new_option, row)
 			opt_map[oid] = options.size()
 			options.append(new_option)
 
@@ -283,6 +290,25 @@ static func _parse_creation_check_items(text: String) -> Array:
 			"direction": str(kv[1]).strip_edges()
 		})
 	return items
+
+
+# 功能：从 CSV 行中解析叙事后果文本，按分支写入选项。
+# 说明：outcome_branch 为 default/success/fail，对应写入 outcome_default/outcome_success/outcome_fail。
+#       已有非空内容的分支不覆盖。
+static func _try_parse_creation_outcome(option: Dictionary, row: Dictionary) -> void:
+	var outcome_text := str(row.get("outcome_text", "")).strip_edges()
+	if outcome_text.is_empty():
+		return
+	var outcome_branch := str(row.get("outcome_branch", "default")).strip_edges()
+	if outcome_branch.is_empty():
+		outcome_branch = "default"
+	var key := "outcome_" + outcome_branch
+	if not option.has(key):
+		key = "outcome_default"
+	# 已有非空内容时不覆盖（同选项多行场景）。
+	var existing := str(option.get(key, ""))
+	if existing.is_empty():
+		option[key] = outcome_text
 
 
 # 从 attribute_names.csv 加载属性名称映射表。

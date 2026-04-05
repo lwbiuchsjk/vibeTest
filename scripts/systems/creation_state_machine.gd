@@ -27,6 +27,12 @@ var _answered_count: int = 0
 var _narrative_lines: Array = []
 # 当前展示到的叙事段索引。
 var _narrative_index: int = 0
+# outcome phase 标记：选择选项后是否正在展示叙事后果。
+var _in_outcome: bool = false
+# outcome phase 暂存的叙事后果文本。
+var _outcome_text: String = ""
+# outcome phase 暂存的 act() 额外返回信息（选项 ID、检定结果等）。
+var _outcome_extra: Dictionary = {}
 
 
 # ── 对外接口 ──────────────────────────────────────────────────────
@@ -39,6 +45,10 @@ func start(engine: RefCounted, config: Array) -> Dictionary:
 	_current_index = 0
 	_answered_count = 0
 	_valid_indices = []
+	# 清除可能残留的 outcome 状态，防止上一次未完成流程的泄漏。
+	_in_outcome = false
+	_outcome_text = ""
+	_outcome_extra = {}
 
 	if _questions.is_empty():
 		_state = State.SETTLED
@@ -74,8 +84,8 @@ func is_active() -> bool:
 func get_available_actions() -> Array:
 	if _state != State.PRESENTING:
 		return []
-	# narrating 阶段选项尚未出现，返回空。
-	if _is_narrating():
+	# narrating / outcome 阶段选项不可见，返回空。
+	if _is_narrating() or _in_outcome:
 		return []
 	var question: Dictionary = _questions[_current_index]
 	var options: Array = question.get("options", [])
@@ -94,9 +104,11 @@ func get_available_actions() -> Array:
 func act(option_id: String) -> Dictionary:
 	if _state != State.PRESENTING:
 		return {"ok": false, "error": "not_presenting", "state": get_state()}
-	# narrating 阶段不允许选择选项，需先 advance_narrative() 推进到 choosing。
+	# narrating / outcome 阶段不允许选择选项。
 	if _is_narrating():
 		return {"ok": false, "error": "still_narrating", "state": get_state()}
+	if _in_outcome:
+		return {"ok": false, "error": "in_outcome", "state": get_state()}
 
 	var question: Dictionary = _questions[_current_index]
 	var selected_option: Dictionary = _find_option(question, option_id)
@@ -155,21 +167,20 @@ func act(option_id: String) -> Dictionary:
 		option_id, str(question.get("question_id", "")), total_applied
 	])
 
-	# effect 可能改变后续问题的条件判定结果，重新扫描有效问题列表。
-	_valid_indices = _scan_valid_indices_from(_current_index + 1)
-	# 推进到下一个满足条件的问题。
-	var next_valid := _find_next_valid_index(_current_index + 1)
-	if next_valid < 0:
-		_state = State.SETTLED
-		extra["settled"] = true
-		print("[开局选择] 全部问题完成，SETTLED")
+	# 确定叙事后果文本：优先取对应检定分支，为空则回退 outcome_default。
+	var outcome := _resolve_outcome_text(selected_option, check_executed, check_passed)
+	if not outcome.is_empty():
+		# 有叙事后果，进入 outcome phase，暂存状态等待 confirm_outcome()。
+		_in_outcome = true
+		_outcome_text = outcome
+		_outcome_extra = extra
+		extra["phase"] = "outcome"
+		extra["outcome_text"] = outcome
+		print("[开局选择] 进入 outcome phase")
 		return _build_response(extra)
 
-	_current_index = next_valid
-	_answered_count += 1
-	_init_narrative()
-	print("[开局选择] 下一题: %s" % _get_current_question_id())
-	return _build_response(extra)
+	# 无叙事后果，直接推进到下一题或 SETTLED。
+	return _advance_to_next_question(extra)
 
 
 # ── 叙事分段 ─────────────────────────────────────────────────────
@@ -205,11 +216,62 @@ func _is_narrating() -> bool:
 	return _narrative_lines.size() > 1 and _narrative_index < _narrative_lines.size() - 1
 
 
-# 功能：获取当前叙事阶段名称。
-func _get_narrative_phase() -> String:
+# 功能：获取当前阶段名称（outcome > narrating > choosing）。
+func _get_current_phase() -> String:
+	if _in_outcome:
+		return "outcome"
 	if _is_narrating():
 		return "narrating"
 	return "choosing"
+
+
+# ── 叙事后果 ─────────────────────────────────────────────────────
+
+# 功能：确认叙事后果展示完毕，推进到下一题或 SETTLED。
+# 说明：仅在 outcome phase 有效，否则返回错误。
+func confirm_outcome() -> Dictionary:
+	if _state != State.PRESENTING:
+		return {"ok": false, "error": "not_presenting", "state": get_state()}
+	if not _in_outcome:
+		return {"ok": false, "error": "not_in_outcome", "state": get_state()}
+
+	_in_outcome = false
+	var extra: Dictionary = _outcome_extra.duplicate()
+	_outcome_text = ""
+	_outcome_extra = {}
+	print("[开局选择] outcome 确认，推进")
+	return _advance_to_next_question(extra)
+
+
+# 功能：根据检定结果选择对应的叙事后果文本。
+# 说明：优先取对应分支，为空则回退 outcome_default。
+func _resolve_outcome_text(option: Dictionary, check_executed: bool, check_passed: bool) -> String:
+	if not check_executed:
+		return str(option.get("outcome_default", ""))
+	var branch_key := "outcome_success" if check_passed else "outcome_fail"
+	var text := str(option.get(branch_key, ""))
+	if text.is_empty():
+		text = str(option.get("outcome_default", ""))
+	return text
+
+
+# 功能：推进到下一个满足条件的问题，或进入 SETTLED。
+# 说明：从 act() 和 confirm_outcome() 共同调用的推进逻辑。
+func _advance_to_next_question(extra: Dictionary) -> Dictionary:
+	# effect 可能改变后续问题的条件判定结果，重新扫描有效问题列表。
+	_valid_indices = _scan_valid_indices_from(_current_index + 1)
+	var next_valid := _find_next_valid_index(_current_index + 1)
+	if next_valid < 0:
+		_state = State.SETTLED
+		extra["settled"] = true
+		print("[开局选择] 全部问题完成，SETTLED")
+		return _build_response(extra)
+
+	_current_index = next_valid
+	_answered_count += 1
+	_init_narrative()
+	print("[开局选择] 下一题: %s" % _get_current_question_id())
+	return _build_response(extra)
 
 
 # ── Effect Apply ─────────────────────────────────────────────────
@@ -451,8 +513,8 @@ func _build_response(extra: Dictionary = {}) -> Dictionary:
 		response["question_text"] = str(question.get("question_text", ""))
 		response["question_index"] = _answered_count
 		response["question_total"] = _answered_count + _valid_indices.size()
-		# 叙事分段字段：phase 标识当前阶段，narrative_line 为当前段文字。
-		response["phase"] = _get_narrative_phase()
+		# phase 字段：outcome > narrating > choosing，按优先级判定。
+		response["phase"] = _get_current_phase()
 		var line_idx := mini(_narrative_index, _narrative_lines.size() - 1)
 		response["narrative_line"] = str(_narrative_lines[line_idx]) if not _narrative_lines.is_empty() else ""
 		response["narrative_index"] = _narrative_index

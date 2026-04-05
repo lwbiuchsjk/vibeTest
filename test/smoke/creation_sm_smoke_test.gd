@@ -38,6 +38,13 @@ static func run_all() -> Dictionary:
 	_test_e3_advance_to_choosing(checks, failed)
 	_test_e4_csv_narrative_lines_parse(checks, failed)
 
+	# F：叙事后果展示
+	_test_f1_no_outcome_backward_compat(checks, failed)
+	_test_f2_outcome_phase_entered(checks, failed)
+	_test_f3_confirm_outcome_advances(checks, failed)
+	_test_f4_outcome_branch_selection(checks, failed)
+	_test_f5_csv_outcome_parse(checks, failed)
+
 	return {
 		"ok": failed.is_empty(),
 		"checks": checks,
@@ -306,6 +313,159 @@ static func _test_e4_csv_narrative_lines_parse(checks: Array, failed: Array) -> 
 			_fail(checks, failed, label, "question %s missing narrative_lines" % str(q.get("question_id", "")))
 			return
 	_pass(checks, label)
+
+
+# ── F：叙事后果展示 ──────────────────────────────────────────────
+
+# 场景 F1：无 outcome 的选项，act() 后直接推进，不进入 outcome phase。
+static func _test_f1_no_outcome_backward_compat(checks: Array, failed: Array) -> void:
+	var label := "F1: no outcome -> skip outcome phase (backward compat)"
+	var engine := _build_engine()
+	var config := _build_test_config()
+
+	engine.start_creation(config)
+	var result: Dictionary = engine.creation_act("bg_artisan")
+	var phase := str(result.get("phase", ""))
+	if phase == "outcome":
+		_fail(checks, failed, label, "should not enter outcome phase when no outcome_text")
+		return
+	# 应直接推进到下一题。
+	if str(result.get("state", "")) != "PRESENTING":
+		_fail(checks, failed, label, "expected PRESENTING, got %s" % result.get("state", ""))
+		return
+	_pass(checks, label)
+
+
+# 场景 F2：有 outcome 的选项，act() 后进入 outcome phase。
+static func _test_f2_outcome_phase_entered(checks: Array, failed: Array) -> void:
+	var label := "F2: with outcome -> phase=outcome after act"
+	var engine := _build_engine()
+	var config: Array = [_build_outcome_question()]
+
+	engine.start_creation(config)
+	var result: Dictionary = engine.creation_act("opt_outcome_a")
+	var phase := str(result.get("phase", ""))
+	if phase != "outcome":
+		_fail(checks, failed, label, "expected phase=outcome, got %s" % phase)
+		return
+	var outcome_text := str(result.get("outcome_text", ""))
+	if outcome_text != "这是选择后的叙事后果":
+		_fail(checks, failed, label, "unexpected outcome_text: %s" % outcome_text)
+		return
+	# outcome 阶段 available_actions 应为空。
+	var actions: Array = result.get("available_actions", [])
+	if not actions.is_empty():
+		_fail(checks, failed, label, "outcome phase should have empty available_actions")
+		return
+	_pass(checks, label)
+
+
+# 场景 F3：confirm_outcome() 后推进到 SETTLED。
+static func _test_f3_confirm_outcome_advances(checks: Array, failed: Array) -> void:
+	var label := "F3: confirm_outcome -> advances to SETTLED"
+	var engine := _build_engine()
+	var config: Array = [_build_outcome_question()]
+
+	engine.start_creation(config)
+	engine.creation_act("opt_outcome_a")
+	var result: Dictionary = engine.creation_confirm_outcome()
+	if str(result.get("state", "")) != "SETTLED":
+		_fail(checks, failed, label, "expected SETTLED after confirm_outcome, got %s" % result.get("state", ""))
+		return
+	_pass(checks, label)
+
+
+# 场景 F4：检定分支后果——成功时取 outcome_success，回退 outcome_default。
+static func _test_f4_outcome_branch_selection(checks: Array, failed: Array) -> void:
+	var label := "F4: outcome branch selection based on check result"
+	var engine := _build_engine()
+	# 给高 craft 确保检定通过概率高。
+	engine.player_role_state.set_attribute("craft", 20)
+	engine._sync_role_to_world_state()
+
+	var config: Array = [_build_outcome_check_question()]
+	engine.start_creation(config)
+	var result: Dictionary = engine.creation_act("opt_oc_craft")
+
+	var phase := str(result.get("phase", ""))
+	if phase != "outcome":
+		_fail(checks, failed, label, "expected phase=outcome, got %s" % phase)
+		return
+	var outcome_text := str(result.get("outcome_text", ""))
+	var check_passed: bool = result.get("check_result", {}).get("pass", false)
+	if check_passed:
+		if outcome_text != "检定成功的后果":
+			_fail(checks, failed, label, "expected success outcome, got: %s" % outcome_text)
+			return
+	else:
+		# 骰运失败，应回退到 default（fail 分支为空）。
+		if outcome_text != "默认后果":
+			_fail(checks, failed, label, "expected default outcome on fail, got: %s" % outcome_text)
+			return
+	_pass(checks, label)
+
+
+# 场景 F5：CSV 加载后，选项 outcome 字段正确解析。
+static func _test_f5_csv_outcome_parse(checks: Array, failed: Array) -> void:
+	var label := "F5: CSV outcome fields parsed correctly"
+	var result: Dictionary = ConfigLoader.load_creation_config("res://scripts/config/creation_questions.csv")
+	if not result.get("ok", false):
+		_fail(checks, failed, label, "CSV load failed: %s" % str(result.get("error", "")))
+		return
+	var questions: Array = result.get("data", [])
+	# 验证所有选项都有 outcome_default 字段（即使为空）。
+	for q_variant in questions:
+		var q: Dictionary = q_variant
+		for opt_variant in q.get("options", []):
+			var opt: Dictionary = opt_variant
+			if not opt.has("outcome_default"):
+				_fail(checks, failed, label, "option %s missing outcome_default" % str(opt.get("option_id", "")))
+				return
+	_pass(checks, label)
+
+
+# 构建带叙事后果的测试问题配置。
+static func _build_outcome_question() -> Dictionary:
+	return {
+		"question_id": "q_outcome_test",
+		"question_text": "后果测试",
+		"narrative_lines": ["后果测试"],
+		"condition": "",
+		"options": [
+			{
+				"option_id": "opt_outcome_a",
+				"option_text": "有后果的选项",
+				"effects": [{"target": "attribute", "key": "craft", "value": "+1"}],
+				"outcome_default": "这是选择后的叙事后果",
+				"outcome_success": "",
+				"outcome_fail": "",
+			}
+		]
+	}
+
+
+# 构建带检定 + 叙事后果的测试问题配置。
+static func _build_outcome_check_question() -> Dictionary:
+	return {
+		"question_id": "q_oc_test",
+		"question_text": "检定后果测试",
+		"narrative_lines": ["检定后果测试"],
+		"condition": "",
+		"options": [
+			{
+				"option_id": "opt_oc_craft",
+				"option_text": "测试检定后果",
+				"check": {"type": "assessment", "items": [{"key": "craft", "direction": "positive"}], "hitThreshold": 6, "requiredHits": 1},
+				"effects_default": [{"target": "attribute", "key": "craft", "value": "+1"}],
+				"effects_success": [],
+				"effects_fail": [],
+				"effects": [{"target": "attribute", "key": "craft", "value": "+1"}],
+				"outcome_default": "默认后果",
+				"outcome_success": "检定成功的后果",
+				"outcome_fail": "",
+			}
+		]
+	}
 
 
 # 构建带多段叙事的测试问题配置。

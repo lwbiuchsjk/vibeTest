@@ -245,6 +245,35 @@ func _on_creation_continue_pressed() -> void:
 	_render_creation_phase(result)
 
 
+# 功能：渲染开局选择的叙事后果展示界面。
+# 说明：展示后果文本 + 【继续】按钮，继续后推进到下一题或事件流程。
+func _render_creation_outcome(result: Dictionary) -> void:
+	var outcome_text := str(result.get("outcome_text", ""))
+	event_detail_label.text = outcome_text
+	_clear_option_list()
+	var btn := Button.new()
+	btn.text = "继续"
+	btn.pressed.connect(_on_creation_outcome_confirmed)
+	ButtonTheme.apply(btn)
+	option_list.add_child(btn)
+	_update_side_panels()
+
+
+# 功能：处理叙事后果展示的【继续】按钮点击。
+# 说明：调用引擎代理确认后果，根据返回状态决定渲染下一题或进入事件流程。
+func _on_creation_outcome_confirmed() -> void:
+	var result: Dictionary = _engine.creation_confirm_outcome()
+	if not result.get("ok", false):
+		status_label.text = "后果确认失败: %s" % str(result.get("error", "unknown"))
+		return
+	var state := str(result.get("state", ""))
+	if state == "PRESENTING":
+		_render_creation_phase(result)
+	else:
+		_append_log("开局选择完成，开始预览第一个事件。")
+		_preview_next_event()
+
+
 # 功能：处理开局选择的选项按钮点击。
 # 说明：调用引擎代理执行选择，根据返回状态决定渲染下一题或进入事件流程。
 func _on_creation_option_pressed(option_id: String) -> void:
@@ -254,6 +283,12 @@ func _on_creation_option_pressed(option_id: String) -> void:
 		return
 
 	_append_log("开局选择: %s" % option_id)
+
+	var phase := str(result.get("phase", ""))
+	if phase == "outcome":
+		# 有叙事后果，展示后果文本 + 继续按钮。
+		_render_creation_outcome(result)
+		return
 
 	var state := str(result.get("state", ""))
 	if state == "PRESENTING":

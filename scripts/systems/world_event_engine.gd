@@ -2937,6 +2937,10 @@ func creation_act(option_id: String) -> Dictionary:
 func creation_advance_narrative() -> Dictionary:
 	return _creation_sm.advance_narrative()
 
+# 功能：确认开局选择的叙事后果展示，推进到下一题或 SETTLED。
+func creation_confirm_outcome() -> Dictionary:
+	return _creation_sm.confirm_outcome()
+
 # 功能：查询开局选择状态机是否处于活跃状态。
 func is_creation_active() -> bool:
 	return _creation_sm.is_active()
