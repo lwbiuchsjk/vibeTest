@@ -82,7 +82,7 @@ func get_available_actions() -> Array:
 	return actions
 
 
-# 功能：玩家选择一个选项，立即 apply effect，推进到下一题或 SETTLED。
+# 功能：玩家选择一个选项，执行检定（如有），按分支 apply effect，推进到下一题或 SETTLED。
 func act(option_id: String) -> Dictionary:
 	if _state != State.PRESENTING:
 		return {"ok": false, "error": "not_presenting", "state": get_state()}
@@ -92,18 +92,56 @@ func act(option_id: String) -> Dictionary:
 	if selected_option.is_empty():
 		return {"ok": false, "error": "invalid_option", "state": get_state(), "option_id": option_id}
 
-	# 立即 apply 该选项的所有 effect。
-	var effects: Array = selected_option.get("effects", [])
-	for effect_variant in effects:
+	# 执行检定（如有），决定 apply 哪组分支 effects。
+	# 安全规则：配置了 check 但引擎无法执行时，视为无检定，只 apply default。
+	var check: Dictionary = selected_option.get("check", {})
+	var check_result: Dictionary = {}
+	var check_executed := false
+	var check_passed := false
+	if not check.is_empty() and _engine != null and _engine.has_method("_is_check_pass"):
+		check_result = _engine._is_check_pass(check)
+		check_executed = true
+		check_passed = check_result.get("pass", false)
+		print("[开局选择] 检定 %s → %s (result_type=%s)" % [
+			option_id,
+			"通过" if check_passed else "失败",
+			str(check_result.get("result_type", ""))
+		])
+	elif not check.is_empty():
+		print("[开局选择] 选项 %s 配置了检定但引擎不支持，跳过检定仅 apply default" % option_id)
+
+	# 始终 apply default 分支的 effects。
+	# 向后兼容：若无 effects_default 字段，回退到 effects 字段。
+	var effects_default: Array = selected_option.get("effects_default", selected_option.get("effects", []))
+	var effects_branch: Array = []
+	if not check_executed:
+		# 未执行检定（无配置 / 引擎不支持），只 apply default。
+		effects_branch = []
+	elif check_passed:
+		effects_branch = selected_option.get("effects_success", [])
+	else:
+		effects_branch = selected_option.get("effects_fail", [])
+
+	var total_applied := 0
+	for effect_variant in effects_default:
 		var effect: Dictionary = effect_variant
 		_apply_effect(effect)
+		total_applied += 1
+	for effect_variant in effects_branch:
+		var effect: Dictionary = effect_variant
+		_apply_effect(effect)
+		total_applied += 1
 
 	# apply 完成后同步 world_state.player。
 	if _engine != null and _engine.player_role_state != null:
 		_engine._sync_role_to_world_state()
 
+	var extra: Dictionary = {"selected_option": option_id}
+	if not check_result.is_empty():
+		extra["check_result"] = check_result
+
 	print("[开局选择] 选择 %s (问题 %s)，已 apply %d 条 effect" % [
-		option_id, str(question.get("question_id", "")), effects.size()
+		option_id, str(question.get("question_id", "")), total_applied
 	])
 
 	# effect 可能改变后续问题的条件判定结果，重新扫描有效问题列表。
@@ -112,13 +150,14 @@ func act(option_id: String) -> Dictionary:
 	var next_valid := _find_next_valid_index(_current_index + 1)
 	if next_valid < 0:
 		_state = State.SETTLED
+		extra["settled"] = true
 		print("[开局选择] 全部问题完成，SETTLED")
-		return _build_response({"selected_option": option_id, "settled": true})
+		return _build_response(extra)
 
 	_current_index = next_valid
 	_answered_count += 1
 	print("[开局选择] 下一题: %s" % _get_current_question_id())
-	return _build_response({"selected_option": option_id})
+	return _build_response(extra)
 
 
 # ── Effect Apply ─────────────────────────────────────────────────

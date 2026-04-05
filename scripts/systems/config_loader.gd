@@ -181,30 +181,98 @@ static func load_creation_config(path: String) -> Dictionary:
 		if oid.is_empty():
 			continue
 
-		# 构建 effect 条目。
+		# 构建 effect 条目，附带分支标记。
 		var effect: Dictionary = {
 			"target": str(row.get("effect_target", "")),
 			"key": str(row.get("effect_key", "")),
 			"value": str(row.get("effect_value", ""))
 		}
+		var branch := str(row.get("effect_branch", "default")).strip_edges()
+		if branch.is_empty():
+			branch = "default"
 
-		# 若该选项已存在，追加 effect；否则创建新选项。
+		# 若该选项已存在，追加 effect 到对应分支；否则创建新选项。
 		var opt_map: Dictionary = option_index_maps[qid]
 		if opt_map.has(oid):
 			var o_idx: int = int(opt_map[oid])
 			var existing_option: Dictionary = options[o_idx]
-			var effects: Array = existing_option["effects"]
-			effects.append(effect)
+			_append_creation_effect(existing_option, effect, branch)
+			# 检定配置只在首次出现时写入，后续同选项行不覆盖。
+			_try_parse_creation_check(existing_option, row)
 		else:
 			var new_option: Dictionary = {
 				"option_id": oid,
 				"option_text": str(row.get("option_text", "")),
-				"effects": [effect]
+				"effects_default": [],
+				"effects_success": [],
+				"effects_fail": [],
+				# 向后兼容：保留 effects 字段，指向 effects_default。
+				"effects": [],
+				"check": {}
 			}
+			_append_creation_effect(new_option, effect, branch)
+			_try_parse_creation_check(new_option, row)
 			opt_map[oid] = options.size()
 			options.append(new_option)
 
+	# 向后兼容：将 effects_default 复制到 effects，供旧逻辑使用。
+	for q_variant in questions:
+		var q: Dictionary = q_variant
+		for opt_variant in q.get("options", []):
+			var opt: Dictionary = opt_variant
+			opt["effects"] = opt.get("effects_default", [])
+
 	return {"ok": true, "data": questions}
+
+
+# 功能：将 effect 追加到选项的对应分支数组中。
+static func _append_creation_effect(option: Dictionary, effect: Dictionary, branch: String) -> void:
+	var key := "effects_" + branch
+	if not option.has(key):
+		key = "effects_default"
+	var arr: Array = option[key]
+	arr.append(effect)
+
+
+# 功能：从 CSV 行中解析检定配置，写入选项的 check 字段。
+# 说明：只在选项尚无 check 配置时解析，避免同选项多行重复覆盖。
+static func _try_parse_creation_check(option: Dictionary, row: Dictionary) -> void:
+	var existing_check: Dictionary = option.get("check", {})
+	if not existing_check.is_empty():
+		return
+	var check_type := str(row.get("check_type", "")).strip_edges()
+	if check_type.is_empty():
+		return
+	var check: Dictionary = {"type": check_type}
+	var items_str := str(row.get("check_items", "")).strip_edges()
+	if not items_str.is_empty():
+		check["items"] = _parse_creation_check_items(items_str)
+	var hit_threshold := str(row.get("check_hit_threshold", "")).strip_edges()
+	if not hit_threshold.is_empty():
+		check["hitThreshold"] = int(hit_threshold)
+	var required_hits := str(row.get("check_required_hits", "")).strip_edges()
+	if not required_hits.is_empty():
+		check["requiredHits"] = int(required_hits)
+	option["check"] = check
+
+
+# 功能：解析检定 items 字符串为数组。
+# 格式：与 option_rules 一致，如 "craft:positive;insight:negative"。
+static func _parse_creation_check_items(text: String) -> Array:
+	var items: Array = []
+	var parts := text.split(";")
+	for part in parts:
+		var seg := part.strip_edges()
+		if seg.is_empty():
+			continue
+		var kv := seg.split(":")
+		if kv.size() < 2:
+			continue
+		items.append({
+			"key": str(kv[0]).strip_edges(),
+			"direction": str(kv[1]).strip_edges()
+		})
+	return items
 
 
 # 从 attribute_names.csv 加载属性名称映射表。

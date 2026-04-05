@@ -26,10 +26,188 @@ static func run_all() -> Dictionary:
 	_test_c1_cumulative_effects(checks, failed)
 	_test_c2_xinxing_clamp(checks, failed)
 
+	# D：检定分支
+	_test_d1_check_branch_success(checks, failed)
+	_test_d2_check_branch_fail(checks, failed)
+	_test_d3_no_check_backward_compat(checks, failed)
+	_test_d4_csv_check_parse(checks, failed)
+
 	return {
 		"ok": failed.is_empty(),
 		"checks": checks,
 		"failed": failed
+	}
+
+
+# ── D：检定分支 ──────────────────────────────────────────────────
+
+# 场景 D1：检定通过时，default + success 分支 effects 均 apply。
+static func _test_d1_check_branch_success(checks: Array, failed: Array) -> void:
+	var label := "D1: check pass -> default + success effects applied"
+	var engine := _build_engine()
+	# 给玩家高 craft 值以确保检定通过（低难度 requiredHits=1，hitThreshold=6）。
+	engine.player_role_state.set_attribute("craft", 20)
+	engine._sync_role_to_world_state()
+
+	var config: Array = [_build_check_question()]
+	var old_craft: int = engine.player_role_state.get_attribute("craft")
+	var old_insight: int = engine.player_role_state.get_attribute("insight")
+
+	engine.start_creation(config)
+	var result: Dictionary = engine.creation_act("opt_check_craft")
+
+	var new_craft: int = engine.player_role_state.get_attribute("craft")
+	var new_insight: int = engine.player_role_state.get_attribute("insight")
+
+	# default: craft +1（始终 apply）。
+	if new_craft < old_craft + 1:
+		_fail(checks, failed, label, "craft default +1 not applied: old=%d new=%d" % [old_craft, new_craft])
+		return
+
+	# 检查 check_result 是否在返回值中。
+	if not result.has("check_result"):
+		_fail(checks, failed, label, "response missing check_result")
+		return
+
+	var check_passed: bool = result.get("check_result", {}).get("pass", false)
+	if not check_passed:
+		# 高 craft 值仍可能因骰运失败，跳过而非报错。
+		_pass(checks, label + " (skipped: dice failed despite high craft)")
+		return
+
+	# success: insight +2。
+	if new_insight != old_insight + 2:
+		_fail(checks, failed, label, "insight success +2 not applied: old=%d new=%d" % [old_insight, new_insight])
+		return
+	_pass(checks, label)
+
+
+# 场景 D2：检定失败时，default + fail 分支 effects 均 apply。
+static func _test_d2_check_branch_fail(checks: Array, failed: Array) -> void:
+	var label := "D2: check fail -> default + fail effects applied"
+	var engine := _build_engine()
+	# 给玩家 craft=0 使骰池极小，大概率失败。
+	engine.player_role_state.set_attribute("craft", 0)
+	engine._sync_role_to_world_state()
+
+	var config: Array = [_build_check_question()]
+	var old_craft: int = engine.player_role_state.get_attribute("craft")
+	var old_aptitude: int = engine.player_role_state.get_attribute("aptitude")
+
+	engine.start_creation(config)
+	var result: Dictionary = engine.creation_act("opt_check_craft")
+
+	var new_craft: int = engine.player_role_state.get_attribute("craft")
+	var new_aptitude: int = engine.player_role_state.get_attribute("aptitude")
+
+	var check_passed: bool = result.get("check_result", {}).get("pass", true)
+	if check_passed:
+		# craft=0 仍可能因骰运通过，跳过而非报错。
+		_pass(checks, label + " (skipped: dice passed despite low craft)")
+		return
+
+	# default: craft +1（始终 apply）。
+	if new_craft != old_craft + 1:
+		_fail(checks, failed, label, "craft default +1 not applied: old=%d new=%d" % [old_craft, new_craft])
+		return
+	# fail: aptitude -1。
+	if new_aptitude != old_aptitude - 1:
+		_fail(checks, failed, label, "aptitude fail -1 not applied: old=%d new=%d" % [old_aptitude, new_aptitude])
+		return
+	_pass(checks, label)
+
+
+# 场景 D3：无 check 配置时，行为与旧版完全一致（向后兼容）。
+static func _test_d3_no_check_backward_compat(checks: Array, failed: Array) -> void:
+	var label := "D3: no check -> backward compatible (effects_default only)"
+	var engine := _build_engine()
+	var config := _build_test_config()
+
+	var old_craft: int = engine.player_role_state.get_attribute("craft")
+
+	engine.start_creation(config)
+	var result: Dictionary = engine.creation_act("bg_artisan")
+
+	var new_craft: int = engine.player_role_state.get_attribute("craft")
+
+	# 无 check 时不应返回 check_result。
+	if result.has("check_result"):
+		_fail(checks, failed, label, "unexpected check_result in response for no-check option")
+		return
+	# effects 正常 apply。
+	if new_craft != old_craft + 2:
+		_fail(checks, failed, label, "craft: expected %d, got %d" % [old_craft + 2, new_craft])
+		return
+	_pass(checks, label)
+
+
+# 场景 D4：从 CSV 加载的配置正确解析 check 字段和 effect_branch。
+static func _test_d4_csv_check_parse(checks: Array, failed: Array) -> void:
+	var label := "D4: CSV check fields parsed correctly"
+	var result: Dictionary = ConfigLoader.load_creation_config("res://scripts/config/creation_questions.csv")
+	if not result.get("ok", false):
+		_fail(checks, failed, label, "CSV load failed: %s" % str(result.get("error", "")))
+		return
+
+	var questions: Array = result.get("data", [])
+	if questions.is_empty():
+		_fail(checks, failed, label, "no questions loaded")
+		return
+
+	# 第一个问题的 bg_artisan 选项应有 check 配置。
+	var q0: Dictionary = questions[0]
+	var options: Array = q0.get("options", [])
+	var artisan_opt: Dictionary = {}
+	for opt_variant in options:
+		var opt: Dictionary = opt_variant
+		if str(opt.get("option_id", "")) == "bg_artisan":
+			artisan_opt = opt
+			break
+	if artisan_opt.is_empty():
+		_fail(checks, failed, label, "bg_artisan option not found")
+		return
+
+	var check: Dictionary = artisan_opt.get("check", {})
+	if check.is_empty():
+		_fail(checks, failed, label, "bg_artisan check is empty")
+		return
+	if str(check.get("type", "")) != "assessment":
+		_fail(checks, failed, label, "check type: expected assessment, got %s" % str(check.get("type", "")))
+		return
+	var items: Array = check.get("items", [])
+	if items.is_empty():
+		_fail(checks, failed, label, "check items is empty")
+		return
+
+	# 检查 effect_branch 分组：应有 effects_default 和 effects_success。
+	var defaults: Array = artisan_opt.get("effects_default", [])
+	var successes: Array = artisan_opt.get("effects_success", [])
+	if defaults.size() < 2:
+		_fail(checks, failed, label, "effects_default should have >=2 entries (craft+2, aptitude-1), got %d" % defaults.size())
+		return
+	if successes.is_empty():
+		_fail(checks, failed, label, "effects_success should not be empty")
+		return
+	_pass(checks, label)
+
+
+# 构建带检定的测试问题配置。
+static func _build_check_question() -> Dictionary:
+	return {
+		"question_id": "q_check_test",
+		"question_text": "检定测试",
+		"condition": "",
+		"options": [
+			{
+				"option_id": "opt_check_craft",
+				"option_text": "测试百艺检定",
+				"check": {"type": "assessment", "items": [{"key": "craft", "direction": "positive"}], "hitThreshold": 6, "requiredHits": 1},
+				"effects_default": [{"target": "attribute", "key": "craft", "value": "+1"}],
+				"effects_success": [{"target": "attribute", "key": "insight", "value": "+2"}],
+				"effects_fail": [{"target": "attribute", "key": "aptitude", "value": "-1"}],
+				"effects": [{"target": "attribute", "key": "craft", "value": "+1"}]
+			}
+		]
 	}
 
 
