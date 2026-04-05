@@ -44,6 +44,15 @@ Godot 4.5，GDScript，Git 版本控制
 - 如需查看知识库节点概览、索引和结构化缓存，使用 `_kb_sync/cache/KB_CONTEXT.md`、`_kb_sync/cache/KB_CONTEXT.json` 与 `_kb_sync/cache/cache_index.json`。
 - 新增文档应当放在 `Design` 目录下。
 
+## 提交流程
+
+当用户要求提交时，按以下步骤执行：
+
+1. **审查**：先执行 `/codex:review`，将审查结果翻译为中文展示。
+2. **评估**：与用户讨论审查意见，必要时修复后再提交。
+3. **提交**：总结改动要点，创建提交并推送。提交信息使用中文，格式参照 `feat:/fix:/chore:` 前缀。
+4. 审查和提交可以分步进行，也可以用户明确要求时合并执行。
+
 ## 测试流程
 
 - 本项目 Godot 统一通过 `tools/run_godot.ps1` 调用，不要假设系统 PATH 中存在 `godot`。
