@@ -39,6 +39,9 @@ Godot 4.5，GDScript，Git 版本控制
 
 ## 工作流程
 
+- **设计改动的落地规则**：
+  - 大范围改动（涉及多个文件、新建文档、结构性调整）：必须先与用户讨论清楚方案，经用户明确确认后，才可以落地执行。
+  - 简单改动（单个文件的小幅修改、已有共识的补充）：讨论清楚后，可直接落地，无需额外确认。
 - 更新知识库时，默认使用 `_kb_sync/kb_bootstrap.ps1`。
 - 如需查看单篇在线文档的独立内容与格式信息，优先读取 `_kb_sync/Design` 下对应的 `.md` 文件。
 - 如需查看知识库节点概览、索引和结构化缓存，使用 `_kb_sync/cache/KB_CONTEXT.md`、`_kb_sync/cache/KB_CONTEXT.json` 与 `_kb_sync/cache/cache_index.json`。
