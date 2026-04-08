@@ -10,7 +10,8 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:hub.docker.com)",
       "mcp__plugin_discord_discord__fetch_messages",
-      "mcp__plugin_discord_discord__reply"
+      "mcp__plugin_discord_discord__reply",
+      "WebSearch"
     ]
   }
 }
