@@ -12,7 +12,7 @@ Godot 4.5，GDScript，Git 版本控制
 - scripts/      脚本文件
 - assets/       资源文件（图片、音效等）
 - test/         测试文件
-- Design/       本地设计文件。创建文档时优先放在这里
+- Design/       设计文档 Obsidian vault（Git submodule → 私有仓库 `vibe-test-design`）
 - _kb_sync/     本地在线知识库缓存功能。更新知识库中通常使用本路径下的方法
 - _kb_sync/cache/KB_CACHE.md   在线知识库缓存主入口。这里可以看到所有在线知识库的缓存。
 - _kb_sync/Design/              在线知识库缓存的单个md文件。查询文件指定文件时，可以优先在这里查找文件。
@@ -57,6 +57,30 @@ Godot 4.5，GDScript，Git 版本控制
 2. **评估**：与用户讨论审查意见，必要时修复后再提交。
 3. **提交**：总结改动要点，创建提交并推送。提交信息使用中文，格式参照 `feat:/fix:/chore:` 前缀。
 4. 审查和提交可以分步进行，也可以用户明确要求时合并执行。
+
+### Design 文档提交（两步提交）
+
+`Design/` 是独立的 Git submodule（私有仓库），提交时需要两步：
+
+1. **先提交 Design/ 内部**：
+   ```bash
+   cd Design/
+   git add -A && git commit -m "docs: ..." && git push
+   ```
+2. **再更新主项目的 submodule 指针**：
+   ```bash
+   cd ..
+   git add Design && git commit -m "chore: 更新 Design submodule 指针" && git push
+   ```
+
+当改动同时涉及代码和文档时，两步提交可合并在主项目提交流程中一起完成。
+
+## Obsidian CLI
+
+- 路径：`D:/softwares/obsidian/Obsidian.com`
+- vault 名称：`Design`
+- 用于文档重命名（自动更新 `[[]]` 链接）、属性操作、搜索等场景
+- 示例：`"D:/softwares/obsidian/Obsidian.com" backlinks vault=Design file="文档名"`
 
 ## 测试流程
 
