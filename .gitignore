@@ -23,8 +23,5 @@ design/
 # Local environment config (path varies per machine, see tools/local_env.example.json)
 tools/local_env.json
 
-# Local Godot runner (path varies per machine)
-tools/run_godot.ps1
-
 # Web export output (CI handles export and deploy)
 output/

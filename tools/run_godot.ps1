@@ -9,8 +9,17 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# 说明：这里维护项目级固定 Godot 路径；如后续升级版本，只需修改这一处。
-$godotExe = "\godot.exe"
+# 说明：从 tools/local_env.json 读取本机 Godot 路径，避免硬编码。
+$localEnvPath = Join-Path $PSScriptRoot "local_env.json"
+if (-not (Test-Path $localEnvPath)) {
+    throw "local_env.json not found: $localEnvPath`nPlease copy tools/local_env.example.json to tools/local_env.json and fill in your local paths."
+}
+$localEnv = Get-Content $localEnvPath -Raw | ConvertFrom-Json
+$godotExe = $localEnv.godot_exe
+
+if (-not $godotExe) {
+    throw "godot_exe is missing or empty in $localEnvPath`nPlease add godot_exe to your tools/local_env.json (see tools/local_env.example.json)."
+}
 
 if (-not (Test-Path $godotExe)) {
     throw "Godot executable not found: $godotExe"

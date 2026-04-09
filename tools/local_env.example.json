@@ -1,4 +1,5 @@
 {
   "obsidian_cli": "D:/softwares/obsidian/Obsidian.com",
-  "vault_name": "Design"
+  "vault_name": "Design",
+  "godot_exe": "<your_godot_console_exe_path>"
 }
