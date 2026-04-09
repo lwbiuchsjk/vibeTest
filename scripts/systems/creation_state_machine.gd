@@ -514,6 +514,7 @@ func _build_response(extra: Dictionary = {}) -> Dictionary:
 		var question: Dictionary = _questions[_current_index]
 		response["question_id"] = str(question.get("question_id", ""))
 		response["question_text"] = str(question.get("question_text", ""))
+		response["background_art"] = str(question.get("background_art", ""))
 		response["question_index"] = _answered_count
 		response["question_total"] = _answered_count + _valid_indices.size()
 		# phase 字段：outcome > narrating > choosing，按优先级判定。

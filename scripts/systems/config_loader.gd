@@ -178,6 +178,7 @@ static func load_creation_config(path: String) -> Dictionary:
 				"question_text": raw_text,
 				"narrative_lines": narrative_lines,
 				"condition": str(row.get("condition", "")),
+				"background_art": str(row.get("background_art", "")).strip_edges(),
 				"options": []
 			}
 			question_index_map[qid] = questions.size()

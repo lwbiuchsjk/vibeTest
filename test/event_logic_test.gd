@@ -202,6 +202,9 @@ func _render_creation_phase(result: Dictionary) -> void:
 	var phase := str(result.get("phase", "choosing"))
 	var narrative_line := str(result.get("narrative_line", result.get("question_text", "")))
 
+	# 渲染背景图。
+	_render_event_background(str(result.get("background_art", "")))
+
 	# 更新状态栏进度提示。
 	status_label.text = "角色创建 (%d/%d)" % [question_index + 1, question_total]
 
