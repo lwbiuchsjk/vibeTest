@@ -82,6 +82,22 @@ Godot 4.5，GDScript，Git 版本控制
 - 用于文档重命名（自动更新 `[[]]` 链接）、属性操作、搜索等场景
 - 示例：`"D:/softwares/obsidian/Obsidian.com" backlinks vault=Design file="文档名"`
 
+### 文档删除与重命名规范
+
+删除或重命名 `Design/` 下的文档前，**必须先检查引用关系**，避免产生断链：
+
+1. **优先使用 Obsidian CLI**（需 Obsidian 运行中）：
+   ```bash
+   "D:/softwares/obsidian/Obsidian.com" backlinks vault=Design file="文档名"
+   ```
+   能识别所有链接形式，包括别名链接 `[[file|alias]]`。
+
+2. **备选：Grep 搜索**（Obsidian 未运行时）：
+   搜索 `[[文档名]]` 模式。可能漏掉别名链接，但不依赖 Obsidian。
+
+3. 如果存在引用，先更新引用方文档，再执行删除或重命名。
+4. 重命名文档优先使用 Obsidian CLI 的 `move` 命令，它会自动更新所有 `[[]]` 链接。
+
 ## 测试流程
 
 - 本项目 Godot 统一通过 `tools/run_godot.ps1` 调用，不要假设系统 PATH 中存在 `godot`。
