@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://bfh422y8raf1q"
+
+[deps]
+
+files=["res://test/config/intro_flow_test/task_eval_grades.grade.translation", "res://test/config/intro_flow_test/task_eval_grades.grade.translation", "res://test/config/intro_flow_test/task_eval_grades.min.translation", "res://test/config/intro_flow_test/task_eval_grades.max.translation", "res://test/config/intro_flow_test/task_eval_grades.display.translation", "res://test/config/intro_flow_test/task_eval_grades.label.translation"]
+
+source_file="res://test/config/intro_flow_test/task_eval_grades.csv"
+dest_files=["res://test/config/intro_flow_test/task_eval_grades.grade.translation", "res://test/config/intro_flow_test/task_eval_grades.grade.translation", "res://test/config/intro_flow_test/task_eval_grades.min.translation", "res://test/config/intro_flow_test/task_eval_grades.max.translation", "res://test/config/intro_flow_test/task_eval_grades.display.translation", "res://test/config/intro_flow_test/task_eval_grades.label.translation"]
+
+[params]
+
+compress=true
+delimiter=0

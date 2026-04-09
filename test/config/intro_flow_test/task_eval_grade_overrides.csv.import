@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://cgphuwtl0be4l"
+
+[deps]
+
+files=["res://test/config/intro_flow_test/task_eval_grade_overrides.rule.translation", "res://test/config/intro_flow_test/task_eval_grade_overrides.priority.translation", "res://test/config/intro_flow_test/task_eval_grade_overrides.from.translation", "res://test/config/intro_flow_test/task_eval_grade_overrides.when.translation", "res://test/config/intro_flow_test/task_eval_grade_overrides.to.translation"]
+
+source_file="res://test/config/intro_flow_test/task_eval_grade_overrides.csv"
+dest_files=["res://test/config/intro_flow_test/task_eval_grade_overrides.rule.translation", "res://test/config/intro_flow_test/task_eval_grade_overrides.priority.translation", "res://test/config/intro_flow_test/task_eval_grade_overrides.from.translation", "res://test/config/intro_flow_test/task_eval_grade_overrides.when.translation", "res://test/config/intro_flow_test/task_eval_grade_overrides.to.translation"]
+
+[params]
+
+compress=true
+delimiter=0

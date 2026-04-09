@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://drsk8sr655d7p"
+
+[deps]
+
+files=["res://test/config/intro_flow_test/events.title.translation", "res://test/config/intro_flow_test/events.background.translation", "res://test/config/intro_flow_test/events.base.translation", "res://test/config/intro_flow_test/events.continuation.translation", "res://test/config/intro_flow_test/events.choice.translation", "res://test/config/intro_flow_test/events.tags.translation", "res://test/config/intro_flow_test/events.task.translation", "res://test/config/intro_flow_test/events.is.translation", "res://test/config/intro_flow_test/events.type.translation"]
+
+source_file="res://test/config/intro_flow_test/events.csv"
+dest_files=["res://test/config/intro_flow_test/events.title.translation", "res://test/config/intro_flow_test/events.background.translation", "res://test/config/intro_flow_test/events.base.translation", "res://test/config/intro_flow_test/events.continuation.translation", "res://test/config/intro_flow_test/events.choice.translation", "res://test/config/intro_flow_test/events.tags.translation", "res://test/config/intro_flow_test/events.task.translation", "res://test/config/intro_flow_test/events.is.translation", "res://test/config/intro_flow_test/events.type.translation"]
+
+[params]
+
+compress=true
+delimiter=0

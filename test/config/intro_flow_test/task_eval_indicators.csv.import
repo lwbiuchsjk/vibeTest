@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://wi440cq2o53f"
+
+[deps]
+
+files=["res://test/config/intro_flow_test/task_eval_indicators.indicator.translation", "res://test/config/intro_flow_test/task_eval_indicators.left.translation", "res://test/config/intro_flow_test/task_eval_indicators.op.translation", "res://test/config/intro_flow_test/task_eval_indicators.right.translation", "res://test/config/intro_flow_test/task_eval_indicators.pass.translation", "res://test/config/intro_flow_test/task_eval_indicators.fail.translation"]
+
+source_file="res://test/config/intro_flow_test/task_eval_indicators.csv"
+dest_files=["res://test/config/intro_flow_test/task_eval_indicators.indicator.translation", "res://test/config/intro_flow_test/task_eval_indicators.left.translation", "res://test/config/intro_flow_test/task_eval_indicators.op.translation", "res://test/config/intro_flow_test/task_eval_indicators.right.translation", "res://test/config/intro_flow_test/task_eval_indicators.pass.translation", "res://test/config/intro_flow_test/task_eval_indicators.fail.translation"]
+
+[params]
+
+compress=true
+delimiter=0

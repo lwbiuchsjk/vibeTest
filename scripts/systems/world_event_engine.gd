@@ -2954,10 +2954,18 @@ func evaluate_condition(expr: String) -> bool:
 	return _evaluate_condition(expr)
 
 # 功能：加载开局选择配置。
-# 说明：配置文件与 roles.csv 同级，固定在 res://scripts/config/ 下。
+# 说明：优先从 csv_dir_path 下查找 creation_questions.csv；
+#       若未找到则回退到默认路径 res://scripts/config/creation_questions.csv。
 #       文件不存在时静默跳过，不影响引擎正常启动。
-func _load_creation_config(_csv_dir_path: String = "") -> void:
-	var config_path := "res://scripts/config/creation_questions.csv"
+func _load_creation_config(csv_dir_path: String = "") -> void:
+	var default_path := "res://scripts/config/creation_questions.csv"
+	var config_path := default_path
+	# 当指定了 csv_dir_path 且其中包含 creation_questions.csv 时，优先使用
+	csv_dir_path = csv_dir_path.strip_edges()
+	if not csv_dir_path.is_empty():
+		var dir_candidate := csv_dir_path.path_join("creation_questions.csv")
+		if FileAccess.file_exists(dir_candidate):
+			config_path = dir_candidate
 	if not FileAccess.file_exists(config_path):
 		_creation_config = []
 		return

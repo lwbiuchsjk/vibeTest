@@ -1,0 +1,3 @@
+task_id,rule_id,priority,from_grade_id,when,to_grade_id
+task_exam,exam_risky_if_wanted,100,g_perfect,flags.isWanted == true,g_risky
+task_smuggle,smuggle_clean_if_not_wanted,100,,flags.isWanted == false,g_clean

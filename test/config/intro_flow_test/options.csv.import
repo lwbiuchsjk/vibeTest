@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://di3aojo36npro"
+
+[deps]
+
+files=["res://test/config/intro_flow_test/options.choice.translation", "res://test/config/intro_flow_test/options.text.translation", "res://test/config/intro_flow_test/options.display.translation"]
+
+source_file="res://test/config/intro_flow_test/options.csv"
+dest_files=["res://test/config/intro_flow_test/options.choice.translation", "res://test/config/intro_flow_test/options.text.translation", "res://test/config/intro_flow_test/options.display.translation"]
+
+[params]
+
+compress=true
+delimiter=0
