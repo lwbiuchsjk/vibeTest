@@ -77,10 +77,10 @@ Godot 4.5，GDScript，Git 版本控制
 
 ## Obsidian CLI
 
-- 路径：`D:/softwares/obsidian/Obsidian.com`
-- vault 名称：`Design`
+- 路径和 vault 名称配置在 `tools/local_env.json`（模板见 `tools/local_env.example.json`）。
+- 使用前读取该文件获取 `obsidian_cli` 和 `vault_name`。若当前环境为 WSL（`uname -r` 含 `microsoft`），需用 `wslpath -u` 将 Windows 路径转换为 WSL 路径。
 - 用于文档重命名（自动更新 `[[]]` 链接）、属性操作、搜索等场景
-- 示例：`"D:/softwares/obsidian/Obsidian.com" backlinks vault=Design file="文档名"`
+- 示例：`"<obsidian_cli>" backlinks vault=<vault_name> file="文档名"`
 
 ### 文档删除与重命名规范
 
@@ -88,7 +88,7 @@ Godot 4.5，GDScript，Git 版本控制
 
 1. **优先使用 Obsidian CLI**（需 Obsidian 运行中）：
    ```bash
-   "D:/softwares/obsidian/Obsidian.com" backlinks vault=Design file="文档名"
+   "<obsidian_cli>" backlinks vault=<vault_name> file="文档名"
    ```
    能识别所有链接形式，包括别名链接 `[[file|alias]]`。
 
