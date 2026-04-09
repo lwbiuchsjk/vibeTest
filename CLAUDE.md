@@ -13,9 +13,9 @@ Godot 4.5，GDScript，Git 版本控制
 - assets/       资源文件（图片、音效等）
 - test/         测试文件
 - Design/       设计文档 Obsidian vault（Git submodule → 私有仓库 `vibe-test-design`）
-- _kb_sync/     在线知识库同步工具。文档已全量迁移至 `Design/`，此目录仅用于知识库同步操作
-- _kb_sync/cache/KB_CACHE.md   在线知识库缓存主入口
-- _kb_sync/Design/              在线知识库缓存的单个 md 文件（历史缓存，文档主库已迁移至 `Design/`）
+- _kb_sync/     在线知识库同步工具目录。除非用户明确要求执行知识库同步或排查同步脚本，否则不要读取该目录内容，也不要将其作为常规上下文来源
+- _kb_sync/cache/              在线知识库缓存目录。默认不要读取，包括 `KB_CACHE.md`、`KB_CONTEXT.md`、`KB_CONTEXT.json` 等缓存文件
+- _kb_sync/Design/             在线知识库历史缓存目录。文档主库已迁移至 `Design/`，默认不要读取
 
 # 开发规范
 
@@ -43,8 +43,8 @@ Godot 4.5，GDScript，Git 版本控制
   - 大范围改动（涉及多个文件、新建文档、结构性调整）：必须先与用户讨论清楚方案，经用户明确确认后，才可以落地执行。
   - 简单改动（单个文件的小幅修改、已有共识的补充）：讨论清楚后，可直接落地，无需额外确认。
 - 更新知识库时，默认使用 `_kb_sync/kb_bootstrap.ps1`。
-- 查找设计文档时，优先读取 `Design/` 目录。`_kb_sync/Design/` 为历史缓存，不再作为首选来源。
-- 如需查看知识库节点概览、索引和结构化缓存，使用 `_kb_sync/cache/KB_CONTEXT.md`、`_kb_sync/cache/KB_CONTEXT.json` 与 `_kb_sync/cache/cache_index.json`。
+- 查找设计文档时，只读取 `Design/` 目录，不要读取 `_kb_sync/Design/`、`_kb_sync/cache/` 或 `_kb_sync` 下的其他缓存内容。
+- 仅当用户明确要求执行知识库同步、排查知识库同步问题或核对在线知识库缓存时，才允许进入 `_kb_sync/` 目录读取对应文件。
 - 新增文档应当放在 `Design` 目录下。
 
 ## 提交流程
