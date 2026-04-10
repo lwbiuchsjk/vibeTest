@@ -12,7 +12,8 @@
       "mcp__plugin_discord_discord__fetch_messages",
       "mcp__plugin_discord_discord__reply",
       "WebSearch",
-      "Skill(codex:rescue)"
+      "Skill(codex:rescue)",
+      "Skill(update-config)"
     ]
   }
 }
