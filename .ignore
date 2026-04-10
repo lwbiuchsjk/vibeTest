@@ -1,0 +1,7 @@
+# Godot auto-generated files (from CSV, not useful for code understanding)
+*.translation
+*.import
+*.uid
+
+# Historical KB cache (deprecated, docs moved to Design/)
+_kb_sync/Design/
