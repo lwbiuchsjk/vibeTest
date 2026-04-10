@@ -896,7 +896,7 @@ func debug_get_candidate_weights() -> Dictionary:
 	}
 
 # 功能：执行事件硬约束过滤。
-# 说明：地点、地点状态、NPC 在场、链 allowedTags 任一不满足即排除。
+# 说明：地点、地点状态、世界级 flag、NPC 在场、链 allowedTags 任一不满足即排除。
 func _is_event_eligible(event_def: Dictionary) -> bool:
 	var eligibility: Dictionary = event_def.get("eligibility", {})
 	var current_location := str(world_state.get("currentLocationId", ""))
@@ -917,6 +917,18 @@ func _is_event_eligible(event_def: Dictionary) -> bool:
 		var expected: Variant = clause.get("value", 0)
 		var actual: Variant = current_location_state.get(key, null)
 		if not _compare_values(actual, op, expected):
+			return false
+
+	# 说明：世界级 flag 硬过滤，检查 world_state["flags"] 中的全局标记。
+	var required_flags: Array = eligibility.get("requiredFlags", [])
+	for flag_clause_variant in required_flags:
+		var flag_clause: Dictionary = flag_clause_variant
+		var flag_key := str(flag_clause.get("key", ""))
+		var flag_op := str(flag_clause.get("op", "=="))
+		var flag_expected: Variant = flag_clause.get("value", 0)
+		var flags_dict: Dictionary = _dict_or_empty(world_state.get("flags", {}))
+		var flag_actual: Variant = flags_dict.get(flag_key, null)
+		if not _compare_values(flag_actual, flag_op, flag_expected):
 			return false
 
 	# 说明：NPC 在场硬过滤。

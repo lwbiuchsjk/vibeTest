@@ -764,6 +764,17 @@ static func _apply_event_condition_row(event_def: Dictionary, row: Dictionary) -
 		event_def["eligibility"] = eligibility_c
 		return
 
+	# 说明：世界级 flag 硬过滤，用于实现一次性事件等需要全局状态判断的场景。
+	if condition_type == "required_flag":
+		if left.is_empty():
+			return
+		var eligibility_d: Dictionary = event_def.get("eligibility", {})
+		var flag_clauses: Array = eligibility_d.get("requiredFlags", [])
+		flag_clauses.append({"key": left, "op": op if not op.is_empty() else "==", "value": _parse_literal(right)})
+		eligibility_d["requiredFlags"] = flag_clauses
+		event_def["eligibility"] = eligibility_d
+		return
+
 	if condition_type == "weight_rule":
 		if left.is_empty() or op.is_empty() or right.is_empty():
 			return
