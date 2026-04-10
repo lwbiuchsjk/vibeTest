@@ -13,9 +13,7 @@ Godot 4.5，GDScript，Git 版本控制
 - assets/       资源文件（图片、音效等）
 - test/         测试文件
 - Design/       设计文档 Obsidian vault（Git submodule → 私有仓库 `vibe-test-design`）
-- _kb_sync/     在线知识库同步工具目录。除非用户明确要求执行知识库同步或排查同步脚本，否则不要读取该目录内容，也不要将其作为常规上下文来源
-- _kb_sync/cache/              在线知识库缓存目录。默认不要读取，包括 `KB_CACHE.md`、`KB_CONTEXT.md`、`KB_CONTEXT.json` 等缓存文件
-- _kb_sync/Design/             在线知识库历史缓存目录。文档主库已迁移至 `Design/`，默认不要读取
+- _kb_sync/     在线知识库同步工具目录（访问规则见"工作流程"）
 
 # 开发规范
 
@@ -43,8 +41,7 @@ Godot 4.5，GDScript，Git 版本控制
   - 大范围改动（涉及多个文件、新建文档、结构性调整）：必须先与用户讨论清楚方案，经用户明确确认后，才可以落地执行。
   - 简单改动（单个文件的小幅修改、已有共识的补充）：讨论清楚后，可直接落地，无需额外确认。
 - 更新知识库时，默认使用 `_kb_sync/kb_bootstrap.ps1`。
-- 查找设计文档时，只读取 `Design/` 目录，不要读取 `_kb_sync/Design/`、`_kb_sync/cache/` 或 `_kb_sync` 下的其他缓存内容。
-- 仅当用户明确要求执行知识库同步、排查知识库同步问题或核对在线知识库缓存时，才允许进入 `_kb_sync/` 目录读取对应文件。
+- **`_kb_sync/` 访问规则**：设计文档只从 `Design/` 读取。`_kb_sync/` 整个目录（含 `cache/`、`Design/` 等子目录）默认不读取，仅当用户明确要求执行知识库同步或排查同步问题时才允许进入。
 - 新增文档应当放在 `Design` 目录下。
 
 ## 提交流程
@@ -79,24 +76,22 @@ Godot 4.5，GDScript，Git 版本控制
 
 - 路径和 vault 名称配置在 `tools/local_env.json`（模板见 `tools/local_env.example.json`）。
 - 使用前读取该文件获取 `obsidian_cli` 和 `vault_name`。若当前环境为 WSL（`uname -r` 含 `microsoft`），需用 `wslpath -u` 将 Windows 路径转换为 WSL 路径。
-- 用于文档重命名（自动更新 `[[]]` 链接）、属性操作、搜索等场景
 - 示例：`"<obsidian_cli>" backlinks vault=<vault_name> file="文档名"`
+
+### 优先使用 Obsidian CLI 的场景
+
+操作 `Design/` 下的 md 文档时，以下场景**优先使用 Obsidian CLI** 而非 Glob/Grep/Read（需 Obsidian 运行中；未运行时回退到 Grep）：
+
+1. **链接关系查询**：`backlinks`（反向链接）、`links`（正向链接）、`orphans`（孤立文件）、`deadends`（终端文件）、`unresolved`（断链）。能识别所有 `[[]]` 链接形式包括别名链接，Grep 无法可靠替代。
+2. **属性与标签查询/修改**：`tags`（标签列表与过滤）、`properties`（属性列表）、`property:read` / `property:set`（读写属性）。直接操作 YAML frontmatter，比手动解析更可靠。
+3. **文档结构概览**：`outline`（标题层级树）。输出结构化层级信息，比 Grep 搜 `^#+` 更清晰。
 
 ### 文档删除与重命名规范
 
-删除或重命名 `Design/` 下的文档前，**必须先检查引用关系**，避免产生断链：
+删除或重命名 `Design/` 下的文档前，**必须先用 `backlinks` 检查引用关系**，避免产生断链。Obsidian 未运行时可用 Grep 搜索 `[[文档名]]` 作为备选（可能漏掉别名链接）。
 
-1. **优先使用 Obsidian CLI**（需 Obsidian 运行中）：
-   ```bash
-   "<obsidian_cli>" backlinks vault=<vault_name> file="文档名"
-   ```
-   能识别所有链接形式，包括别名链接 `[[file|alias]]`。
-
-2. **备选：Grep 搜索**（Obsidian 未运行时）：
-   搜索 `[[文档名]]` 模式。可能漏掉别名链接，但不依赖 Obsidian。
-
-3. 如果存在引用，先更新引用方文档，再执行删除或重命名。
-4. 重命名文档优先使用 Obsidian CLI 的 `move` 命令，它会自动更新所有 `[[]]` 链接。
+1. 如果存在引用，先更新引用方文档，再执行删除或重命名。
+2. 重命名文档优先使用 Obsidian CLI 的 `move` 命令，它会自动更新所有 `[[]]` 链接。
 
 ## 测试流程
 
