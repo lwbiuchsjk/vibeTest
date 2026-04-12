@@ -1,4 +1,5 @@
 task_id,title,duration_turns,on_expire,weight_bias_profile,complete_when
-task_exam,考试冲刺,2,fail,exam_default,progress.study >= 51
-task_part_time,生活补贴,2,fail,job_default,params.prosperity >= 22
-task_smuggle,码头暗线,3,fail,smuggle_default,flags.gotHarborIntel == true
+task_meet_cheng,认识程叔衡,99,fail,,
+task_meet_lu,认识陆承岳,99,fail,,
+task_meet_zhou,认识周既明,99,fail,,
+task_life_cost,生活的账,99,fail,,
