@@ -14,7 +14,7 @@
         "-Quiet"
       ],
       "runOptions": {
-        "runOn": "folderOpen"
+        "runOn": "default"
       },
       "problemMatcher": []
     }
