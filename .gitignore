@@ -18,8 +18,14 @@ _kb_sync/Design/
 # Local IDE settings
 .vscode/settings.json
 
+# Codex agent config (auto-generated)
+.codex
+
 # Local environment config (path varies per machine, see tools/local_env.example.json)
 tools/local_env.json
 
 # Web export output (CI handles export and deploy)
 output/
+
+# Codex agent config (auto-generated)
+.codex
