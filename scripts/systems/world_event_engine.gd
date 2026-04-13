@@ -2581,9 +2581,27 @@ func _eval_complete_when_after_settlement() -> void:
 		_complete_task(str(task_id_variant))
 
 
-# 功能：判断任务 complete_when 是否命中。
-# 说明：表达式格式为 "<path> <op> <literal>"，支持路径来源 task/progress/world_state。
+# 功能：判断任务条件表达式是否命中（accept_when / complete_when 共用）。
+# 说明：支持分号分隔的多条件 AND 语法，如 "flags.a == true;flags.b == true"。
+#       单条件格式为 "<path> <op> <literal>"，支持路径来源 task/progress/world_state。
 func _is_task_complete_when_satisfied(task_runtime: Dictionary, condition: String) -> bool:
+	# 按分号拆分为多个子条件，全部满足才返回 true（AND 语义）。
+	# 无有效子条件时返回 false，避免空字符串或纯分号输入被误判为满足。
+	var sub_conditions: Array = condition.split(";", false)
+	var evaluated_count: int = 0
+	for sub_variant in sub_conditions:
+		var sub_condition := str(sub_variant).strip_edges()
+		if sub_condition.is_empty():
+			continue
+		evaluated_count += 1
+		if not _eval_single_task_condition(task_runtime, sub_condition):
+			return false
+	return evaluated_count > 0
+
+
+# 功能：求值单个条件子表达式。
+# 说明：从 _is_task_complete_when_satisfied 拆出，保持单条件求值逻辑独立。
+func _eval_single_task_condition(task_runtime: Dictionary, condition: String) -> bool:
 	var operators := [">=", "<=", "==", "!=", ">", "<"]
 	for op_variant in operators:
 		var op := str(op_variant)
