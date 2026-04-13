@@ -57,6 +57,11 @@ Godot 4.5，GDScript，Git 版本控制
 ## CSV 配置流水线（Step 3）执行规范
 
 - **批量文件并行处理**：事件卡数量超过 10 个时，从读取阶段就使用并行 Agent 分批处理，不要串行逐个读取。
+- **双轨工作流**：Step 3 使用脚本（`tools/csv_translator.py`）自动生成 + LLM 人工补全两条轨道并行：
+  1. 脚本产出 5 张表（events, event_conditions, event_presentations, options, option_rules），仅处理含 `base_weight` frontmatter 的新格式事件卡。
+  2. LLM 负责脚本不覆盖的部分：event_outcomes.csv、tasks.csv，以及需要人工判断的特殊情况（链式事件、非标效果等）。
+  3. 新批次事件卡首次使用时，脚本与 LLM 分别独立翻译，**比较产出差异**以验证脚本可靠性。验证通过后，后续批次可信任脚本产出。
+- **脚本维护规则**：当设计模板、引擎功能或 CSV 表结构发生变化时，需检查 `tools/csv_translator.py` 是否覆盖对应变动，必要时同步更新脚本。
 
 # 当前进度
 
