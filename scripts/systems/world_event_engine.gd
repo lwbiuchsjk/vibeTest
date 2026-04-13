@@ -226,6 +226,9 @@ func preview_next_turn() -> Dictionary:
 	if not _pending_turn_context.is_empty():
 		return _build_pending_turn_response(_pending_turn_context)
 
+	# 说明：先自动接取任务，确保本回合事件选择能立即吃到 task_links 权重。
+	_check_auto_accept_tasks()
+
 	var next_event_result := _select_next_event()
 	if not next_event_result.get("ok", false):
 		return next_event_result
@@ -257,6 +260,9 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 		return _resolve_pending_turn(selected_option_id)
 	if _is_world_ended():
 		return _build_world_ended_response()
+
+	# 说明：执行回合前先自动接取任务，保证调度阶段读取到最新任务状态。
+	_check_auto_accept_tasks()
 
 	var next_event_result := _select_next_event()
 	if not next_event_result.get("ok", false):
@@ -2154,6 +2160,63 @@ func _apply_task_action(action: Dictionary) -> void:
 			_complete_task(task_id)
 		_:
 			pass
+
+
+# 功能：判断任务是否已经进入任务系统已知集合。
+# 说明：只要任务存在于 active、completed、failed、abandoned 任一列表，就视为已知任务，不再自动接取。
+func _is_task_known(task_id: String) -> bool:
+	var normalized_id := task_id.strip_edges()
+	if normalized_id.is_empty():
+		return false
+
+	_ensure_task_runtime_state()
+	if _find_active_task_index(normalized_id) >= 0:
+		return true
+
+	var tasks_state: Dictionary = _dict_or_empty(world_state.get("tasks", {}))
+	var archive_keys: Array = ["completed", "failed", "abandoned"]
+	for archive_key_variant in archive_keys:
+		var archive_key: String = str(archive_key_variant)
+		var archive_list: Array = _array_or_empty(tasks_state.get(archive_key, []))
+		if archive_list.has(normalized_id):
+			return true
+	return false
+
+
+# 功能：检查并自动接取满足 accept_when 的任务。
+# 说明：该检查发生在选取回合事件之前，使新接取任务能立即参与本回合的事件权重计算。
+func _check_auto_accept_tasks() -> void:
+	_ensure_task_runtime_state()
+
+	var tasks_state: Dictionary = _dict_or_empty(world_state.get("tasks", {}))
+	var active: Array = _array_or_empty(tasks_state.get("active", []))
+	var task_config: Dictionary = _dict_or_empty(world_state.get("taskConfig", {}))
+	var max_active_count: int = maxi(1, int(task_config.get("maxActiveCount", 1)))
+	if active.size() >= max_active_count:
+		return
+
+	for task_id_variant in _task_def_map.keys():
+		var task_id: String = str(task_id_variant).strip_edges()
+		if task_id.is_empty():
+			continue
+		var task_def: Dictionary = _dict_or_empty(_task_def_map.get(task_id, {}))
+		if task_def.is_empty():
+			continue
+
+		var accept_when: String = str(task_def.get("acceptWhen", "")).strip_edges()
+		if accept_when.is_empty():
+			continue
+		if _is_task_known(task_id):
+			continue
+
+		# 说明：每次接取后重新读取 active 数量，确保严格遵守并行任务上限。
+		tasks_state = _dict_or_empty(world_state.get("tasks", {}))
+		active = _array_or_empty(tasks_state.get("active", []))
+		if active.size() >= max_active_count:
+			break
+
+		if _is_task_complete_when_satisfied({}, accept_when):
+			_accept_task(task_id)
 
 
 # 功能：接取任务并写入 active 列表。

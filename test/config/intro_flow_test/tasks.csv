@@ -1,5 +1,5 @@
-task_id,title,duration_turns,on_expire,weight_bias_profile,complete_when
-task_meet_cheng,认识程叔衡,99,fail,,
-task_meet_lu,认识陆承岳,99,fail,,
-task_meet_zhou,认识周既明,99,fail,,
-task_life_cost,生活的账,99,fail,,
+task_id,title,duration_turns,on_expire,weight_bias_profile,complete_when,accept_when
+task_meet_cheng,认识程叔衡,99,fail,,flags.met_cheng == true,flags.met_cheng == false
+task_meet_lu,认识陆承岳,99,fail,,flags.met_lu == true,flags.met_lu == false
+task_meet_zhou,认识周既明,99,fail,,flags.met_zhou == true,flags.met_zhou == false
+task_life_cost,生活的账,99,fail,,flags.life_cost == true,flags.life_cost == false

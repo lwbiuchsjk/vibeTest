@@ -1,9 +1,5 @@
 event_id,branch,target,op,key,value
 evt_s2_sk_01,default,flags,set,met_cheng,true
-evt_s2_sk_01,default,task,accept_task,task_meet_cheng,
 evt_s2_sk_02,default,flags,set,met_lu,true
-evt_s2_sk_02,default,task,accept_task,task_meet_lu,
 evt_s2_sk_03,default,flags,set,met_zhou,true
-evt_s2_sk_03,default,task,accept_task,task_meet_zhou,
 evt_s2_sk_04,default,flags,set,life_cost,true
-evt_s2_sk_04,default,task,accept_task,task_life_cost,

@@ -271,6 +271,8 @@ static func _assemble_task_defs(tables: Dictionary) -> Dictionary:
 				"durationTurns": maxi(1, _to_int(row.get("duration_turns", "1"), 1)),
 				"onExpire": str(row.get("on_expire", "fail")).strip_edges(),
 				"weightBiasProfile": str(row.get("weight_bias_profile", "")).strip_edges(),
+				# 说明：任务自动接取条件表达式，留空表示仅能通过显式 accept_task 接取。
+				"acceptWhen": str(row.get("accept_when", "")).strip_edges(),
 				# 说明：任务自动完成条件表达式，留空表示仅能通过显式 complete_task 完成。
 				"completeWhen": str(row.get("complete_when", "")).strip_edges()
 			}
