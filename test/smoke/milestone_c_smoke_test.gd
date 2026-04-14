@@ -1,11 +1,16 @@
 extends RefCounted
 
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
+const SmokeConfig := preload("res://test/smoke/smoke_config.gd")
 
 
 # 功能：执行里程碑 C 的任务偏置冒烟验证。
 # 说明：验证点包含偏置生效、硬过滤不受影响、最终权重下限成立。
-static func run_from_csv(csv_dir: String = "res://scripts/config/world_event_mvp") -> Dictionary:
+# 注意：断言引用旧配置事件 ID（evt_study_001 等），必须使用 world_event_mvp 配置。
+#       详见 smoke_config.gd 例外说明。
+static func run_from_csv(csv_dir: String = "") -> Dictionary:
+	if csv_dir.strip_edges().is_empty():
+		csv_dir = SmokeConfig.DEFAULT_CSV_DIR
 	var base_engine := WorldEventEngine.new(20260305)
 	var base_load := base_engine.load_from_csv_dir(csv_dir)
 	if not base_load.get("ok", false):

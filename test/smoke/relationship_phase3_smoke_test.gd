@@ -3,6 +3,7 @@ extends RefCounted
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 const RuleEngine := preload("res://scripts/systems/rule_engine.gd")
 const AffinityMap := preload("res://scripts/models/affinity_map.gd")
+const SmokeConfig := preload("res://test/smoke/smoke_config.gd")
 
 
 # 功能：固定随机序列，便于在 smoke 中复现骰面结果。
@@ -379,9 +380,11 @@ static func _test_j_end_to_end_csv_integration(checks: Array, failed: Array) -> 
 # ---- 辅助方法 ----
 
 # 功能：构建带关系数据的测试引擎。
+# 注意：断言引用旧配置事件 ID（evt_market_001），必须使用 world_event_mvp 配置。
+#       详见 smoke_config.gd 例外说明。
 static func _build_relationship_engine(xinxing_value: int) -> WorldEventEngine:
 	var engine := WorldEventEngine.new(20260324)
-	engine.load_from_csv_dir("res://scripts/config/world_event_mvp")
+	engine.load_from_csv_dir(SmokeConfig.DEFAULT_CSV_DIR)
 	if engine.player_role_state != null:
 		engine.player_role_state.set_xinxing(xinxing_value)
 	else:

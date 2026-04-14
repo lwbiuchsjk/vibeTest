@@ -6,6 +6,7 @@ extends RefCounted
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 const RoleStateClass := preload("res://scripts/models/role_state.gd")
 const AffinityMap := preload("res://scripts/models/affinity_map.gd")
+const SmokeConfig := preload("res://test/smoke/smoke_config.gd")
 
 
 static func run_all() -> Dictionary:
@@ -321,9 +322,10 @@ static func _test_e2_forced_full_flow(checks: Array, failed: Array) -> void:
 # ── 工具函数 ─────────────────────────────────────────────────────
 
 # 构建从 CSV 加载的完整引擎（包含 sys_reflection 和所有其他事件）。
+# 说明：csv_dir 从 SmokeConfig 读取，支持外部配置调整。
 static func _build_engine_with_csv() -> WorldEventEngine:
 	var engine := WorldEventEngine.new(20260329)
-	engine.load_from_csv_dir("res://scripts/config/world_event_mvp")
+	engine.load_from_csv_dir(SmokeConfig.get_csv_dir())
 	return engine
 
 

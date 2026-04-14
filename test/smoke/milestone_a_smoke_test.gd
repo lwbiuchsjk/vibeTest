@@ -5,10 +5,12 @@ const AffinityMap := preload("res://scripts/models/affinity_map.gd")
 const LocationGraph := preload("res://scripts/models/location_graph.gd")
 const RuleEngine := preload("res://scripts/systems/rule_engine.gd")
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
+const SmokeConfig := preload("res://test/smoke/smoke_config.gd")
 
 static func run() -> Dictionary:
 	var runtime := ConfigRuntime.shared()
-	var load_result := runtime.ensure_loaded()
+	# 说明：使用 SmokeConfig 提供的 csv_dir 覆盖默认配置路径。
+	var load_result := runtime.ensure_loaded({"world_event_csv_dir": SmokeConfig.get_csv_dir()})
 	if not load_result.get("ok", false):
 		return load_result
 	var context := runtime.build_context()

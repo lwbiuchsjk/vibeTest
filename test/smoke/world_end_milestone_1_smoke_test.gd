@@ -2,11 +2,15 @@ extends RefCounted
 
 const ConfigRuntime := preload("res://scripts/systems/config_runtime.gd")
 const WorldEventConfigAssembler := preload("res://scripts/systems/world_event_config_assembler.gd")
+const SmokeConfig := preload("res://test/smoke/smoke_config.gd")
 
 
 # 功能：验证世界结束里程碑 1 的配置层能力。
 # 说明：先验证现有 CSV 能正常编译出 isEndingEvent 字段，再验证 ending event + choice point 的强约束会被阻断。
-static func run_from_csv(csv_dir: String = "res://scripts/config/world_event_mvp") -> Dictionary:
+# 参数：csv_dir 为空时从 SmokeConfig 读取配置路径。
+static func run_from_csv(csv_dir: String = "") -> Dictionary:
+	if csv_dir.strip_edges().is_empty():
+		csv_dir = SmokeConfig.get_csv_dir()
 	var runtime := ConfigRuntime.shared()
 	var load_result := runtime.ensure_loaded({"world_event_csv_dir": csv_dir}, true)
 	if not load_result.get("ok", false):

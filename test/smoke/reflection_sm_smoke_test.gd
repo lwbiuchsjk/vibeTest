@@ -6,6 +6,7 @@ extends RefCounted
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 const RoleStateClass := preload("res://scripts/models/role_state.gd")
 const AffinityMap := preload("res://scripts/models/affinity_map.gd")
+const SmokeConfig := preload("res://test/smoke/smoke_config.gd")
 
 
 static func run_all() -> Dictionary:
@@ -508,9 +509,10 @@ static func _test_f2_focus_limit_flow(checks: Array, failed: Array) -> void:
 # ── 辅助方法 ─────────────────────────────────────────────────────
 
 # 构建带玩家角色的引擎实例。
+# 说明：csv_dir 从 SmokeConfig 读取，支持外部配置调整。
 static func _build_engine_with_player() -> WorldEventEngine:
 	var engine := WorldEventEngine.new(20260329)
-	engine.load_from_csv_dir("res://scripts/config/world_event_mvp")
+	engine.load_from_csv_dir(SmokeConfig.get_csv_dir())
 	return engine
 
 # 向引擎注入周期级累积变动记录（绕过事件执行流程，直接写入）。

@@ -7,6 +7,7 @@ extends RefCounted
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 const RoleState := preload("res://scripts/models/role_state.gd")
 const AffinityMap := preload("res://scripts/models/affinity_map.gd")
+const SmokeConfig := preload("res://test/smoke/smoke_config.gd")
 
 
 static func run_all() -> Dictionary:
@@ -479,9 +480,10 @@ static func _test_f1_end_to_end(checks: Array, failed: Array) -> void:
 
 # 功能：构建已加载 CSV 配置的测试引擎。
 # 说明：固定随机种子保证可复现；加载完成后 AffinityMap 与 RoleState 均已初始化。
+# 说明：csv_dir 从 SmokeConfig 读取，支持外部配置调整。
 static func _build_engine() -> WorldEventEngine:
 	var engine := WorldEventEngine.new(20260327)
-	engine.load_from_csv_dir("res://scripts/config/world_event_mvp")
+	engine.load_from_csv_dir(SmokeConfig.get_csv_dir())
 	return engine
 
 

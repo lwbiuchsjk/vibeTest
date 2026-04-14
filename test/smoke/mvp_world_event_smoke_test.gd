@@ -1,6 +1,7 @@
 extends RefCounted
 
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
+const SmokeConfig := preload("res://test/smoke/smoke_config.gd")
 
 static func run() -> Dictionary:
 	var engine := WorldEventEngine.new(20260226)
@@ -16,8 +17,12 @@ static func run() -> Dictionary:
 	return _run_loop(engine, option_rng)
 
 # 功能：使用 CSV 配置目录执行世界事件引擎冒烟测试。
-# 说明：覆盖“CSV 编译 -> 引擎加载 -> 回合循环”的完整路径。
-static func run_from_csv(csv_dir: String = "res://scripts/config/world_event_mvp") -> Dictionary:
+# 说明：覆盖"CSV 编译 -> 引擎加载 -> 回合循环"的完整路径。
+# 注意：断言基于旧配置事件集，必须使用 world_event_mvp 配置。
+#       详见 smoke_config.gd 例外说明。
+static func run_from_csv(csv_dir: String = "") -> Dictionary:
+	if csv_dir.strip_edges().is_empty():
+		csv_dir = SmokeConfig.DEFAULT_CSV_DIR
 	var engine := WorldEventEngine.new(20260226)
 	var option_rng := RandomNumberGenerator.new()
 	option_rng.seed = 20260227

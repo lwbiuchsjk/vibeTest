@@ -1,11 +1,16 @@
 extends RefCounted
 
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
+const SmokeConfig := preload("res://test/smoke/smoke_config.gd")
 
 
 # 功能：执行里程碑 3（任务终态评价）冒烟验收。
 # 说明：覆盖 completed 分档与分流、failed/abandoned 非完成态、resultRecords 写入与评价后果应用。
-static func run_from_csv(csv_dir: String = "res://scripts/config/world_event_mvp") -> Dictionary:
+# 注意：断言引用旧配置任务 ID（task_exam / task_smuggle 等），必须使用 world_event_mvp 配置。
+#       详见 smoke_config.gd 例外说明。
+static func run_from_csv(csv_dir: String = "") -> Dictionary:
+	if csv_dir.strip_edges().is_empty():
+		csv_dir = SmokeConfig.DEFAULT_CSV_DIR
 	var engine := WorldEventEngine.new(20260306)
 	var load_result := engine.load_from_csv_dir(csv_dir)
 	if not load_result.get("ok", false):

@@ -2,6 +2,7 @@ extends RefCounted
 
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 const RuleEngine := preload("res://scripts/systems/rule_engine.gd")
+const SmokeConfig := preload("res://test/smoke/smoke_config.gd")
 
 
 # 功能：固定随机序列，便于在 smoke 中复现概率结果。
@@ -688,9 +689,11 @@ static func _ensure_ready_for_option_choice(engine: WorldEventEngine, checks: Ar
 
 
 # 功能：构建测试引擎并注入心性值。
+# 注意：断言引用旧配置事件 ID（evt_market_001），必须使用 world_event_mvp 配置。
+#       详见 smoke_config.gd 例外说明。
 static func _build_test_engine(xinxing_value: int) -> WorldEventEngine:
 	var engine := WorldEventEngine.new(20260320)
-	engine.load_from_csv_dir("res://scripts/config/world_event_mvp")
+	engine.load_from_csv_dir(SmokeConfig.DEFAULT_CSV_DIR)
 	if engine.player_role_state != null:
 		engine.player_role_state.set_xinxing(xinxing_value)
 	else:

@@ -6,6 +6,7 @@ extends RefCounted
 const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 const CreationStateMachine := preload("res://scripts/systems/creation_state_machine.gd")
 const ConfigLoader := preload("res://scripts/systems/config_loader.gd")
+const SmokeConfig := preload("res://test/smoke/smoke_config.gd")
 
 
 static func run_all() -> Dictionary:
@@ -158,7 +159,7 @@ static func _test_d3_no_check_backward_compat(checks: Array, failed: Array) -> v
 # 说明：验证导入阶段配置（q_intro_1_opt_1）的检定和分支效果解析。
 static func _test_d4_csv_check_parse(checks: Array, failed: Array) -> void:
 	var label := "D4: CSV check fields parsed correctly"
-	var result: Dictionary = ConfigLoader.load_creation_config("res://scripts/config/creation_questions.csv")
+	var result: Dictionary = ConfigLoader.load_creation_config(SmokeConfig.get_creation_csv())
 	if not result.get("ok", false):
 		_fail(checks, failed, label, "CSV load failed: %s" % str(result.get("error", "")))
 		return
@@ -313,7 +314,7 @@ static func _test_e3_advance_to_choosing(checks: Array, failed: Array) -> void:
 # 场景 E4：从 CSV 加载时，含 | 的 question_text 正确解析为 narrative_lines。
 static func _test_e4_csv_narrative_lines_parse(checks: Array, failed: Array) -> void:
 	var label := "E4: CSV narrative_lines parsed from | separator"
-	var result: Dictionary = ConfigLoader.load_creation_config("res://scripts/config/creation_questions.csv")
+	var result: Dictionary = ConfigLoader.load_creation_config(SmokeConfig.get_creation_csv())
 	if not result.get("ok", false):
 		_fail(checks, failed, label, "CSV load failed: %s" % str(result.get("error", "")))
 		return
@@ -421,7 +422,7 @@ static func _test_f4_outcome_branch_selection(checks: Array, failed: Array) -> v
 # 场景 F5：CSV 加载后，选项 outcome 字段正确解析。
 static func _test_f5_csv_outcome_parse(checks: Array, failed: Array) -> void:
 	var label := "F5: CSV outcome fields parsed correctly"
-	var result: Dictionary = ConfigLoader.load_creation_config("res://scripts/config/creation_questions.csv")
+	var result: Dictionary = ConfigLoader.load_creation_config(SmokeConfig.get_creation_csv())
 	if not result.get("ok", false):
 		_fail(checks, failed, label, "CSV load failed: %s" % str(result.get("error", "")))
 		return
@@ -752,9 +753,10 @@ static func _test_c2_xinxing_clamp(checks: Array, failed: Array) -> void:
 # ── 测试工具 ─────────────────────────────────────────────────────
 
 # 构建带玩家角色的引擎实例。
+# 说明：csv_dir 从 SmokeConfig 读取，支持外部配置调整。
 static func _build_engine() -> WorldEventEngine:
 	var engine := WorldEventEngine.new(20260401)
-	engine.load_from_csv_dir("res://scripts/config/world_event_mvp")
+	engine.load_from_csv_dir(SmokeConfig.get_csv_dir())
 	return engine
 
 

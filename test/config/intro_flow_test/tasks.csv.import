@@ -6,10 +6,10 @@ uid="uid://dn2pxy5vcu0pg"
 
 [deps]
 
-files=["res://test/config/intro_flow_test/tasks.title.translation", "res://test/config/intro_flow_test/tasks.duration.translation", "res://test/config/intro_flow_test/tasks.on.translation", "res://test/config/intro_flow_test/tasks.weight.translation", "res://test/config/intro_flow_test/tasks.complete.translation"]
+files=["res://test/config/intro_flow_test/tasks.title.translation", "res://test/config/intro_flow_test/tasks.duration.translation", "res://test/config/intro_flow_test/tasks.on.translation", "res://test/config/intro_flow_test/tasks.weight.translation", "res://test/config/intro_flow_test/tasks.complete.translation", "res://test/config/intro_flow_test/tasks.accept.translation"]
 
 source_file="res://test/config/intro_flow_test/tasks.csv"
-dest_files=["res://test/config/intro_flow_test/tasks.title.translation", "res://test/config/intro_flow_test/tasks.duration.translation", "res://test/config/intro_flow_test/tasks.on.translation", "res://test/config/intro_flow_test/tasks.weight.translation", "res://test/config/intro_flow_test/tasks.complete.translation"]
+dest_files=["res://test/config/intro_flow_test/tasks.title.translation", "res://test/config/intro_flow_test/tasks.duration.translation", "res://test/config/intro_flow_test/tasks.on.translation", "res://test/config/intro_flow_test/tasks.weight.translation", "res://test/config/intro_flow_test/tasks.complete.translation", "res://test/config/intro_flow_test/tasks.accept.translation"]
 
 [params]
 
