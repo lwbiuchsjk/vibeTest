@@ -61,7 +61,21 @@ Godot 4.5，GDScript，Git 版本控制
   1. 脚本产出 5 张表（events, event_conditions, event_presentations, options, option_rules），仅处理含 `base_weight` frontmatter 的新格式事件卡。
   2. LLM 负责脚本不覆盖的部分：event_outcomes.csv、tasks.csv，以及需要人工判断的特殊情况（链式事件、非标效果等）。
   3. 新批次事件卡首次使用时，脚本与 LLM 分别独立翻译，**比较产出差异**以验证脚本可靠性。验证通过后，后续批次可信任脚本产出。
-- **脚本维护规则**：当设计模板、引擎功能或 CSV 表结构发生变化时，需检查 `tools/csv_translator.py` 是否覆盖对应变动，必要时同步更新脚本。
+- **脚本维护规则**：当设计模板、引擎功能或 CSV 表结构发生变化时，需检查以下脚本是否覆盖对应变动，必要时同步更新：
+  - `tools/csv_translator.py`（CSV 生成）
+  - `tools/csv_validator.py`（CSV 静态检查，硬编码常量来源见脚本头部声明）
+
+## CSV 配置静态检查规范
+
+- **鉴定选项必配 fail 分支**：`option_rules.csv` 中所有带 `rule_type=check` 的选项必须有对应的 `resolution,fail` 行。引擎 `_resolve_check_resolution()` 在无 `onFailResolution` 时 fallback 到 default 分支，导致鉴定失败与成功效果相同。fail 分支设计规则：
+  - 有 affinity 效果的选项：fail 保留 affinity 效果，移除技能收益
+  - 纯技能收益的选项：fail 给 `key,0`（无奖励）
+- **自动化检查**：`tools/csv_validator.py` 覆盖以下检查项（Step 4 静态检查阶段运行）：
+  1. fail 分支缺失：有 check 的选项必须有 resolution,fail 行
+  2. 跨表 FK 一致性：option_rules → options → events，从表 → events
+  3. key 合法性：cost/resolution key 对照 attribute_names.csv + 已知资源
+  4. rule_type / condition_type 合法性
+  5. cost value 正负号
 
 # 当前进度
 
