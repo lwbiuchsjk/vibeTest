@@ -1,1 +1,5 @@
 task_id,status,grade_id,target,op,key,value
+task_meet_cheng,failed,,world,set_forced_next,,evt_s2_sk_01
+task_meet_lu,failed,,world,set_forced_next,,evt_s2_sk_02
+task_meet_zhou,failed,,world,set_forced_next,,evt_s2_sk_03
+task_life_cost,failed,,world,set_forced_next,,evt_s2_sk_04
