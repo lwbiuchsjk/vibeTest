@@ -29,3 +29,6 @@ output/
 
 # Codex agent config (auto-generated)
 .codex
+
+# Godot translation temp files
+*.tmp
