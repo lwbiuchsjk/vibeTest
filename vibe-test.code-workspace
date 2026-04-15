@@ -8,5 +8,7 @@
 			"path": "Design"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"godotTools.lsp.serverPort": 6200
+	}
 }
