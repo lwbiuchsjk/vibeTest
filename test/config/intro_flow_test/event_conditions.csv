@@ -3,6 +3,9 @@ evt_s2_sk_01,required_flag,flags.met_cheng,==,false,
 evt_s2_sk_02,required_flag,flags.met_lu,==,false,
 evt_s2_sk_03,required_flag,flags.met_zhou,==,false,
 evt_s2_sk_04,required_flag,flags.life_cost,==,false,
+evt_s2_sk_04,required_flag,flags.met_cheng,==,true,
+evt_s2_sk_04,required_flag,flags.met_lu,==,true,
+evt_s2_sk_04,required_flag,flags.met_zhou,==,true,
 evt_s2_sk_04,weight_rule,flags.met_cheng,==,true,10
 evt_s2_sk_04,weight_rule,flags.met_lu,==,true,10
 evt_s2_sk_04,weight_rule,flags.met_zhou,==,true,10

@@ -357,6 +357,8 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 		var post_phase := str(_pending_turn_context.get("phase", ""))
 		if post_phase == "preemptive_bet" or post_phase == "desperate_gamble":
 			return _build_pending_turn_response(_pending_turn_context)
+		# 说明：正常选项路径不经过 _finalize_option_turn，需在此执行事件级 effects。
+		_apply_event_effects(event_def)
 	else:
 		# 说明：普通事件、缺失选择点或无可选项事件，都在这里统一按事件默认效果结算。
 		world_state["forcedNextEventId"] = ""
@@ -925,15 +927,14 @@ func _is_event_eligible(event_def: Dictionary) -> bool:
 		if not _compare_values(actual, op, expected):
 			return false
 
-	# 说明：世界级 flag 硬过滤，检查 world_state["flags"] 中的全局标记。
+	# 说明：世界级硬过滤，通过点路径从 world_state 根开始解析（与 weight_rule 共用路径约定）。
 	var required_flags: Array = eligibility.get("requiredFlags", [])
 	for flag_clause_variant in required_flags:
 		var flag_clause: Dictionary = flag_clause_variant
 		var flag_key := str(flag_clause.get("key", ""))
 		var flag_op := str(flag_clause.get("op", "=="))
 		var flag_expected: Variant = flag_clause.get("value", 0)
-		var flags_dict: Dictionary = _dict_or_empty(world_state.get("flags", {}))
-		var flag_actual: Variant = flags_dict.get(flag_key, null)
+		var flag_actual: Variant = _resolve_path_value(flag_key)
 		if not _compare_values(flag_actual, flag_op, flag_expected):
 			return false
 
@@ -1124,7 +1125,13 @@ func _parse_literal(raw: String) -> Variant:
 # 功能：统一比较函数。
 # 说明：大小比较会先转为 float，再执行比较。
 func _compare_values(actual: Variant, op: String, expected: Variant) -> bool:
+	# 说明：null 处理——等值/不等值比较时将 null 视为 false（flag 不存在 ≡ false）；
+	# 大小比较时 null 无法参与，直接判定不通过。
 	if actual == null:
+		if op == "==":
+			return false == expected
+		if op == "!=":
+			return false != expected
 		return false
 	match op:
 		"==":
@@ -1822,6 +1829,9 @@ func _finalize_reflection_turn(
 # 功能：风险入口结算后完成回合推进。
 # 说明：抽取自 _resolve_pending_turn 的回合末尾逻辑，避免风险入口与主流程重复编写。
 func _finalize_option_turn(event_def: Dictionary) -> Dictionary:
+	# 说明：统一执行事件级 effects（如 setFlags），确保一次性事件的 flag 在所有选项路径下都正确写入。
+	_apply_event_effects(event_def)
+
 	var event_id := str(_pending_turn_context.get("event_id", ""))
 	var route := str(_pending_turn_context.get("route", "scheduler"))
 	var expected_forced := str(_pending_turn_context.get("expected_forced", ""))
