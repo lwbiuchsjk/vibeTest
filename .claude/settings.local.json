@@ -13,7 +13,8 @@
       "mcp__plugin_discord_discord__reply",
       "WebSearch",
       "Skill(codex:rescue)",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "WebFetch(domain:developers.openai.com)"
     ]
   }
 }
