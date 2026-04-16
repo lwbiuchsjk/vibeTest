@@ -65,6 +65,10 @@ Godot 4.5，GDScript，Git 版本控制
   - `tools/csv_translator.py`（CSV 生成）
   - `tools/csv_validator.py`（CSV 静态检查，硬编码常量来源见脚本头部声明）
 
+## 忽略文件
+
+- `.claude/settings.local.json` 的改动由用户自行管理，Claude 不主动提交。
+
 ## CSV 配置静态检查规范
 
 - **鉴定选项必配 fail 分支**：`option_rules.csv` 中所有带 `rule_type=check` 的选项必须有对应的 `resolution,fail` 行。引擎 `_resolve_check_resolution()` 在无 `onFailResolution` 时 fallback 到 default 分支，导致鉴定失败与成功效果相同。fail 分支设计规则：
