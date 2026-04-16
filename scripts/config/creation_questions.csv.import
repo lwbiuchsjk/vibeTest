@@ -1,17 +1,1 @@
-[remap]
-
-importer="csv_translation"
-type="Translation"
-uid="uid://bfkbyphtge6y"
-
-[deps]
-
-files=["res://scripts/config/creation_questions.question.translation", "res://scripts/config/creation_questions.condition.translation", "res://scripts/config/creation_questions.background.translation", "res://scripts/config/creation_questions.option.translation", "res://scripts/config/creation_questions.option.translation", "res://scripts/config/creation_questions.effect.translation", "res://scripts/config/creation_questions.effect.translation", "res://scripts/config/creation_questions.effect.translation", "res://scripts/config/creation_questions.effect.translation", "res://scripts/config/creation_questions.check.translation", "res://scripts/config/creation_questions.check.translation", "res://scripts/config/creation_questions.check.translation", "res://scripts/config/creation_questions.check.translation", "res://scripts/config/creation_questions.outcome.translation", "res://scripts/config/creation_questions.outcome.translation"]
-
-source_file="res://scripts/config/creation_questions.csv"
-dest_files=["res://scripts/config/creation_questions.question.translation", "res://scripts/config/creation_questions.condition.translation", "res://scripts/config/creation_questions.background.translation", "res://scripts/config/creation_questions.option.translation", "res://scripts/config/creation_questions.option.translation", "res://scripts/config/creation_questions.effect.translation", "res://scripts/config/creation_questions.effect.translation", "res://scripts/config/creation_questions.effect.translation", "res://scripts/config/creation_questions.effect.translation", "res://scripts/config/creation_questions.check.translation", "res://scripts/config/creation_questions.check.translation", "res://scripts/config/creation_questions.check.translation", "res://scripts/config/creation_questions.check.translation", "res://scripts/config/creation_questions.outcome.translation", "res://scripts/config/creation_questions.outcome.translation"]
-
-[params]
-
-compress=true
-delimiter=0
+[remap]\n\nimporter="keep"

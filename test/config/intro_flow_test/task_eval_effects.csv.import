@@ -1,17 +1,1 @@
-[remap]
-
-importer="csv_translation"
-type="Translation"
-uid="uid://ce8l5pmqv4vow"
-
-[deps]
-
-files=["res://test/config/intro_flow_test/task_eval_effects.status.translation", "res://test/config/intro_flow_test/task_eval_effects.grade.translation", "res://test/config/intro_flow_test/task_eval_effects.target.translation", "res://test/config/intro_flow_test/task_eval_effects.op.translation", "res://test/config/intro_flow_test/task_eval_effects.key.translation", "res://test/config/intro_flow_test/task_eval_effects.value.translation"]
-
-source_file="res://test/config/intro_flow_test/task_eval_effects.csv"
-dest_files=["res://test/config/intro_flow_test/task_eval_effects.status.translation", "res://test/config/intro_flow_test/task_eval_effects.grade.translation", "res://test/config/intro_flow_test/task_eval_effects.target.translation", "res://test/config/intro_flow_test/task_eval_effects.op.translation", "res://test/config/intro_flow_test/task_eval_effects.key.translation", "res://test/config/intro_flow_test/task_eval_effects.value.translation"]
-
-[params]
-
-compress=true
-delimiter=0
+[remap]\n\nimporter="keep"

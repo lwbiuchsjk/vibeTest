@@ -1,17 +1,1 @@
-[remap]
-
-importer="csv_translation"
-type="Translation"
-uid="uid://cxlrl4hgpu8ln"
-
-[deps]
-
-files=["res://test/config/reflection_dispatch_test/options.choice.translation", "res://test/config/reflection_dispatch_test/options.text.translation", "res://test/config/reflection_dispatch_test/options.display.translation"]
-
-source_file="res://test/config/reflection_dispatch_test/options.csv"
-dest_files=["res://test/config/reflection_dispatch_test/options.choice.translation", "res://test/config/reflection_dispatch_test/options.text.translation", "res://test/config/reflection_dispatch_test/options.display.translation"]
-
-[params]
-
-compress=true
-delimiter=0
+[remap]\n\nimporter="keep"

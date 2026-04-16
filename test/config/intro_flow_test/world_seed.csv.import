@@ -1,17 +1,1 @@
-[remap]
-
-importer="csv_translation"
-type="Translation"
-uid="uid://cydx5h42fri2p"
-
-[deps]
-
-files=["res://test/config/intro_flow_test/world_seed.scope.translation", "res://test/config/intro_flow_test/world_seed.scope.translation", "res://test/config/intro_flow_test/world_seed.key.translation", "res://test/config/intro_flow_test/world_seed.value.translation"]
-
-source_file="res://test/config/intro_flow_test/world_seed.csv"
-dest_files=["res://test/config/intro_flow_test/world_seed.scope.translation", "res://test/config/intro_flow_test/world_seed.scope.translation", "res://test/config/intro_flow_test/world_seed.key.translation", "res://test/config/intro_flow_test/world_seed.value.translation"]
-
-[params]
-
-compress=true
-delimiter=0
+[remap]\n\nimporter="keep"

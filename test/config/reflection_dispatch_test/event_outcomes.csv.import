@@ -1,17 +1,1 @@
-[remap]
-
-importer="csv_translation"
-type="Translation"
-uid="uid://gphts7gkbjgn"
-
-[deps]
-
-files=["res://test/config/reflection_dispatch_test/event_outcomes.branch.translation", "res://test/config/reflection_dispatch_test/event_outcomes.target.translation", "res://test/config/reflection_dispatch_test/event_outcomes.op.translation", "res://test/config/reflection_dispatch_test/event_outcomes.key.translation", "res://test/config/reflection_dispatch_test/event_outcomes.value.translation"]
-
-source_file="res://test/config/reflection_dispatch_test/event_outcomes.csv"
-dest_files=["res://test/config/reflection_dispatch_test/event_outcomes.branch.translation", "res://test/config/reflection_dispatch_test/event_outcomes.target.translation", "res://test/config/reflection_dispatch_test/event_outcomes.op.translation", "res://test/config/reflection_dispatch_test/event_outcomes.key.translation", "res://test/config/reflection_dispatch_test/event_outcomes.value.translation"]
-
-[params]
-
-compress=true
-delimiter=0
+[remap]\n\nimporter="keep"

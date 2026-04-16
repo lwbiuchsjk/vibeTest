@@ -32,3 +32,6 @@ output/
 
 # Godot translation temp files
 *.tmp
+
+# Godot CSV import translation artifacts (unused — CSV read via FileAccess)
+*.translation

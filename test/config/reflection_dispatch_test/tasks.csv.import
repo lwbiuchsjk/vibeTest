@@ -1,17 +1,1 @@
-[remap]
-
-importer="csv_translation"
-type="Translation"
-uid="uid://ciw6uhk0ppthg"
-
-[deps]
-
-files=["res://test/config/reflection_dispatch_test/tasks.title.translation", "res://test/config/reflection_dispatch_test/tasks.duration.translation", "res://test/config/reflection_dispatch_test/tasks.on.translation", "res://test/config/reflection_dispatch_test/tasks.weight.translation", "res://test/config/reflection_dispatch_test/tasks.complete.translation"]
-
-source_file="res://test/config/reflection_dispatch_test/tasks.csv"
-dest_files=["res://test/config/reflection_dispatch_test/tasks.title.translation", "res://test/config/reflection_dispatch_test/tasks.duration.translation", "res://test/config/reflection_dispatch_test/tasks.on.translation", "res://test/config/reflection_dispatch_test/tasks.weight.translation", "res://test/config/reflection_dispatch_test/tasks.complete.translation"]
-
-[params]
-
-compress=true
-delimiter=0
+[remap]\n\nimporter="keep"

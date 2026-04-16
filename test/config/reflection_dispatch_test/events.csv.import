@@ -1,17 +1,1 @@
-[remap]
-
-importer="csv_translation"
-type="Translation"
-uid="uid://dupeeooos8jwm"
-
-[deps]
-
-files=["res://test/config/reflection_dispatch_test/events.title.translation", "res://test/config/reflection_dispatch_test/events.background.translation", "res://test/config/reflection_dispatch_test/events.base.translation", "res://test/config/reflection_dispatch_test/events.continuation.translation", "res://test/config/reflection_dispatch_test/events.choice.translation", "res://test/config/reflection_dispatch_test/events.tags.translation", "res://test/config/reflection_dispatch_test/events.task.translation", "res://test/config/reflection_dispatch_test/events.is.translation", "res://test/config/reflection_dispatch_test/events.type.translation"]
-
-source_file="res://test/config/reflection_dispatch_test/events.csv"
-dest_files=["res://test/config/reflection_dispatch_test/events.title.translation", "res://test/config/reflection_dispatch_test/events.background.translation", "res://test/config/reflection_dispatch_test/events.base.translation", "res://test/config/reflection_dispatch_test/events.continuation.translation", "res://test/config/reflection_dispatch_test/events.choice.translation", "res://test/config/reflection_dispatch_test/events.tags.translation", "res://test/config/reflection_dispatch_test/events.task.translation", "res://test/config/reflection_dispatch_test/events.is.translation", "res://test/config/reflection_dispatch_test/events.type.translation"]
-
-[params]
-
-compress=true
-delimiter=0
+[remap]\n\nimporter="keep"
