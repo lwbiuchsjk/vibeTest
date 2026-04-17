@@ -14,7 +14,8 @@
       "WebSearch",
       "Skill(codex:rescue)",
       "Skill(update-config)",
-      "WebFetch(domain:developers.openai.com)"
+      "WebFetch(domain:developers.openai.com)",
+      "Skill(codex:setup)"
     ]
   }
 }
