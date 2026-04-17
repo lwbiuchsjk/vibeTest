@@ -41,6 +41,8 @@ var _last_check_result: Dictionary = {}
 var _last_affinity_changes: Array = []
 # 周期级累积关系变动记录，跨事件保留，仅在自省结算后清空。
 var _cycle_affinity_changes: Array = []
+# 叙事包系统配置（默认回合容量），从 world_seed packConfig 加载。
+var _pack_config: Dictionary = {}
 # 自省系统配置（操作限额、调整刻度、推荐数量），从 world_seed reflectionConfig 加载。
 var _reflection_config: Dictionary = {}
 # 自省操作已使用次数，自省开始时重置为0。
@@ -209,10 +211,15 @@ func load_from_data(data: Dictionary, location_graph: Variant = null, role_state
 	_init_affinity_system()
 	# 初始化自省系统配置。
 	_init_reflection_config()
+	# 初始化叙事包系统配置。
+	_init_pack_config()
+	# 确保 packContext 存在（首次加载时初始化为空包状态）。
+	_ensure_pack_context()
 	return {"ok": true}
 
 # 功能：预览下一回合事件，但不立即结算。
-# 说明：统一创建待处理上下文，并返回当前阶段的事件数据；若已有待处理事件，则直接复用当前上下文。
+# 说明：叙事包联动——根据包状态路由到地点选择、自省或正常事件调度。
+#       若已有待处理事件，直接复用当前上下文。
 func preview_next_turn() -> Dictionary:
 	# 预览阶段清空上次结算缓存，避免 UI 显示过期数据。
 	_last_check_result = {}
@@ -225,6 +232,49 @@ func preview_next_turn() -> Dictionary:
 
 	if not _pending_turn_context.is_empty():
 		return _build_pending_turn_response(_pending_turn_context)
+
+	# 叙事包联动：检查是否需要进入地点选择。
+	if _is_pack_awaiting_location():
+		var loc_event: Dictionary = _build_location_select_event()
+		return {
+			"ok": true,
+			"phase": "location_select",
+			"event_id": "_location_select",
+			"title": str(loc_event.get("title", "")),
+			"type": "location_select",
+			"options": loc_event.get("options", []),
+			"awaiting_input": true
+		}
+
+	# 叙事包联动：检查包是否已结束，需要触发自省。
+	if _is_pack_finished():
+		var pack_ctx: Dictionary = _dict_or_empty(world_state.get("packContext", {}))
+		var should_reflect := not bool(pack_ctx.get("interrupted", false))
+		# chain 打断后，检查是否有 pendingReflectionAfterChain 标记。
+		if bool(pack_ctx.get("interrupted", false)) and bool(world_state.get("pendingReflectionAfterChain", false)):
+			should_reflect = true
+			world_state.erase("pendingReflectionAfterChain")
+		if should_reflect:
+			# 强制插入自省事件。
+			var reflection_def: Dictionary = _event_map.get("sys_reflection", {})
+			if not reflection_def.is_empty():
+				_pending_turn_context = _create_pending_turn_context(
+					"sys_reflection", "pack_end_reflection", "", reflection_def
+				)
+				return _build_pending_turn_response(_pending_turn_context)
+		# 不触发自省（chain 打断且无 triggerReflection），直接清空包进入地点选择。
+		_clear_pack_context()
+		# 清空后进入地点选择（_is_pack_awaiting_location 此时必定为 true），内联构建返回值避免递归。
+		var loc_event_fallback: Dictionary = _build_location_select_event()
+		return {
+			"ok": true,
+			"phase": "location_select",
+			"event_id": "_location_select",
+			"title": str(loc_event_fallback.get("title", "")),
+			"type": "location_select",
+			"options": loc_event_fallback.get("options", []),
+			"awaiting_input": true
+		}
 
 	# 说明：先自动接取任务，确保本回合事件选择能立即吃到 task_links 权重。
 	_check_auto_accept_tasks()
@@ -249,6 +299,34 @@ func confirm_pending_turn(selected_option_id: String = "") -> Dictionary:
 		return {"ok": false, "error": "no pending turn to confirm"}
 	return _resolve_pending_turn(selected_option_id)
 
+
+# 功能：确认地点选择，初始化新的叙事包。
+# 说明：由 UI 层在玩家选定地点后调用。location_id 必须是 _build_location_select_event 返回的合法选项。
+#       该操作不消耗回合、不推进任务、不记入历史。
+func confirm_location_select(location_id: String) -> Dictionary:
+	if _is_world_ended():
+		return _build_world_ended_response()
+	if location_id.strip_edges().is_empty():
+		return {"ok": false, "error": "location_id is empty"}
+	if not _is_pack_awaiting_location():
+		return {"ok": false, "error": "not in location select phase"}
+
+	# 验证地点合法性：必须是当前地点或其邻居。
+	var current_location := str(world_state.get("currentLocationId", ""))
+	var valid := (location_id == current_location)
+	if not valid and _location_graph != null:
+		var neighbors: Array = _location_graph.get_neighbors(current_location)
+		valid = location_id in neighbors
+	if not valid:
+		return {"ok": false, "error": "location %s is not reachable from %s" % [location_id, current_location]}
+
+	_start_new_pack(location_id)
+	return {
+		"ok": true,
+		"location_id": location_id,
+		"pack_capacity": int(_pack_config.get("defaultCapacity", 3))
+	}
+
 # 功能：执行一个回合。
 # 说明：若已有待处理事件，则继续推进当前阶段；否则先选出事件，再通过统一的待处理上下文完成展示、选择或确认。
 func run_turn(selected_option_id: String = "") -> Dictionary:
@@ -260,6 +338,13 @@ func run_turn(selected_option_id: String = "") -> Dictionary:
 		return _resolve_pending_turn(selected_option_id)
 	if _is_world_ended():
 		return _build_world_ended_response()
+
+	# 叙事包联动：run_turn 也需要检查包状态，防止绕过 preview_next_turn 时跳过地点选择和自省。
+	if _is_pack_awaiting_location():
+		return {"ok": false, "error": "pack awaiting location select, call confirm_location_select() first"}
+	if _is_pack_finished():
+		# 包已结束但尚未自省/清空，需要先经过 preview_next_turn 路由。
+		return {"ok": false, "error": "pack finished, call preview_next_turn() to trigger reflection"}
 
 	# 说明：执行回合前先自动接取任务，保证调度阶段读取到最新任务状态。
 	_check_auto_accept_tasks()
@@ -305,6 +390,10 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 		return _resolve_preemptive_bet_phase(selected_option_id)
 	if phase == "desperate_gamble":
 		return _resolve_desperate_gamble_phase(selected_option_id)
+
+	# P0-1 修复：在任何 _apply_*（可能触发链退出清空 chainContext）之前缓存 deferred 状态，
+	# 供后续结算代码判断是否跳过 turn 推进和任务 tick。
+	_pending_turn_context["_was_in_deferred_chain"] = _is_in_deferred_chain()
 
 	# 功能：自省事件分支——将 confirm_pending_turn 的调用转发给自省状态机。
 	# 说明：自省期间持续占据 pending_turn，每次 confirm 推进一步；SETTLED 后清除并推进回合。
@@ -368,13 +457,19 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 	# 说明：任务自动完成判定必须发生在"本回合结算动作完成后、任务到期推进前"。
 	_eval_complete_when_after_settlement()
 	_record_history(event_id)
-	_tick_tasks_after_turn()
+	# 叙事包联动：使用缓存的 deferred 状态，避免链退出后 chainContext 被清空导致误判。
+	var was_deferred := bool(_pending_turn_context.get("_was_in_deferred_chain", false))
+	if not was_deferred:
+		_tick_tasks_after_turn()
 	var ended_this_turn := false
 	if bool(event_def.get("isEndingEvent", false)):
 		_finalize_world(event_id)
 		ended_this_turn = true
 	if not ended_this_turn:
-		world_state["turn"] = int(world_state.get("turn", 0)) + 1
+		if not was_deferred:
+			world_state["turn"] = int(world_state.get("turn", 0)) + 1
+			# 叙事包联动：推进包内回合计数。
+			_advance_pack_turn()
 		_pending_turn_context.clear()
 
 	return _build_result_payload(
@@ -395,9 +490,32 @@ func _select_next_event() -> Dictionary:
 	var route := "scheduler"
 
 	if not expected_forced.is_empty():
-		next_event_id = expected_forced
-		route = "forced"
-	else:
+		# 叙事包联动：检查 forcedNext 事件的地点约束是否与当前地点匹配。
+		var forced_def: Dictionary = _event_map.get(expected_forced, {})
+		var forced_eligible := true
+		if not forced_def.is_empty():
+			var forced_eligibility: Dictionary = forced_def.get("eligibility", {})
+			var forced_locations: Array = forced_eligibility.get("requiredLocations", [])
+			var current_loc := str(world_state.get("currentLocationId", ""))
+			if not forced_locations.is_empty() and not (current_loc in forced_locations):
+				# 地点不匹配：保留 forcedNextEventId，走正常调度流程。
+				forced_eligible = false
+				print("[叙事包] forcedNext %s 地点不匹配（需要 %s，当前 %s），延迟触发" % [
+					expected_forced, str(forced_locations), current_loc
+				])
+		if forced_eligible:
+			next_event_id = expected_forced
+			route = "forced"
+			# 叙事包联动：无地点约束的 forcedNext 事件插入时，包回合容量 +1。
+			if not forced_def.is_empty():
+				var fl: Array = forced_def.get("eligibility", {}).get("requiredLocations", [])
+				if fl.is_empty():
+					var pack_ctx: Dictionary = _dict_or_empty(world_state.get("packContext", {}))
+					if not str(pack_ctx.get("locationId", "")).is_empty():
+						pack_ctx["turnCapacity"] = int(pack_ctx.get("turnCapacity", 0)) + 1
+						world_state["packContext"] = pack_ctx
+						print("[叙事包] 无地点约束 forcedNext，包容量 +1")
+	if next_event_id.is_empty():
 		var candidates := _build_candidates()
 		if candidates.is_empty():
 			next_event_id = _fallback_event_id()
@@ -1250,7 +1368,13 @@ func _ensure_or_patch_chain_context(chain_patch: Dictionary) -> void:
 			"allowedTags": chain_patch.get("allowedTags", []),
 			"constraints": chain_patch.get("constraints", {}),
 			"weightBias": chain_patch.get("weightBias", {}),
-			"exitWhenStageGte": int(chain_patch.get("exitWhenStageGte", 0))
+			"exitWhenStageGte": int(chain_patch.get("exitWhenStageGte", 0)),
+			# 叙事包联动：链内回合结算模式（standard=每步消耗标准回合，deferred=冻结回合链末结算）。
+			"turnMode": str(chain_patch.get("turnMode", "standard")),
+			# 叙事包联动：deferred 模式下链结束时消耗的回合数（0=不消耗）。
+			"deferredTurnCost": int(chain_patch.get("deferredTurnCost", 1)),
+			# 叙事包联动：链结束后是否触发自省事件。
+			"triggerReflectionOnExit": bool(chain_patch.get("triggerReflectionOnExit", false))
 		}
 	else:
 		ctx["stage"] = int(ctx.get("stage", 0)) + int(chain_patch.get("stageDelta", 1))
@@ -1262,9 +1386,18 @@ func _ensure_or_patch_chain_context(chain_patch: Dictionary) -> void:
 			ctx["weightBias"] = chain_patch.get("weightBias", {})
 		if chain_patch.has("exitWhenStageGte"):
 			ctx["exitWhenStageGte"] = int(chain_patch.get("exitWhenStageGte", 0))
+		# 叙事包联动字段：仅在 patch 中明确提供时才覆盖，否则保留已有值。
+		if chain_patch.has("turnMode"):
+			ctx["turnMode"] = str(chain_patch.get("turnMode", "standard"))
+		if chain_patch.has("deferredTurnCost"):
+			ctx["deferredTurnCost"] = int(chain_patch.get("deferredTurnCost", 1))
+		if chain_patch.has("triggerReflectionOnExit"):
+			ctx["triggerReflectionOnExit"] = bool(chain_patch.get("triggerReflectionOnExit", false))
 
 	var exit_stage := int(ctx.get("exitWhenStageGte", 0))
 	if exit_stage > 0 and int(ctx.get("stage", 0)) >= exit_stage:
+		# 叙事包联动：链退出时执行延迟结算（deferred 模式下按 deferredTurnCost 批量推进）。
+		_finalize_chain_exit(ctx)
 		world_state["chainContext"] = null
 	else:
 		world_state["chainContext"] = ctx
@@ -1799,7 +1932,8 @@ func _resolve_reflection_phase(
 
 
 # 功能：自省结算后完成回合推进。
-# 说明：复用与普通事件相同的回合末尾逻辑（历史记录、任务推进、turn +1）。
+# 说明：叙事包联动——自省作为包的终结环节，不消耗回合、不推进任务计时器。
+#       仅执行历史记录和 continuation policy。自省完成后清空 packContext，进入地点选择。
 func _finalize_reflection_turn(
 	event_id: String,
 	route: String,
@@ -1811,10 +1945,12 @@ func _finalize_reflection_turn(
 	_apply_continuation_policy(event_def)
 	_eval_complete_when_after_settlement()
 	_record_history(event_id)
-	_tick_tasks_after_turn()
-	world_state["turn"] = int(world_state.get("turn", 0)) + 1
+	# 叙事包联动：自省不消耗回合，不推进任务计时器。
+	# _tick_tasks_after_turn() 和 turn += 1 被移除。
 	_pending_turn_context.clear()
-	print("[自省调度] 结算完成，turn=%d" % int(world_state.get("turn", 0)))
+	# 叙事包联动：自省完成后清空包状态，下次进入地点选择。
+	_clear_pack_context()
+	print("[自省调度] 结算完成（不消耗回合），turn=%d" % int(world_state.get("turn", 0)))
 	return _build_result_payload(
 		route,
 		event_id,
@@ -1841,13 +1977,19 @@ func _finalize_option_turn(event_def: Dictionary) -> Dictionary:
 
 	_eval_complete_when_after_settlement()
 	_record_history(event_id)
-	_tick_tasks_after_turn()
+	# 叙事包联动：使用缓存的 deferred 状态，避免链退出后 chainContext 被清空导致误判。
+	var was_deferred := bool(_pending_turn_context.get("_was_in_deferred_chain", false))
+	if not was_deferred:
+		_tick_tasks_after_turn()
 	var ended_this_turn := false
 	if bool(event_def.get("isEndingEvent", false)):
 		_finalize_world(event_id)
 		ended_this_turn = true
 	if not ended_this_turn:
-		world_state["turn"] = int(world_state.get("turn", 0)) + 1
+		if not was_deferred:
+			world_state["turn"] = int(world_state.get("turn", 0)) + 1
+			# 叙事包联动：推进包内回合计数。
+			_advance_pack_turn()
 		_pending_turn_context.clear()
 
 	return _build_result_payload(
@@ -2864,6 +3006,199 @@ func _array_or_empty(value: Variant) -> Array:
 	if typeof(value) == TYPE_ARRAY and value != null:
 		return value
 	return []
+
+# ── 叙事包系统 ──────────────────────────────────────────────────
+
+# 功能：确保 world_state 中存在 packContext。
+# 说明：首次加载时初始化为空包状态（locationId 为空表示尚未开始首个包）。
+func _ensure_pack_context() -> void:
+	if not world_state.has("packContext") or typeof(world_state.get("packContext", null)) != TYPE_DICTIONARY:
+		world_state["packContext"] = {
+			"locationId": "",
+			"turnCapacity": 0,
+			"turnsElapsed": 0,
+			"interrupted": false
+		}
+
+
+# 功能：初始化叙事包系统配置，从 world_state.packConfig 加载。
+# 说明：缺省时使用默认值（defaultCapacity=3），保证系统在无配置时也能正常运行。
+func _init_pack_config() -> void:
+	var raw: Dictionary = _dict_or_empty(world_state.get("packConfig", {}))
+	_pack_config = {
+		"defaultCapacity": int(raw.get("defaultCapacity", 3)),
+	}
+	print("[叙事包] packConfig 已加载: %s" % str(_pack_config))
+
+
+# 功能：判断当前是否处于 deferred 模式的 chain 中。
+# 说明：用于回合结算出口决定是否跳过 turn 推进和任务 tick。
+func _is_in_deferred_chain() -> bool:
+	var raw_ctx: Variant = world_state.get("chainContext", null)
+	if typeof(raw_ctx) != TYPE_DICTIONARY or raw_ctx == null:
+		return false
+	var ctx: Dictionary = raw_ctx
+	return str(ctx.get("turnMode", "standard")) == "deferred"
+
+
+# 功能：链退出时执行延迟结算和叙事包状态更新。
+# 说明：deferred 模式下按 deferredTurnCost 批量推进 turn 和任务 tick；
+#       standard 模式下无额外操作（每步已正常结算）。
+#       无论模式，都标记 packContext.interrupted 并记录是否需要触发自省。
+func _finalize_chain_exit(chain_ctx: Dictionary) -> void:
+	var turn_mode := str(chain_ctx.get("turnMode", "standard"))
+	var trigger_reflection := bool(chain_ctx.get("triggerReflectionOnExit", false))
+
+	# deferred 模式：批量结算冻结的回合。
+	# 每次 tick 前先递增 turn，确保 _tick_tasks_after_turn 读取到正确的回合数判断任务到期。
+	if turn_mode == "deferred":
+		var cost := int(chain_ctx.get("deferredTurnCost", 1))
+		if cost > 0:
+			for i in range(cost):
+				world_state["turn"] = int(world_state.get("turn", 0)) + 1
+				_tick_tasks_after_turn()
+			print("[叙事包] chain deferred 结算: turn += %d" % cost)
+
+	# 标记当前包被 chain 打断。
+	var pack_ctx: Dictionary = _dict_or_empty(world_state.get("packContext", {}))
+	if not pack_ctx.is_empty():
+		pack_ctx["interrupted"] = true
+		world_state["packContext"] = pack_ctx
+
+	# 记录是否需要在包结束后触发自省（由 preview_next_turn 消费）。
+	if trigger_reflection:
+		world_state["pendingReflectionAfterChain"] = true
+	print("[叙事包] chain 退出: turnMode=%s, triggerReflection=%s" % [turn_mode, str(trigger_reflection)])
+
+
+# 功能：推进叙事包回合计数并检查包是否结束。
+# 说明：在标准回合结算后调用。返回 true 表示包已结束，主循环应在下次进入地点选择。
+func _advance_pack_turn() -> bool:
+	var pack_ctx: Dictionary = _dict_or_empty(world_state.get("packContext", {}))
+	if pack_ctx.is_empty() or str(pack_ctx.get("locationId", "")).is_empty():
+		return false
+	pack_ctx["turnsElapsed"] = int(pack_ctx.get("turnsElapsed", 0)) + 1
+	world_state["packContext"] = pack_ctx
+	var elapsed := int(pack_ctx.get("turnsElapsed", 0))
+	var capacity := int(pack_ctx.get("turnCapacity", 0))
+	if capacity > 0 and elapsed >= capacity:
+		print("[叙事包] 包已结束: elapsed=%d, capacity=%d" % [elapsed, capacity])
+		return true
+	return false
+
+
+# 功能：清空叙事包状态，准备进入地点选择。
+# 说明：清空 packContext 使 preview_next_turn 检测到空包并进入地点选择流程。
+func _clear_pack_context() -> void:
+	world_state["packContext"] = {
+		"locationId": "",
+		"turnCapacity": 0,
+		"turnsElapsed": 0,
+		"interrupted": false
+	}
+
+
+# 功能：初始化新的叙事包。
+# 说明：玩家选定地点后调用，设置地点和回合容量。
+func _start_new_pack(location_id: String) -> void:
+	var capacity := int(_pack_config.get("defaultCapacity", 3))
+	world_state["packContext"] = {
+		"locationId": location_id,
+		"turnCapacity": capacity,
+		"turnsElapsed": 0,
+		"interrupted": false
+	}
+	world_state["currentLocationId"] = location_id
+	print("[叙事包] 新包开始: location=%s, capacity=%d" % [location_id, capacity])
+
+
+# 功能：检查叙事包是否处于需要进入地点选择的状态。
+# 说明：packContext 为空（locationId 为空）表示尚未开始包或上一个包已结束。
+func _is_pack_awaiting_location() -> bool:
+	var pack_ctx: Dictionary = _dict_or_empty(world_state.get("packContext", {}))
+	return str(pack_ctx.get("locationId", "")).is_empty()
+
+
+# 功能：检查叙事包是否已结束（回合用完或被 chain 打断后）。
+func _is_pack_finished() -> bool:
+	var pack_ctx: Dictionary = _dict_or_empty(world_state.get("packContext", {}))
+	if str(pack_ctx.get("locationId", "")).is_empty():
+		return false
+	if bool(pack_ctx.get("interrupted", false)):
+		return true
+	var elapsed := int(pack_ctx.get("turnsElapsed", 0))
+	var capacity := int(pack_ctx.get("turnCapacity", 0))
+	return capacity > 0 and elapsed >= capacity
+
+
+# 功能：构建地点选择虚拟事件。
+# 说明：根据 LocationGraph 生成可选地点列表，每个地点作为一个选项。
+func _build_location_select_event() -> Dictionary:
+	var current_location := str(world_state.get("currentLocationId", ""))
+	var neighbor_ids: Array = []
+	if _location_graph != null:
+		neighbor_ids = _location_graph.get_neighbors(current_location)
+
+	# 构建可选地点列表：邻居 + 当前地点（留在原地）。
+	var location_ids: Array = []
+	# 当前地点排在第一位（留在原地选项）。
+	if not current_location.is_empty():
+		location_ids.append(current_location)
+	for neighbor_variant in neighbor_ids:
+		var neighbor_id := str(neighbor_variant)
+		if neighbor_id != current_location and not neighbor_id.is_empty():
+			location_ids.append(neighbor_id)
+
+	# 为每个地点生成选项。
+	var options: Array = []
+	var display_order := 1
+	for loc_id_variant in location_ids:
+		var loc_id := str(loc_id_variant)
+		var display_name := loc_id
+		if _location_graph != null:
+			var graph_name := _location_graph.get_display_name(loc_id)
+			if not graph_name.is_empty():
+				display_name = graph_name
+
+		# 附加地点信息：NPC 在场情况。
+		var npc_presence: Dictionary = _dict_or_empty(world_state.get("npcPresence", {}))
+		var npc_list: Array = _array_or_empty(npc_presence.get(loc_id, []))
+
+		# 检查是否有待触发 forcedNext 事件指向该地点。
+		var has_pending_forced := false
+		var forced_id := str(world_state.get("forcedNextEventId", ""))
+		if not forced_id.is_empty():
+			var forced_def: Dictionary = _event_map.get(forced_id, {})
+			var forced_eligibility: Dictionary = forced_def.get("eligibility", {})
+			var forced_locations: Array = forced_eligibility.get("requiredLocations", [])
+			if not forced_locations.is_empty() and loc_id in forced_locations:
+				has_pending_forced = true
+
+		var is_current := (loc_id == current_location)
+		var option_text := display_name
+		if is_current:
+			option_text = "%s（留在原地）" % display_name
+
+		options.append({
+			"id": "loc_select_%s" % loc_id,
+			"location_id": loc_id,
+			"text": option_text,
+			"display_order": display_order,
+			"npc_present": npc_list,
+			"has_pending_forced": has_pending_forced,
+			"is_current": is_current,
+			"visible": true,
+			"selectable": true
+		})
+		display_order += 1
+
+	return {
+		"event_id": "_location_select",
+		"title": "选择前往的地点",
+		"type": "location_select",
+		"options": options
+	}
+
 
 # ── 自省与关系调整系统 ──────────────────────────────────────────
 

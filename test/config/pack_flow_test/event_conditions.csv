@@ -1,0 +1,11 @@
+event_id,condition_type,left,op,right,delta
+evt_ph_01,required_location,,,loc_pharmacy,
+evt_ph_02,required_location,,,loc_pharmacy,
+evt_ph_03,required_location,,,loc_pharmacy,
+evt_ph_04,required_location,,,loc_pharmacy,
+evt_mk_01,required_location,,,loc_market,
+evt_mk_02,required_location,,,loc_market,
+evt_mk_03,required_location,,,loc_market,
+evt_hb_01,required_location,,,loc_harbor,
+evt_hb_02,required_location,,,loc_harbor,
+evt_hb_forced,required_location,,,loc_harbor,

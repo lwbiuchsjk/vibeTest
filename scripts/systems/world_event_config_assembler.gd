@@ -210,6 +210,11 @@ static func _assemble_world_state(tables: Dictionary) -> Dictionary:
 				var affinity_config: Dictionary = world_state.get("affinityConfig", {})
 				affinity_config[key] = _to_int(value_text, 0)
 				world_state["affinityConfig"] = affinity_config
+			"pack_config":
+				# 说明：叙事包系统配置（默认回合容量），写入 packConfig 字典。
+				var pack_config: Dictionary = world_state.get("packConfig", {})
+				pack_config[key] = _to_int(value_text, 0)
+				world_state["packConfig"] = pack_config
 			"reflection_config":
 				# 说明：自省系统配置（操作限额、调整刻度、推荐数量、关注上限、初始关注列表），写入 reflectionConfig 字典。
 				var reflection_config: Dictionary = world_state.get("reflectionConfig", {})

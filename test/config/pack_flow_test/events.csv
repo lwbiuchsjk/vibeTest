@@ -1,0 +1,15 @@
+event_id,title,background_art,base_weight,continuation_policy,choice_point_id,tags,task_links,is_ending_event,type
+sys_reflection,自省,,30,ReturnToScheduler,,system;reflection,,FALSE,reflection
+evt_ph_01,药铺日常：整理药材,,10,ReturnToScheduler,cp_ph_01,filler;pharmacy,,FALSE,
+evt_ph_02,药铺日常：磨药,,10,ReturnToScheduler,cp_ph_02,filler;pharmacy,,FALSE,
+evt_ph_03,药铺日常：看诊帮手,,10,ReturnToScheduler,cp_ph_03,filler;pharmacy,,FALSE,
+evt_ph_04,药铺日常：盘点库存,,10,ReturnToScheduler,cp_ph_04,filler;pharmacy,,FALSE,
+evt_mk_01,集市见闻：吆喝声,,10,ReturnToScheduler,cp_mk_01,filler;market,,FALSE,
+evt_mk_02,集市见闻：小贩闲谈,,10,ReturnToScheduler,cp_mk_02,filler;market,,FALSE,
+evt_mk_03,集市见闻：稀罕货,,10,ReturnToScheduler,cp_mk_03,filler;market,,FALSE,
+evt_hb_01,码头见闻：卸货,,10,ReturnToScheduler,cp_hb_01,filler;harbor,,FALSE,
+evt_hb_02,码头见闻：水手故事,,10,ReturnToScheduler,cp_hb_02,filler;harbor,,FALSE,
+evt_global_01,天气变化,,10,ReturnToScheduler,cp_global_01,filler;global,,FALSE,
+evt_hb_forced,码头紧急：委托失败,,10,ReturnToScheduler,cp_hb_forced,filler;harbor;forced,,FALSE,
+evt_chain_entry,突发事件：暗流涌动,,10,ChainContinue,cp_chain_entry,chain;urgent,,FALSE,
+evt_chain_step,突发事件：事态升级,,10,ReturnToScheduler,cp_chain_step,chain;urgent,,FALSE,

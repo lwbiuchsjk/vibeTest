@@ -1,0 +1,14 @@
+event_id,presentation_id,display_order,item_type,speaker,text
+evt_ph_01,evt_ph_01_p1,1,text,旁白,药铺里弥漫着草药的气味，你开始整理今天到货的药材。
+evt_ph_02,evt_ph_02_p1,1,text,旁白,研钵和药杵在手中起落，磨药的活计虽然枯燥，倒也安神。
+evt_ph_03,evt_ph_03_p1,1,text,旁白,今天有病人来看诊，药师让你在旁边帮忙递药、记方子。
+evt_ph_04,evt_ph_04_p1,1,text,旁白,月底了，药师吩咐你把库房的药材清点一遍。
+evt_mk_01,evt_mk_01_p1,1,text,旁白,集市上人声鼎沸，各种吆喝声此起彼伏。
+evt_mk_02,evt_mk_02_p1,1,text,旁白,卖杂货的小贩拉你闲聊了几句，说了些镇上的新鲜事。
+evt_mk_03,evt_mk_03_p1,1,text,旁白,有个外地商人摆出了些没见过的物件，引来不少人围观。
+evt_hb_01,evt_hb_01_p1,1,text,旁白,码头上正在卸货，搬运工们喊着号子，忙得热火朝天。
+evt_hb_02,evt_hb_02_p1,1,text,旁白,一个老水手坐在船桩上，给几个年轻人讲他出海的见闻。
+evt_global_01,evt_global_01_p1,1,text,旁白,天色突然阴沉下来，看样子要变天了。
+evt_hb_forced,evt_hb_forced_p1,1,text,旁白,码头上传来急促的呼喊，似乎出了什么乱子。
+evt_chain_entry,evt_chain_entry_p1,1,text,旁白,一阵喧哗打破了平静，似乎有什么不寻常的事情正在发生。
+evt_chain_step,evt_chain_step_p1,1,text,旁白,事态进一步升级，你不得不做出应对。

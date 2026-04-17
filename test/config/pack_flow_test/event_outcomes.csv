@@ -1,0 +1,7 @@
+event_id,branch,target,op,key,value
+evt_chain_entry,default,chain_context,patch,chainId,chain_urgent
+evt_chain_entry,default,chain_context,patch,stage,1
+evt_chain_entry,default,chain_context,patch,allowedTags,chain;urgent
+evt_chain_entry,default,chain_context,patch,exitWhenStageGte,3
+evt_chain_entry,default,chain_context,patch,turnMode,deferred
+evt_chain_entry,default,chain_context,patch,deferredTurnCost,1
