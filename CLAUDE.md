@@ -89,6 +89,10 @@ Godot 4.5，GDScript，Git 版本控制
   5. cost value 正负号
   6. 任务保底完整性：`tasks.csv` 中 `on_expire=fail` 的任务，必须在 `task_eval_effects.csv` 中有对应的 `status=failed` 效果行
 
+## 提交兜底（pre-commit hook）
+
+本地 `.git/hooks/pre-commit` 会在每次提交前运行 `tools/fix_csv_imports.py`（CSV 导入格式检查）和 `tools/check_design_submodule.py`（Design submodule 模式检查），任一失败即阻断提交。背景、触发场景、手动修正方法、新环境启用步骤见 [[工程开发积累]] 第 6 条。
+
 # 当前进度
 
 进度详情存放在 `design_dir` 的 `进度/` 子目录下，此处仅维护索引。
