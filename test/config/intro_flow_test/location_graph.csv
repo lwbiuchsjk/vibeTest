@@ -1,0 +1,5 @@
+location_id,display_name,neighbors,art_file
+loc_pharmacy,药铺,loc_market;loc_outskirts,town.svg
+loc_market,镇集市,loc_pharmacy;loc_training_ground;loc_outskirts,market.svg
+loc_training_ground,练场,loc_market;loc_outskirts,square.svg
+loc_outskirts,镇外,loc_pharmacy;loc_market;loc_training_ground,square.svg

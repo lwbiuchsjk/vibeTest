@@ -1,8 +1,14 @@
 section,scope_a,scope_b,key,value
 core,,,turn,1
-core,,,current_location_id,town_square
+core,,,current_location_id,loc_pharmacy
 core,,,forced_next_event_id,
+pack_config,,,defaultCapacity,3
 task_config,,,max_active_count,4
+npc_presence,loc_pharmacy,,npc_id,npc_qin
+npc_presence,loc_pharmacy,,npc_id,npc_he
+npc_presence,loc_market,,npc_id,npc_cheng
+npc_presence,loc_training_ground,,npc_id,npc_lu
+npc_presence,loc_training_ground,,npc_id,npc_zhou
 flag,,,met_cheng,false
 flag,,,met_lu,false
 flag,,,met_zhou,false

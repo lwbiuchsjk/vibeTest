@@ -1,4 +1,7 @@
 {
   "random_seed": 20260409,
-  "world_event_csv_dir": "res://test/config/intro_flow_test"
+  "world_event_csv_dir": "res://test/config/intro_flow_test",
+  "roles": "res://test/config/intro_flow_test/roles.csv",
+  "location_graph": "res://test/config/intro_flow_test/location_graph.csv",
+  "affinity": "res://test/config/intro_flow_test/affinity.csv"
 }

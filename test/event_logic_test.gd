@@ -1523,6 +1523,12 @@ func _load_world_event_test_config(test_config: Dictionary) -> Dictionary:
 	var csv_dir := str(test_config.get("world_event_csv_dir", "")).strip_edges()
 	if not csv_dir.is_empty():
 		override_paths["world_event_csv_dir"] = csv_dir
+	# 说明：量产测试数据集（如 intro_flow_test）自带人物/地点/关系配置，
+	# 这里按 test_config.json 里显式指定的 key 逐项 override，未指定则回退全局默认。
+	for override_key in ["roles", "location_graph", "affinity"]:
+		var override_path := str(test_config.get(override_key, "")).strip_edges()
+		if not override_path.is_empty():
+			override_paths[override_key] = override_path
 
 	var load_result := runtime.ensure_loaded(override_paths)
 	if not load_result.get("ok", false):

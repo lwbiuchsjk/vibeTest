@@ -103,6 +103,7 @@ Godot 4.5，GDScript，Git 版本控制
 
 - [自我积累型_阶段2_拆解进度](Design/进度/自我积累型_阶段2_拆解进度.md) — Step 4 进行中，冒烟/静态检查通过
 - [填充事件批量生产_阶段2](Design/进度/填充事件批量生产_阶段2.md) — 34 个已生产，CSV 已验证
+- [intro_flow_test_叙事包改造进度](Design/进度/intro_flow_test_叙事包改造进度.md) — E 完成，仅剩功能走查 F
 
 ## 已归档
 
