@@ -155,6 +155,11 @@ func _render_current_event(turn_result: Dictionary) -> void:
 		_render_reflection_phase(turn_result)
 		return
 
+	# 地点选择：包结束或首次进入时，由引擎返回 phase=location_select，options 在顶层。
+	if phase == "location_select":
+		_render_location_select(turn_result)
+		return
+
 	if awaiting_choice:
 		# 获取完整选项定义（含 check/cost/preemptiveBet）和心性风险配置。
 		var risk_profile: Dictionary = turn_result.get("xinxing_risk_profile", {})
@@ -505,6 +510,53 @@ func _on_reflection_action_pressed(encoded_action: String) -> void:
 	else:
 		# 自省已结算（phase = resolved），走统一结算后分流。
 		_handle_resolved_turn_result(turn_result, "自省结算完成")
+
+
+# ── 地点选择 UI ──────────────────────────────────────────────────
+
+# 功能：渲染地点选择阶段的按钮列表。
+# 说明：引擎返回的 options 在顶层（区别于普通事件 choice.options），每个 option 带
+#       location_id / npc_present / has_pending_forced / is_current 等元数据，按地点一行渲染。
+func _render_location_select(turn_result: Dictionary) -> void:
+	status_label.text = "选择前往的地点（不消耗回合）"
+	var options: Array = turn_result.get("options", [])
+	if options.is_empty():
+		_add_option_hint("无可选地点，请检查 location_graph 与 currentLocationId 配置。")
+		return
+	for opt_variant in options:
+		var opt: Dictionary = opt_variant
+		var location_id := str(opt.get("location_id", ""))
+		var option_text := str(opt.get("text", location_id))
+		# 辅助信息行：NPC 在场列表 + 待触发 forcedNext 标记。
+		var hints: Array[String] = []
+		var npc_present: Array = opt.get("npc_present", [])
+		if not npc_present.is_empty():
+			var npc_parts: Array[String] = []
+			for n in npc_present:
+				npc_parts.append(str(n))
+			hints.append("在场: %s" % ", ".join(npc_parts))
+		if bool(opt.get("has_pending_forced", false)):
+			hints.append("★ 有待触发事件")
+		var button_text := option_text
+		if not hints.is_empty():
+			button_text = "%s\n    %s" % [option_text, "    ".join(hints)]
+		var btn := Button.new()
+		btn.text = button_text
+		btn.pressed.connect(_on_location_select_pressed.bind(location_id))
+		ButtonTheme.apply(btn)
+		option_list.add_child(btn)
+
+
+# 功能：处理地点选择按钮点击。
+# 说明：调用引擎 confirm_location_select 初始化新包，再预览包内首个事件。
+func _on_location_select_pressed(location_id: String) -> void:
+	var result := _engine.confirm_location_select(location_id)
+	if not result.get("ok", false):
+		status_label.text = "地点选择失败: %s" % str(result.get("error", "unknown"))
+		_update_side_panels()
+		return
+	_append_log("前往地点: %s（包容量 %d）" % [location_id, int(result.get("pack_capacity", 0))])
+	_preview_next_event()
 
 
 # ── 选项与押注 UI ────────────────────────────────────────────────
@@ -887,6 +939,15 @@ func _build_event_debug_text(turn_result: Dictionary) -> String:
 	if turn_result.has("reflection_state"):
 		lines.append("reflection_state=%s" % str(turn_result.get("reflection_state", "")))
 		lines.append("reflection_ops_remaining=%s" % str(turn_result.get("reflection_ops_remaining", 0)))
+	# 叙事包调试信息。
+	var pack_ctx: Dictionary = _engine.world_state.get("packContext", {})
+	if not pack_ctx.is_empty():
+		lines.append("pack=%s turns=%d/%d interrupted=%s" % [
+			str(pack_ctx.get("locationId", "")),
+			int(pack_ctx.get("turnsElapsed", 0)),
+			int(pack_ctx.get("turnCapacity", 0)),
+			str(pack_ctx.get("interrupted", false))
+		])
 	return "\n".join(lines)
 
 
@@ -1000,16 +1061,24 @@ func _update_character_panel(player: Dictionary, xinxing_tracker: Dictionary) ->
 
 
 # 功能：更新左侧世界面板。
-# 说明：回合、地点与三大参数紧凑排列，一眼可读。
+# 说明：回合、地点、叙事包回合与三大参数紧凑排列，一眼可读。
 func _update_world_panel(world_state: Dictionary, params: Dictionary) -> void:
 	var turn := int(world_state.get("turn", 0))
 	var location := str(world_state.get("currentLocationId", ""))
 	var danger := int(params.get("danger", 0))
 	var prosperity := int(params.get("prosperity", 0))
 	var morale := int(params.get("morale", 0))
+	# 叙事包回合：locationId 为空表示尚未开始包（首次进入或刚结束）。
+	var pack_ctx: Dictionary = world_state.get("packContext", {})
+	var pack_text := "未开始"
+	if not str(pack_ctx.get("locationId", "")).is_empty():
+		var elapsed := int(pack_ctx.get("turnsElapsed", 0))
+		var capacity := int(pack_ctx.get("turnCapacity", 0))
+		var interrupted_suffix := "（打断）" if bool(pack_ctx.get("interrupted", false)) else ""
+		pack_text = "%d/%d%s" % [elapsed, capacity, interrupted_suffix]
 
-	world_label.text = "回合 %d    地点 %s    ┃    危险 %d    繁荣 %d    士气 %d" % [
-		turn, location, danger, prosperity, morale
+	world_label.text = "回合 %d    地点 %s    包 %s    ┃    危险 %d    繁荣 %d    士气 %d" % [
+		turn, location, pack_text, danger, prosperity, morale
 	]
 
 
