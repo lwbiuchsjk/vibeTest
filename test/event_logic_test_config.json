@@ -1,4 +1,3 @@
 {
-  "random_seed": 20260329,
-  "world_event_csv_dir": "res://test/config/intro_flow_test"
+  "dataset_dir": "res://test/config/intro_flow_test"
 }

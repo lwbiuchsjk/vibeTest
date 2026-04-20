@@ -1554,20 +1554,37 @@ func _history_to_string_array(history: Array) -> Array[String]:
 
 
 # 功能：读取测试场景的配置文件。
-# 说明：仅测试场景使用该配置；当配置缺失或格式异常时，回退为空配置。
+# 说明：外层入口文件仅指定 dataset_dir；实际数据集配置在 <dataset_dir>/test_config.json 里。
+#       合并顺序：以内层为基底，外层同名字段覆盖（便于临时调整 random_seed 等）。
+#       dataset_dir 字段本身只用于定位内层文件，不传给下游 override 逻辑。
+#       若外层没有 dataset_dir，则退回读取外层字段（兼容旧格式、缺失配置不阻断）。
 func _load_test_config() -> Dictionary:
-	if not FileAccess.file_exists(TEST_CONFIG_PATH):
-		return {}
+	var outer := _read_json_dict(TEST_CONFIG_PATH)
+	var dataset_dir := str(outer.get("dataset_dir", "")).strip_edges()
+	if dataset_dir.is_empty():
+		return outer
 
-	var config_text := FileAccess.get_file_as_string(TEST_CONFIG_PATH)
-	if config_text.strip_edges().is_empty():
-		return {}
+	var inner_path := dataset_dir.path_join("test_config.json")
+	var merged: Dictionary = _read_json_dict(inner_path)
+	for key in outer.keys():
+		if str(key) == "dataset_dir":
+			continue
+		merged[str(key)] = outer[key]
+	return merged
 
-	var parsed_config: Variant = JSON.parse_string(config_text)
-	if typeof(parsed_config) != TYPE_DICTIONARY or parsed_config == null:
-		return {}
 
-	return parsed_config
+# 功能：读取 JSON 文件并解析为 Dictionary。
+# 说明：文件缺失、空内容、非 Dictionary 结构时统一返回空 Dictionary，便于调用方写短路判断。
+func _read_json_dict(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {}
+	var text := FileAccess.get_file_as_string(path)
+	if text.strip_edges().is_empty():
+		return {}
+	var parsed: Variant = JSON.parse_string(text)
+	if typeof(parsed) != TYPE_DICTIONARY or parsed == null:
+		return {}
+	return parsed
 
 
 # 功能：读取测试场景的随机种子配置。
