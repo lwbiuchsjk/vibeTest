@@ -35,3 +35,7 @@ output/
 
 # Godot CSV import translation artifacts (unused — CSV read via FileAccess)
 *.translation
+
+# Python cache
+tools/__pycache__/
+*.pyc
