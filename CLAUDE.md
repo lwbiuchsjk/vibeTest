@@ -74,6 +74,22 @@ Godot 4.5，GDScript，Git 版本控制
   - `tools/csv_translator.py`（CSV 生成）
   - `tools/csv_validator.py`（CSV 静态检查，硬编码常量来源见脚本头部声明）
 
+### CSV 契约三件套
+
+CSV 配置流水线由以下三者互为契约，任一改动必须触发另两者的回看。忽视同步将导致脚本产出、静态校验、引擎消费三端失调（根因复盘：曾出现 `target=params` 误路由 affinity/player 效果且未被任何一环拦截的事故）。
+
+1. **设计契约**：`Design/配置翻译指南.md` —— 真源。关键章节由 `<!-- CSV_CONTRACT_ANCHOR: xxx -->` 标记，锚点丢失会被 pre-commit 阻断（`tools/check_csv_contract_docs.py`）。当前锚点：`resolution_target_routing` / `rule_types` / `condition_types`。
+2. **自动翻译**：`tools/csv_translator.py::parse_effect_expression` —— 按契约产出 target/op/key/value。
+3. **静态校验**：`tools/csv_validator.py` —— 按契约校验 CSV。pre-commit 自动对本次提交涉及的配置目录（含 `events.csv`）执行。
+
+**引擎侧触发源**：以下代码位置属于契约边界（查找 `【CSV 契约边界】` 注释锚点），改动时必须同步回看三件套：
+
+- `scripts/systems/world_event_config_assembler.gd::_apply_effect_or_resolution_action`（target 路由分支）
+- 引擎新增/删除的 `rule_type` / `condition_type` 行为分支
+- 资源 key 集合（`RESOURCE_KEYS`）、affinity value 格式
+
+**我（Claude）的操作守则**：接到"改引擎效果/路由/规则类型"的任务时，完成代码改动后必须主动走一遍三件套回看清单，逐项确认是否需要同步改动，再向用户汇报。不要等 pre-commit 报错才想起来。
+
 ## 忽略文件
 
 - `.claude/settings.local.json` 的改动由用户自行管理，Claude 不主动提交。

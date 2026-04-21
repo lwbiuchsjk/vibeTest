@@ -261,11 +261,26 @@ def parse_effect_expression(
 ) -> dict[str, Any] | None:
     """
     解析效果标准术语表达式，返回 CSV 字段值。
+
+    【CSV 契约边界】本函数的 target/op/key/value 产出是 CSV 契约三件套的 "自动翻译" 端。
+    契约真源：Design/配置翻译指南.md（锚点 resolution_target_routing）。
+    修改本函数的产出格式时，必须同步回看：
+      1. Design/配置翻译指南.md（resolution target/op/key/value 映射表）
+      2. tools/csv_validator.py（target/key 校验规则，特别是规则 7）
+      3. scripts/systems/world_event_config_assembler.gd::_apply_effect_or_resolution_action
+
     示例输入：
-      "百艺积累小" → {target: "params", op: "add", key: "craft", value: 1}
-      "心气消耗大" → {target: "params", op: "add", key: "spirit", value: -3}
-      "秦素娘.信任提升小" → {target: "params", op: "add", key: "affinity.player_001->npc_qin", value: 5}
+      "百艺积累小"      → {target: "player",   op: "add", key: "craft",  value: 1}
+      "心气消耗大"      → {target: "player",   op: "add", key: "spirit", value: -3}
+      "心性偏向+小"     → {target: "player",   op: "add", key: "xinxing", value: 1}
+      "秦素娘.信任提升小" → {target: "affinity", op: "",    key: "affinityDeltas",
+                          value: "player_001->npc_qin:+5"}
       "npc_qin.信任提升小" → 同上（新格式用 npc_id）
+
+    target 语义（必须与引擎装配器对齐，参见 scripts/systems/world_event_config_assembler.gd）：
+      - target=player   → RoleState 属性/资源（attribute_names.csv 白名单）
+      - target=affinity → 关系变动，key 固定为 affinityDeltas，value 为 "from->to:±N;..." 段
+      - target=params   → 世界参数（prosperity/morale/danger 等自由命名计数器），本函数不产出
     """
     expr = expr.strip()
     if not expr or expr == "维持":
@@ -286,11 +301,14 @@ def parse_effect_expression(
         mag_entry = magnitude_map.get(("trust", direction))
         if mag_entry:
             value = mag_entry["small"] if magnitude == "小" else mag_entry["large"]
+            # value 已带方向正负号；组装成 "player_001->npc_x:±N" 的单段 affinityDeltas 文本，
+            # 后续在 generate_option_rules_csv 中按 (option_id, branch) 合并为分号分隔串。
+            signed = f"+{value}" if value >= 0 else str(value)
             return {
-                "target": "params",
-                "op": "add",
-                "key": f"affinity.player_001->{npc_id}",
-                "value": value,
+                "target": "affinity",
+                "op": "",
+                "key": "affinityDeltas",
+                "value": f"player_001->{npc_id}:{signed}",
             }
 
     # 关系维持
@@ -306,8 +324,10 @@ def parse_effect_expression(
         mag_entry = magnitude_map.get(("xinxing", direction))
         if mag_entry:
             value = mag_entry["small"] if magnitude == "小" else mag_entry["large"]
+            # 心性存在 RoleState.attributes 中，target=player 走 _apply_world_state_patch.player 分支
+            # 最终经 RoleState.set_value → set_xinxing 自动裁剪到 [-2, +2]。
             return {
-                "target": "params",
+                "target": "player",
                 "op": "add",
                 "key": "xinxing",
                 "value": value,
@@ -328,8 +348,9 @@ def parse_effect_expression(
                     mag_entry = magnitude_map.get((dim, en_dir))
                     if mag_entry:
                         value = mag_entry[en_mag]
+                        # 能力属性写入 RoleState，target=player 对齐引擎玩家状态路径
                         return {
-                            "target": "params",
+                            "target": "player",
                             "op": "add",
                             "key": internal_key,
                             "value": value,
@@ -348,8 +369,9 @@ def parse_effect_expression(
                 mag_entry = magnitude_map.get((dim, direction))
                 if mag_entry:
                     value = mag_entry[en_mag]
+                    # 资源（energy/spirit）也挂在 RoleState.resources，走 target=player
                     return {
-                        "target": "params",
+                        "target": "player",
                         "op": "add",
                         "key": dim,
                         "value": value,
@@ -641,7 +663,14 @@ def generate_option_rules_csv(
                 magnitude_map,
                 npc_display_to_id,
             )
+            # 合并同一 branch 下的多条 affinityDeltas：引擎装配器对 key=affinityDeltas 是覆盖写入，
+            # 多行 target=affinity 会互相覆盖，必须合并为单行 ";" 分隔的 value。
+            # 见 scripts/systems/world_event_config_assembler.gd:_apply_effect_or_resolution_action
+            affinity_segments: dict[str, list[str]] = {}
             for eff in effects:
+                if eff.get("target") == "affinity" and eff.get("key") == "affinityDeltas":
+                    affinity_segments.setdefault(eff["branch"], []).append(str(eff["value"]))
+                    continue
                 rows.append({
                     "option_id": option_id,
                     "rule_type": "resolution",
@@ -652,6 +681,18 @@ def generate_option_rules_csv(
                     "target": eff["target"],
                     "key": eff["key"],
                     "value": str(eff["value"]),
+                })
+            for branch, segments in affinity_segments.items():
+                rows.append({
+                    "option_id": option_id,
+                    "rule_type": "resolution",
+                    "branch": branch,
+                    "left": "",
+                    "op": "",
+                    "right": "",
+                    "target": "affinity",
+                    "key": "affinityDeltas",
+                    "value": ";".join(segments),
                 })
 
     return rows

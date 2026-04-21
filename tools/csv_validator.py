@@ -17,10 +17,11 @@ from pathlib import Path
 
 
 # ============================================================
-# 知识来源声明
+# 【CSV 契约边界】知识来源声明
 # ============================================================
-# 本脚本的检查逻辑依赖以下引擎知识。
-# 引擎功能变更时需同步检查本脚本（见 CLAUDE.md 脚本维护规则）。
+# 本脚本是 CSV 配置契约三件套之一（契约真源：Design/配置翻译指南.md）。
+# 修改本脚本的校验规则、常量集合前，必须同步回看契约真源与引擎装配器；
+# 反之，引擎或翻译指南变动时也需回看本脚本（见 CLAUDE.md "CSV 契约三件套" 规则）。
 #
 # 【运行时读取】（引擎侧改了 CSV，本脚本自动生效）
 #   - {ref_dir}/attribute_names.csv — 合法属性 key 集合
@@ -34,6 +35,26 @@ from pathlib import Path
 #     来源: scripts/systems/world_event_config_assembler.gd（event_conditions 行类型）
 #   - AFFINITY_KEY_PATTERN
 #     来源: scripts/systems/rule_engine.gd（关系效果 key 格式）
+#
+# ------------------------------------------------------------
+# 【CSV 契约摘要 — target 路由】（冗余备份，真源见翻译指南锚点 resolution_target_routing）
+# ------------------------------------------------------------
+# 若翻译指南丢失，按下表反推 resolution 的 target 路由：
+#
+#   target=player   → RoleState 属性/资源（attribute_names.csv 白名单 + RESOURCE_KEYS）
+#                     举例：insight/craft/physique/aptitude/xinxing/energy/spirit
+#   target=affinity → AffinityMap 关系变动，key 固定为 affinityDeltas，
+#                     value 为 "from->to:±N" 多段（分号拼接）
+#   target=params   → world_state.params（自由命名的世界计数器，非玩家属性）
+#   target=flags    → world_state.flags（op=set）
+#   target=world    → 世界动作（set_location / set_forced_next / end_chain / clear_forced_next）
+#   target=chain_context → 链上下文补丁（op=patch）
+#   target=focus    → 自省关注列表补丁
+#   target=task     → 任务 accept/complete/fail 动作
+#
+# 常见错误（本脚本规则 7 会拒绝）：
+#   - 把玩家属性/资源写成 target=params（应为 player）
+#   - 把关系变化写成 target=params, key=affinity.xxx（应为 target=affinity, key=affinityDeltas）
 # ============================================================
 
 # 资源 key（引擎硬编码，不在 attribute_names.csv 中）
@@ -51,8 +72,11 @@ KNOWN_CONDITION_TYPES = {
     "required_npc", "required_location", "required_location_flag",
 }
 
-# 关系效果 key 的正则（affinity.player_001->npc_xxx）
+# 旧版关系 key 的正则（affinity.player_001->npc_xxx）——已废弃，仅用于识别误用
 AFFINITY_KEY_RE = re.compile(r"^affinity\.\w+->\w+$")
+
+# target=affinity 对应的合法 value 段格式：from->to:±N（允许空白与多段分号分隔）
+AFFINITY_DELTA_SEGMENT_RE = re.compile(r"^\s*\w+->\w+\s*:\s*[+\-]?\d+\s*$")
 
 
 # ============================================================
@@ -82,15 +106,9 @@ def load_attribute_keys(ref_dir: Path) -> set[str]:
     return keys
 
 
-def is_valid_effect_key(key: str, attribute_keys: set[str]) -> bool:
-    """检查效果 key 是否属于已知集合。"""
-    if key in attribute_keys:
-        return True
-    if key in RESOURCE_KEYS:
-        return True
-    if AFFINITY_KEY_RE.match(key):
-        return True
-    return False
+def is_player_attr_key(key: str, attribute_keys: set[str]) -> bool:
+    """判定 key 是否为玩家属性/资源（应使用 target=player 路径）。"""
+    return key in attribute_keys or key in RESOURCE_KEYS
 
 
 # ============================================================
@@ -233,23 +251,63 @@ def validate(csv_dir: Path, ref_dir: Path) -> ValidationResult:
             result.add_p2(f"event_conditions: '{eid}' 使用未知 condition_type '{ct}'")
 
     # ── 检查 7: cost / resolution key 合法性 ──
+    # 语义分工（与 world_event_config_assembler._apply_effect_or_resolution_action 对齐）：
+    #   target=player   → 玩家属性/资源（attribute_names.csv + RESOURCE_KEYS）
+    #   target=affinity → 关系变动，key 固定 affinityDeltas，value 段为 from->to:±N
+    #   target=params   → 世界参数（prosperity/morale/danger 等自由命名），不应写属性/关系
     if attribute_keys:
         for row in option_rules:
             rt = row.get("rule_type", "").strip()
             key = row.get("key", "").strip()
             oid = row.get("option_id", "")
-            if not key:
+            target = row.get("target", "").strip()
+            value = row.get("value", "").strip()
+            if not key and rt != "resolution":
                 continue
+
             if rt == "cost":
-                if not is_valid_effect_key(key, attribute_keys):
-                    result.add_p1(f"option_rules: '{oid}' cost key '{key}' 不在已知集合中")
-            elif rt == "resolution":
-                target = row.get("target", "").strip()
-                # 仅检查 params target 的 key（flags/world 的 key 是自由命名）
-                if target == "params" and not is_valid_effect_key(key, attribute_keys):
+                if not is_player_attr_key(key, attribute_keys):
                     result.add_p1(
-                        f"option_rules: '{oid}' resolution key '{key}' 不在已知集合中"
+                        f"option_rules: '{oid}' cost key '{key}' 不是玩家属性/资源"
                     )
+                continue
+
+            if rt != "resolution":
+                continue
+
+            # target=params 不应承载玩家属性 / 资源 / 关系（早期格式错误的主来源）。
+            if target == "params":
+                if is_player_attr_key(key, attribute_keys):
+                    result.add_p1(
+                        f"option_rules: '{oid}' resolution 写错位置: "
+                        f"target=params,key='{key}' 属于玩家状态，应改为 target=player"
+                    )
+                elif AFFINITY_KEY_RE.match(key):
+                    result.add_p1(
+                        f"option_rules: '{oid}' resolution 写错位置: "
+                        f"target=params,key='{key}' 属于关系变动，应改为 "
+                        f"target=affinity,key=affinityDeltas,value='{key[len('affinity.'):]}:±N'"
+                    )
+            elif target == "player":
+                if key and not is_player_attr_key(key, attribute_keys):
+                    result.add_p1(
+                        f"option_rules: '{oid}' target=player 的 key '{key}' 不是玩家属性/资源"
+                    )
+            elif target == "affinity":
+                if key != "affinityDeltas":
+                    result.add_p1(
+                        f"option_rules: '{oid}' target=affinity 的 key 必须为 affinityDeltas，当前='{key}'"
+                    )
+                # value 段格式校验：分号分段，每段 from->to:±N
+                if value:
+                    for segment in value.split(";"):
+                        seg = segment.strip()
+                        if not seg:
+                            continue
+                        if not AFFINITY_DELTA_SEGMENT_RE.match(seg):
+                            result.add_p1(
+                                f"option_rules: '{oid}' target=affinity value 段格式非法: '{seg}'"
+                            )
 
     # ── 检查 8: cost value 应为正数 ──
     for row in option_rules:

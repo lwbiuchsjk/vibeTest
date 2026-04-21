@@ -961,6 +961,14 @@ static func _apply_option_rule_row(row: Dictionary, cp_map: Dictionary, option_r
 	cp_map[cp_id] = cp_item
 
 
+# 【CSV 契约边界】本函数是 CSV 配置契约三件套的"引擎消费"端。
+# target 路由分支是 CSV 翻译的契约真源参考之一。修改、新增、删除本函数的 target 分支时，
+# 必须同步回看：
+#   1. Design/配置翻译指南.md（锚点 resolution_target_routing 的 target 路由总表）
+#   2. tools/csv_translator.py::parse_effect_expression（自动翻译产出）
+#   3. tools/csv_validator.py（target/key 校验规则，特别是规则 7 与 KNOWN_RULE_TYPES）
+# 详见项目 CLAUDE.md 的 "CSV 契约三件套" 规则段。
+#
 # 功能：统一应用 effects 与 resolution 行为动作。
 # 说明：事件 effects 与选项 resolution 共享 target/op/key/value 语义，复用该函数。
 static func _apply_effect_or_resolution_action(container: Dictionary, target: String, op: String, key: String, value_text: String) -> void:
