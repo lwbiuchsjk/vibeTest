@@ -111,6 +111,19 @@ CSV 配置流水线由以下三者互为契约，任一改动必须触发另两�
 
 本地 `.git/hooks/pre-commit` 会在每次提交前运行 `tools/fix_csv_imports.py`（CSV 导入格式检查）和 `tools/check_design_submodule.py`（Design submodule 模式检查），任一失败即阻断提交。背景、触发场景、手动修正方法、新环境启用步骤见 [[工程开发积累]] 第 6 条。
 
+### Windows 环境适配
+
+hook 脚本里写的 `python3` 在 Windows 11 下默认指向 Microsoft Store 的 app execution alias（`C:\Users\<user>\AppData\Local\Microsoft\WindowsApps\python3.exe`），调用时返回 `Permission denied`。真实 Python 装在 `python`（无 3 后缀）路径下。同时 Windows 默认 console 编码是 GBK，hook 脚本里的 `print("✓...")` 会触发 `UnicodeEncodeError`。
+
+首次在 Windows 环境克隆本项目后，本地 patch 两个 hook 文件（主项目 + Design submodule）：
+
+- `.git/hooks/pre-commit`
+- `Design/.git/hooks/pre-commit`
+
+把所有 `python3 ...` 替换为 `PYTHONUTF8=1 python ...`。此外 Design hook 中若有 `python ... "$ROOT/_scripts/..."` 形式（`$ROOT` 是含中文的 junction 路径），改为 `cd "$ROOT" && python _scripts/...` 避免 bash 变量插值把中文路径弄乱。
+
+这些改动只在 `.git/hooks/` 本地生效，不入 repo；跨机器克隆时需各自适配。
+
 # 当前进度
 
 进度详情存放在 `design_dir` 的 `进度/` 子目录下，此处仅维护索引。
