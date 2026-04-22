@@ -273,25 +273,17 @@ def rule_narrative_screen_count(card: EventCard, issues: list):
 
 
 def rule_screen_chars(card: EventCard, issues: list):
-    """R-NR-02：单屏字数（骨架 30-80 / 填充 30-60，柔性）"""
+    """R-NR-02：单屏字数上限（骨架 ≤80 / 填充 ≤60，柔性）。下限不强制（第八轮补丁后）。"""
     event_type = card.frontmatter.get("type", "")
     if event_type == "skeleton":
-        lo, hi = 30, 80
+        hi = 80
     elif event_type == "filler":
-        lo, hi = 30, 60
+        hi = 60
     else:
         return
     for line_no, text in card.narrative_screens:
         n = count_chars(text)
-        if n < lo:
-            issues.append(Issue(
-                file=str(card.path),
-                line=line_no,
-                severity="P2",
-                rule="R-NR-02",
-                message=f"单屏字数={n}，低于下限 {lo}（{event_type}）",
-            ))
-        elif n > hi:
+        if n > hi:
             issues.append(Issue(
                 file=str(card.path),
                 line=line_no,
