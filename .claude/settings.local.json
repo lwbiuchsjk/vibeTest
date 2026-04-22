@@ -9,13 +9,16 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:hub.docker.com)",
+      "WebFetch(domain:developers.openai.com)",
       "mcp__plugin_discord_discord__fetch_messages",
       "mcp__plugin_discord_discord__reply",
       "WebSearch",
       "Skill(codex:rescue)",
-      "Skill(update-config)",
-      "WebFetch(domain:developers.openai.com)",
-      "Skill(codex:setup)"
+      "Skill(codex:setup)",
+      "Skill(update-config)"
+    ],
+    "additionalDirectories": [
+      "/mnt/d/坚果云/vibe-test-design"
     ]
   }
 }
