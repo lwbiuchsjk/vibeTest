@@ -111,18 +111,27 @@ CSV 配置流水线由以下三者互为契约，任一改动必须触发另两�
 
 本地 `.git/hooks/pre-commit` 会在每次提交前运行 `tools/fix_csv_imports.py`（CSV 导入格式检查）和 `tools/check_design_submodule.py`（Design submodule 模式检查），任一失败即阻断提交。背景、触发场景、手动修正方法、新环境启用步骤见 [[工程开发积累]] 第 6 条。
 
-### Windows 环境适配
+### Python 命令兼容（Windows + WSL）
 
-hook 脚本里写的 `python3` 在 Windows 11 下默认指向 Microsoft Store 的 app execution alias（`C:\Users\<user>\AppData\Local\Microsoft\WindowsApps\python3.exe`），调用时返回 `Permission denied`。真实 Python 装在 `python`（无 3 后缀）路径下。同时 Windows 默认 console 编码是 GBK，hook 脚本里的 `print("✓...")` 会触发 `UnicodeEncodeError`。
+Windows 11 下 `python3` 默认指向 Microsoft Store app execution alias（`C:\Users\<user>\AppData\Local\Microsoft\WindowsApps\python3.exe`），调用返回 `Permission denied`；真实 Python 装在 `python`（无 3 后缀）路径下。WSL 下则相反——`python` 不存在，只有 `python3`。
 
-首次在 Windows 环境克隆本项目后，本地 patch 两个 hook 文件（主项目 + Design submodule）：
+两个 pre-commit hook（主项目 + Design submodule）采用**统一探测** pattern，同时兼容两环境：
 
-- `.git/hooks/pre-commit`
-- `Design/.git/hooks/pre-commit`
+```sh
+PYTHON=$(command -v python 2>/dev/null || command -v python3 2>/dev/null)
+if [ -z "$PYTHON" ]; then
+    echo "[pre-commit] 未找到 python 或 python3" >&2
+    exit 1
+fi
+# ... 后续 hook 内的 Python 调用全部用 "$PYTHON"
+PYTHONUTF8=1 "$PYTHON" path/to/script.py
+```
 
-把所有 `python3 ...` 替换为 `PYTHONUTF8=1 python ...`。此外 Design hook 中若有 `python ... "$ROOT/_scripts/..."` 形式（`$ROOT` 是含中文的 junction 路径），改为 `cd "$ROOT" && python _scripts/...` 避免 bash 变量插值把中文路径弄乱。
+优先探测 `python`——Windows 下真 Python 就在这里；WSL 下探测失败自动 fallback 到 `python3`。`PYTHONUTF8=1` 环境变量始终保留（Windows 默认 console 编码是 GBK，print 中文会触发 `UnicodeEncodeError`）。
 
-这些改动只在 `.git/hooks/` 本地生效，不入 repo；跨机器克隆时需各自适配。
+Design hook 中处理含中文的 junction 路径（`$ROOT` 解析到 `D:\坚果云\vibe-test-design`）仍用 `cd "$ROOT" && ...` 避免 bash 变量插值问题。
+
+这些 hook 改动只在 `.git/hooks/` 本地生效，**不入 repo**；跨机器克隆后需手动重建 hook（模板在本节和[[工程开发积累]]第 6 条）。
 
 # 当前进度
 
