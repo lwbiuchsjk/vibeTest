@@ -24,6 +24,9 @@ _kb_sync/Design/
 # Local environment config (path varies per machine, see tools/local_env.example.json)
 tools/local_env.json
 
+# Python virtual environment for tools (openai SDK, etc.)
+tools/.venv/
+
 # Web export output (CI handles export and deploy)
 output/
 

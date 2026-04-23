@@ -2,5 +2,6 @@
   "obsidian_cli": "D:/softwares/obsidian/Obsidian.com",
   "vault_name": "Design",
   "godot_exe": "<your_godot_console_exe_path>",
-  "design_dir": "Design"
+  "design_dir": "Design",
+  "moonshot_api_key": "<your_moonshot_api_key_or_empty>"
 }
