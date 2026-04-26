@@ -16,6 +16,7 @@ CSV 导入文件修正脚本
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -26,20 +27,32 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 KEEP_CONTENT = '[remap]\n\nimporter="keep"\n'
 
 
+# 扫描时跳过的目录（含 .gitignore 中应忽略的内容）。
+# .venv 跳过原因：Windows 下 venv 的 lib64 是 broken symlink，扫到会抛 OSError；
+# 用 os.walk + dirnames 原地修剪，从根本上避免进入这些目录。
+_SKIP_DIRS = {".godot", ".venv"}
+
+
+def _walk_filtered(suffix: str) -> list[Path]:
+    """以 PROJECT_ROOT 为起点遍历，跳过 _SKIP_DIRS，返回匹配后缀的 Path 列表。"""
+    results: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(PROJECT_ROOT):
+        # 原地修剪：阻止 os.walk 进入这些目录，避免 broken symlink 抛 OSError。
+        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+        for fn in filenames:
+            if fn.endswith(suffix):
+                results.append(Path(dirpath) / fn)
+    return sorted(results)
+
+
 def find_csv_imports() -> list[Path]:
-    """搜索项目中所有 .csv.import 文件（排除 .godot 目录）。"""
-    return sorted(
-        p for p in PROJECT_ROOT.rglob("*.csv.import")
-        if ".godot" not in p.parts
-    )
+    """搜索项目中所有 .csv.import 文件（排除 .godot / .venv 目录）。"""
+    return _walk_filtered(".csv.import")
 
 
 def find_stale_translations() -> list[Path]:
-    """搜索项目中残留的 .translation 文件（排除 .godot 目录）。"""
-    return sorted(
-        p for p in PROJECT_ROOT.rglob("*.translation")
-        if ".godot" not in p.parts
-    )
+    """搜索项目中残留的 .translation 文件（排除 .godot / .venv 目录）。"""
+    return _walk_filtered(".translation")
 
 
 def needs_fix(path: Path) -> bool:
