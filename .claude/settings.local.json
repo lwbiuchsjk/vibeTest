@@ -5,6 +5,7 @@
       "Write",
       "Read",
       "Bash(*)",
+      "PowerShell(*)",
       "WebFetch(domain:api.github.com)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
@@ -15,7 +16,10 @@
       "WebSearch",
       "Skill(codex:rescue)",
       "Skill(codex:setup)",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "WebFetch(domain:hskstory.com)",
+      "WebFetch(domain:platform.moonshot.cn)",
+      "WebFetch(domain:platform.kimi.com)"
     ],
     "additionalDirectories": [
       "/mnt/d/坚果云/vibe-test-design"
