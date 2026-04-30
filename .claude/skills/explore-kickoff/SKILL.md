@@ -8,7 +8,7 @@ effort: medium
 
 # Explore Kickoff
 
-启动 _explore 调研任务的标准流程。详细参数见 [reference.md](reference.md)，task body 标准模板见 [references/task_body.md](references/task_body.md)。
+启动 _explore 调研任务的标准流程。详细参数见 [references/parameters.md](references/parameters.md)，task body 标准模板见 [references/task_body.md](references/task_body.md)。
 
 ## 何时使用
 
@@ -152,7 +152,7 @@ skill 在阶段 1 / 阶段 4 自动引用以下项目级 memory，避免已知�
 
 ---
 
-## 项目特定参数（详见 [reference.md](reference.md)）
+## 项目特定参数（详见 [references/parameters.md](references/parameters.md)）
 
 - RemoteTrigger trigger_id：`trig_01SYCxLscNXXiYDYTGLt4Yw7`
 - 设计 repo URL：https://github.com/lwbiuchsjk/vibe-test-design.git
