@@ -6,8 +6,28 @@ const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 const WorldEndScreen := preload("res://scripts/ui/world_end_screen.gd")
 const ResponsiveLayout := preload("res://scripts/ui/responsive_layout.gd")
 const ButtonTheme := preload("res://scripts/ui/button_theme.gd")
+const TextMosaicBackground := preload("res://scripts/ui/text_mosaic_background.gd")
+const TextMosaicParticles := preload("res://scripts/ui/text_mosaic_particles.gd")
 
 const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
+
+# 地点 → 文字马赛克 token 数组(v1 固定映射,详见 Design/文字马赛克美术背景_MVP设计.md §7.1)。
+# v2 演进路径(剧情上下文驱动)留待 PoC 通过后实现;接口 set_text_tokens() 不变。
+# 覆盖范围:scripts/config/location_graph.csv(town_square/market/harbor)
+#       + test/config/intro_flow_test/location_graph.csv(loc_pharmacy/loc_market/loc_training_ground/loc_outskirts)。
+# 注:GDScript const 仅允许字面量,故此处用 Array,使用处再转 PackedStringArray。
+const LOCATION_TEXT_TOKENS: Dictionary = {
+	"town_square": ["广场", "人来", "人往", "石板", "钟声", "市井"],
+	"market": ["市集", "讨价", "喧闹", "货郎", "果蔬", "铜钱"],
+	"harbor": ["港口", "潮汐", "船帆", "鸥鸣", "盐风", "渔获"],
+	"loc_pharmacy": ["药铺", "苦汤", "草药", "杵臼", "症候", "良方"],
+	"loc_market": ["市集", "讨价", "喧闹", "货郎", "果蔬", "铜钱"],
+	"loc_training_ground": ["练场", "拳脚", "汗水", "号令", "招式", "刀光"],
+	"loc_outskirts": ["镇外", "野径", "风沙", "歧路", "斥候", "尘烟"],
+}
+
+# 未匹配 location_id 时的 fallback token,避免文字层完全无渲染。
+const DEFAULT_TEXT_TOKENS: Array = ["风", "云", "山", "水", "城", "镇", "人", "事"]
 
 var _engine: WorldEventEngine
 var _event_logs: Array[String] = []
@@ -21,6 +41,8 @@ var _bet_mode_options: Dictionary = {}
 @onready var right_column: VSplitContainer = $Root/RootContent/MainSplit/RightColumn
 @onready var status_label: Label = $Root/RootContent/Header/StatusLabel
 @onready var event_background_rect: TextureRect = $Root/RootContent/MainSplit/LeftPanel/LeftStack/EventBackground
+@onready var text_mosaic_bg: TextMosaicBackground = $Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicBackground
+@onready var text_mosaic_particles: TextMosaicParticles = $Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicParticles
 @onready var character_panel: PanelContainer = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/CharacterPanel
 @onready var character_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/CharacterPanel/CharacterLabel
 @onready var world_panel: PanelContainer = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/WorldPanel
@@ -1531,17 +1553,83 @@ func _on_viewport_resized() -> void:
 
 # 功能：渲染当前事件背景图。
 # 说明：只消费引擎已解析好的最终背景路径；Consumer 不再自行实现事件/地点 fallback 规则。
+#       同步驱动三层视觉:
+#         - EventBackground(原图层,作为 fallback)
+#         - TextMosaicBackground(静态文字层)
+#         - TextMosaicParticles(动态粒子层,在 flow_regions JSON 定义的主体内流动)
+#       从 _engine.world_state.currentLocationId 取地点 ID 决定 token 集合。
 func _render_event_background(background_art_path: String) -> void:
 	var normalized_path := background_art_path.strip_edges()
 	if normalized_path.is_empty():
 		event_background_rect.texture = null
+		text_mosaic_bg.set_source_image(null)
+		text_mosaic_particles.set_source_image(null)
+		text_mosaic_particles.clear_flow_data()
 		return
 
 	var resource := ResourceLoader.load(normalized_path)
-	if resource is Texture2D:
-		event_background_rect.texture = resource
+	var texture: Texture2D = resource if resource is Texture2D else null
+	event_background_rect.texture = texture
+
+	# 文字马赛克静态层:复用同一 Texture2D,按当前 location_id 选 tokens。
+	# 角色创建阶段 _engine 可能尚未完全初始化 world_state,此处做 null 防御。
+	# 未匹配的 location_id 落到 DEFAULT_TEXT_TOKENS,确保文字层始终有内容可渲染。
+	text_mosaic_bg.set_source_image(texture)
+	var location_id: String = ""
+	if _engine != null:
+		location_id = str(_engine.world_state.get("currentLocationId", ""))
+	var raw_tokens: Array = LOCATION_TEXT_TOKENS.get(location_id, DEFAULT_TEXT_TOKENS)
+	var tokens: PackedStringArray = PackedStringArray(raw_tokens)
+	text_mosaic_bg.set_text_tokens(tokens)
+
+	# 文字马赛克粒子层:加载与 art_file 同名的 flow_regions.json,驱动粒子在主体区域内流动。
+	# JSON 不存在时清空粒子,粒子层渲染为空(不影响静态层)。
+	text_mosaic_particles.set_source_image(texture)
+	text_mosaic_particles.set_text_tokens(tokens)
+	var flow_data: Dictionary = _load_flow_regions_for(normalized_path)
+	if flow_data.is_empty():
+		text_mosaic_particles.clear_flow_data()
 	else:
-		event_background_rect.texture = null
+		var regions: Array = flow_data.get("flow_regions", [])
+		var img_size_arr: Array = flow_data.get("image_size", [0, 0])
+		var img_size: Vector2 = Vector2(
+			float(img_size_arr[0]), float(img_size_arr[1])
+		)
+		text_mosaic_particles.set_flow_data(regions, img_size)
+
+
+# 功能:从背景图路径推导 flow_regions.json 路径并加载。
+# 说明:约定 art_file 与 flow_regions.json 同目录、同 stem;
+#       e.g. ".../town.svg" → ".../town.flow_regions.json"。
+#       JSON 不存在或解析失败时返回空 Dictionary,粒子层会被清空。
+func _load_flow_regions_for(art_path: String) -> Dictionary:
+	var dir: String = art_path.get_base_dir()
+	var stem: String = art_path.get_file().get_basename()
+	var json_path: String = "%s/%s.flow_regions.json" % [dir, stem]
+	if not FileAccess.file_exists(json_path):
+		return {}
+	var f: FileAccess = FileAccess.open(json_path, FileAccess.READ)
+	if f == null:
+		push_warning("flow_regions: 无法打开 %s" % json_path)
+		return {}
+	var text: String = f.get_as_text()
+	f.close()
+	var parsed: Variant = JSON.parse_string(text)
+	if not (parsed is Dictionary):
+		push_warning("flow_regions: %s 解析失败或不是 Dictionary" % json_path)
+		return {}
+	return parsed
+
+
+# 功能:F9 互斥切换"原图层"与"文字马赛克层(静态+粒子)",便于视觉对比。
+# 说明:仅开发期使用;正式发布前可移除或限制为 OS.is_debug_build() 才生效。
+#       粒子层属于 mosaic 体系,跟随 mosaic 静态层一起 toggle。
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F9:
+		var show_mosaic: bool = not text_mosaic_bg.visible
+		text_mosaic_bg.visible = show_mosaic
+		text_mosaic_particles.visible = show_mosaic
+		event_background_rect.visible = not show_mosaic
 
 
 # 功能：将历史事件数组转为字符串数组。

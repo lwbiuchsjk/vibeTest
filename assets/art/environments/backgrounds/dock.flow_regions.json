@@ -1,0 +1,25 @@
+{
+  "source": "dock.svg",
+  "image_size": [128, 128],
+  "schema_version": 1,
+  "flow_regions": [
+    {
+      "type": "rect",
+      "rect": [30, 55, 68, 8],
+      "weight": 0.5,
+      "note": "头顶弧形带:机器人头部上沿,跳过眼睛/天线轮廓。轻密度,像数据/信号缓慢流过头顶,半透气感"
+    },
+    {
+      "type": "rect",
+      "rect": [32, 75, 66, 9],
+      "weight": 1.0,
+      "note": "躯干内部带:眼睛下方的中央躯体区,主流动区。较密向下流,像内部能量循环 / 药力下行 / 脉搏感"
+    }
+  ],
+  "flow_intent": {
+    "direction": "down",
+    "speed_hint": "slow",
+    "feel": "主体内部的呼吸与流转;头顶副区轻、躯干主区重;不流眼睛(关键识别特征)"
+  },
+  "_authoring_note": "本图为 Godot 引擎 logo 占位图,与 town/market/square 共用同一张 SVG。schema_version=1 仅支持 rect。真实美术就位后需对每张图重做语义判断"
+}

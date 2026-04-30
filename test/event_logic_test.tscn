@@ -1,8 +1,10 @@
-[gd_scene load_steps=4 format=3 uid="uid://ppkmkvydqbfv"]
+[gd_scene load_steps=6 format=3 uid="uid://ppkmkvydqbfv"]
 
 [ext_resource type="Script" uid="uid://cbx22u7e0gipa" path="res://test/event_logic_test.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://scripts/ui/task_summary_card.tscn" id="2_task_summary_card"]
 [ext_resource type="PackedScene" uid="uid://cgv3i7k4wqm83" path="res://scripts/ui/world_end_screen.tscn" id="3_world_end_screen"]
+[ext_resource type="Script" path="res://scripts/ui/text_mosaic_background.gd" id="4_text_mosaic_bg"]
+[ext_resource type="Script" path="res://scripts/ui/text_mosaic_particles.gd" id="5_text_mosaic_particles"]
 
 [node name="EventLogicTest" type="Control"]
 layout_mode = 3
@@ -84,6 +86,26 @@ grow_horizontal = 2
 grow_vertical = 2
 expand_mode = 1
 stretch_mode = 6
+
+[node name="TextMosaicBackground" type="Control" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+
+[node name="TextMosaicParticles" type="Control" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("5_text_mosaic_particles")
 
 [node name="LeftOverlay" type="MarginContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack"]
 layout_mode = 1
