@@ -1,0 +1,98 @@
+{
+  "source_hint": "town.svg(占位:Godot 机器人 logo,深色圆角矩形 #363d52 背景 + 蓝白色机器人主体,头形顶部弧线 + 双眼大圆 + 下沿弧线;眼睛是关键识别特征)",
+  "schema_version": 2,
+  "_purpose": "B 路 schema 验证练习,不接入 runtime。让人类读完后判断'看 JSON 能否想象画面';如能则 B 路启动笔触解释器实施;如不能则迭代 schema 后重写",
+  "canvas_intent": {
+    "feel": "焦墨勾勒头部轮廓 / 双眼留白(关键识别特征不画)/ 面部极淡稀疏 / 胸前墨气下渗 / 头顶光晕飘云 / 右下朱砂落款",
+    "ink_palette": ["#1a1a1a", "#3a3a3a", "#7a7a7a", "#b8b8b8", "#ededed"],
+    "accent": "#a83232",
+    "background": "#f4ecd8",
+    "background_note": "宣纸米黄,需要静态层 / canvas 整体 BG 也跟着改,水墨方向必须有暖色底"
+  },
+  "brushstrokes": [
+    {
+      "id": "outline_head_top",
+      "type": "outline",
+      "path": [[28, 60], [38, 55], [50, 53], [64, 52], [78, 53], [90, 55], [100, 60]],
+      "char_density": "dense",
+      "ink_weight": "heavy",
+      "char_size_range": [10, 14],
+      "tokens_hint": "外/壳/形/界/廓",
+      "intent": "头部上沿弧线,焦墨重描;字符沿路径切线方向旋转,像毛笔走边"
+    },
+    {
+      "id": "outline_head_sides",
+      "type": "outline",
+      "path": [[28, 60], [27, 70], [30, 78], [40, 84], [88, 84], [98, 78], [101, 70], [100, 60]],
+      "char_density": "dense",
+      "ink_weight": "heavy",
+      "char_size_range": [10, 14],
+      "tokens_hint": "外/壳/形/界/廓",
+      "intent": "头部左右及下沿轮廓闭合,与 outline_head_top 共同围出机器人头形"
+    },
+    {
+      "id": "wash_face_interior",
+      "type": "wash",
+      "region": [34, 60, 60, 22],
+      "char_density": "very_sparse",
+      "ink_weight": "light",
+      "char_size_range": [5, 7],
+      "tokens_hint": "虚/无/空/淡",
+      "intent": "面部内部大留白,极淡墨稀疏字符仅暗示存在,不抢眼睛戏"
+    },
+    {
+      "id": "void_left_eye",
+      "type": "void",
+      "shape": "circle",
+      "center": [42, 65],
+      "radius": 9,
+      "intent": "左眼区域完全留白(否决其他笔触在此处的渲染),保护关键识别特征"
+    },
+    {
+      "id": "void_right_eye",
+      "type": "void",
+      "shape": "circle",
+      "center": [86, 65],
+      "radius": 9,
+      "intent": "右眼区域完全留白,保护关键识别特征"
+    },
+    {
+      "id": "drift_chest_descend",
+      "type": "drift",
+      "spawn": {"region": [38, 78, 52, 6]},
+      "vector": [0, 1],
+      "fade_distance": 35,
+      "char_density": "sparse",
+      "ink_weight": "varies",
+      "char_size_range": [6, 10],
+      "tokens_hint": "气/灵/虚/影/烟/雾/魂",
+      "intent": "胸前墨气下渗,模拟主体内部能量向下游走;字符从主体下沿向下飘出 35px 后渐隐(α: 1.0 → 0)"
+    },
+    {
+      "id": "wash_top_halo",
+      "type": "wash",
+      "region": [22, 38, 84, 18],
+      "char_density": "very_sparse",
+      "ink_weight": "light",
+      "char_size_range": [4, 6],
+      "tokens_hint": "云/雾/天/远/虚",
+      "intent": "头顶上方淡墨晕染,像头顶气韵 / 远天云雾,极淡稀疏"
+    },
+    {
+      "id": "stamp_seal",
+      "type": "stamp",
+      "position": [114, 116],
+      "size": 11,
+      "color": "accent",
+      "char": "玄",
+      "intent": "右下角朱砂印章,中式落款收束;'玄'字呼应修仙气质,占位真实创作中可换为玩家氏名/ 印或心法字"
+    }
+  ],
+  "_open_questions": [
+    "outline 路径只用了 7-8 个控制点,够不够画出柔和的头形弧线?可能需要 bezier_path 类型而非直线段插值",
+    "wash 的'very_sparse / light'两个等级在不同 region 上的视觉差异是否够直觉?可能需要数值化(0~1 密度 + 0~1 ink_weight)",
+    "drift 的 fade_distance 单位是源图像素还是 canvas 像素?需要 schema 明确",
+    "void 是否能跨 brushstroke 全局生效(否决之后所有笔触在此区域的渲染),还是只对它前面的笔触生效?——本草案假设全局,但 schema 需要明确"
+  ],
+  "_authoring_note": "本 JSON 是 B 路 schema_version=2 的首次练习,目的是验证 LLM 看图能否产出'让人类想象出画面'的脚本。占位 SVG 的限制:机器人是 logo,语义贫乏,只能做形似练习;真实水墨原画到位时,brushstrokes 才能真正表达意境(山势/云气/水流)"
+}

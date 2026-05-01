@@ -34,19 +34,36 @@ extends Control
 # 调试:在每个 region 边界画红框
 @export var debug_show_regions: bool = false
 
-# === 低精度模拟感 / 失真套件(默认值给"温和但可见"的组合,可单独调) ===
+# === 水墨化色板(M1':色相敏感墨色映射;color_mode==0 时生效) ===
+# 不是单色化,是滤镜:V 决定墨阶(灰度),H 决定暖冷偏向,S 决定偏色幅度。
+# 原图色相信息保留,只是被重塑为水墨气质。
 
-# 颜色量化档数(每个 RGB 分量保留几档);256=不量化,小数=banding 严重像老式 LED
-# 5 档 → 5×5×5 = 125 色板,有明显复古感但不丢主体辨识
-@export_range(2, 256) var color_levels: int = 5
-# 位置 snap 网格(canvas 像素);0=不 snap(亚像素),>0=粒子位置取整到 N 像素网格
-# 3 像素 snap 在 8 像素字号下产生"格子步进"感,像低分辨率屏幕
-@export_range(0, 16) var pos_snap: int = 3
-# 单粒子 alpha 随机扰动幅度;0=统一 layer_alpha,>0=每帧 alpha 在 [layer_alpha-x, layer_alpha] 内抖动
-# 模拟信号不稳的亮度忽明忽暗
-@export_range(0.0, 1.0) var alpha_jitter: float = 0.25
-# 每帧每粒子换 token 的概率;0=token 只在重生时换,>0=持续随机替换字符,像 CRT 坏点
-@export_range(0.0, 0.2) var glitch_chance: float = 0.012
+# 墨阶档数(2=黑白二值,5=焦/浓/淡/染/白 5 档;>5 渐变更细腻但水墨阶感弱)
+@export_range(2, 16) var ink_levels: int = 5
+# 暖冷偏色强度;饱和度 × 此值 = 实际混入墨色基色的比例。0=纯灰阶,1=完全偏到墨色基色
+@export_range(0.0, 1.0) var ink_tint_strength: float = 0.4
+# 暖墨基色(赭石,源图暖色调像素混入此色)
+@export var ink_warm_color: Color = Color(0.659, 0.463, 0.353)
+# 冷墨基色(松烟,源图冷色调像素混入此色)
+@export var ink_cool_color: Color = Color(0.227, 0.282, 0.345)
+# 暖色 H 锚点(0.08 ≈ 橙黄);源图色 H 越接近此值越"暖"
+@export_range(0.0, 1.0) var ink_warm_anchor: float = 0.08
+
+# === 粒子生命周期 alpha 衰减(M4:墨迹拖痕感) ===
+
+# 0=平直 alpha,1=完全按曲线(出生 α=0,中段 α=1,底部 α=0);抛物线 1-(2t-1)²
+@export_range(0.0, 1.0) var alpha_lifecycle_strength: float = 0.7
+
+# === 低精度模拟感 / 失真套件(默认全关;保留 export 作为可选调试维度) ===
+
+# 颜色量化档数(每个 RGB 分量保留几档);256=不量化(默认)
+@export_range(2, 256) var color_levels: int = 256
+# 位置 snap 网格(canvas 像素);0=不 snap(默认)
+@export_range(0, 16) var pos_snap: int = 0
+# 单粒子 alpha 随机扰动幅度;0=不抖动(默认)
+@export_range(0.0, 1.0) var alpha_jitter: float = 0.0
+# 每帧每粒子换 token 的概率;0=不替换(默认)
+@export_range(0.0, 0.2) var glitch_chance: float = 0.0
 
 # === 内部状态 ===
 
@@ -223,15 +240,28 @@ func _draw() -> void:
 			int(pos.y * src_h / _image_size.y), 0, src_h - 1
 		)
 		var color: Color = _source_image.get_pixel(src_x, src_y)
-		var draw_color: Color = color if color_mode == 0 else mono_color
-		# 失真:颜色量化 → banding(老式 LED 调色板感)
+		# 水墨化色板映射(M1':color_mode==0 时按色相敏感映射,1=单色 mono_color 不动)
+		var draw_color: Color = (
+			_apply_ink_palette(color) if color_mode == 0 else mono_color
+		)
+		# 失真:颜色量化(默认关闭;保留作为可选调试)
 		if color_levels < 256:
 			draw_color = _quantize_color(draw_color)
-		# 失真:alpha 抖动 → 信号不稳的亮度忽明忽暗
+		# 失真:alpha 抖动(默认关闭)
 		var a_jitter: float = (
 			randf_range(-alpha_jitter, 0.0) if alpha_jitter > 0.0 else 0.0
 		)
-		draw_color.a *= clampf(layer_alpha + a_jitter, 0.0, 1.0)
+		# 粒子生命周期 alpha 衰减(M4):从 region 顶到 image 底归一化进度,
+		# 抛物线 1 - (2t-1)² → 中段最浓、两端淡
+		var rect_data: Array = p["rect"]
+		var ry: float = float(rect_data[1])
+		var life_span: float = max(_image_size.y - ry, 1.0)
+		var life_t: float = clampf((pos.y - ry) / life_span, 0.0, 1.0)
+		var lifecycle_alpha: float = 1.0 - pow(2.0 * life_t - 1.0, 2.0)
+		var alpha_factor: float = lerpf(
+			1.0, lifecycle_alpha, alpha_lifecycle_strength
+		)
+		draw_color.a *= clampf(layer_alpha + a_jitter, 0.0, 1.0) * alpha_factor
 		# baseline 偏移使用粒子自身字号,大字粒子位置略低、小字略高
 		var canvas_pos: Vector2 = Vector2(
 			pos.x * scale_x, pos.y * scale_y + p_size
@@ -257,8 +287,38 @@ func _draw() -> void:
 		_draw_debug_regions(scale_x, scale_y)
 
 
+# 功能:把源图色按"色相敏感的水墨色板"重新映射(M1' 核心算法)。
+# 说明:不是单色化——保留原图色相信息,只是被重塑为水墨气质。
+#       V → 量化到 ink_levels 档墨阶(基础灰阶)
+#       H → 决定暖冷偏向(暖色混入 ink_warm_color,冷色混入 ink_cool_color)
+#       S → 偏色幅度(高饱和偏色重,低饱和接近中性墨)
+#       alpha 不动。
+func _apply_ink_palette(c: Color) -> Color:
+	# V 量化到 ink_levels 档(0=焦墨黑,1=飞白)
+	var levels: float = float(maxi(ink_levels, 2))
+	var ink_v: float = round(c.v * (levels - 1.0)) / (levels - 1.0)
+	var base_gray: Color = Color(ink_v, ink_v, ink_v, c.a)
+
+	# H 与暖锚点的圆形距离(色相是环形 [0,1) 的,用 min 处理跨 0 边界)
+	var hue: float = c.h
+	var dist: float = abs(hue - ink_warm_anchor)
+	if dist > 0.5:
+		dist = 1.0 - dist
+	# warmth: 1=最暖(贴锚点), 0=最冷(对锚点 180°)
+	var warmth: float = 1.0 - dist * 2.0
+
+	# 选偏色基色:暖时混入暖墨,冷时混入冷墨
+	var tint_color: Color = ink_warm_color if warmth > 0.5 else ink_cool_color
+	# 偏色强度:饱和度 × 强度系数(饱和度低的近中性墨,饱和度高的偏色重)
+	var tint_strength: float = c.s * ink_tint_strength
+
+	var result: Color = base_gray.lerp(tint_color, tint_strength)
+	result.a = c.a
+	return result
+
+
 # 功能:把颜色每个 RGB 分量量化到 color_levels 档,产生 LED 矩阵 / 老调色板的 banding 感。
-# 说明:alpha 不量化(避免硬切),仅量化色相亮度。
+# 说明:alpha 不量化(避免硬切),仅量化色相亮度。**保留作为可选失真维度,默认关闭**。
 func _quantize_color(c: Color) -> Color:
 	var lvl: float = float(color_levels - 1)
 	if lvl <= 0.0:

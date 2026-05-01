@@ -24,6 +24,22 @@ extends Control
 @export var color_mode: int = 0
 # 单色模式下的字符颜色(color_mode=1 时生效)
 @export var mono_color: Color = Color.WHITE
+
+# === 水墨化色板(M1':色相敏感墨色映射;color_mode==0 时生效)===
+# 不是单色化,是滤镜:V 决定墨阶,H 决定暖冷偏向,S 决定偏色幅度。
+# 与 TextMosaicParticles 共享同一映射逻辑,推荐两层参数同步以保持视觉一致。
+
+# 墨阶档数(2=黑白二值,5=焦/浓/淡/染/白 5 档)
+@export_range(2, 16) var ink_levels: int = 5
+# 暖冷偏色强度;饱和度 × 此值 = 实际混入墨色基色的比例
+@export_range(0.0, 1.0) var ink_tint_strength: float = 0.4
+# 暖墨基色(赭石,源图暖色调像素混入此色)
+@export var ink_warm_color: Color = Color(0.659, 0.463, 0.353)
+# 冷墨基色(松烟,源图冷色调像素混入此色)
+@export var ink_cool_color: Color = Color(0.227, 0.282, 0.345)
+# 暖色 H 锚点(0.08 ≈ 橙黄);源图色 H 越接近此值越"暖"
+@export_range(0.0, 1.0) var ink_warm_anchor: float = 0.08
+
 # 调试:在每个采样格画小圆点(验证密度,不影响最终视觉)
 @export var debug_show_grid: bool = false
 
@@ -113,10 +129,10 @@ func _draw() -> void:
 			var color: Color = _source_image.get_pixel(sx, sy)
 			if color.a >= density_threshold:
 				var token: String = _text_tokens[token_idx % token_count]
-				# 对比度强化:围绕 0.5 灰度做线性放大,clamp 到 [0,1]
-				var draw_color: Color = (
-					_apply_contrast(color) if color_mode == 0 else mono_color
-				)
+				# 颜色处理(color_mode==0):先 contrast 强化亮度对比,再 ink palette 水墨化色调
+				var draw_color: Color = mono_color
+				if color_mode == 0:
+					draw_color = _apply_ink_palette(_apply_contrast(color))
 				draw_string(
 					_font,
 					Vector2(x, y + baseline_offset),
@@ -133,6 +149,27 @@ func _draw() -> void:
 	# 调试网格(仅 debug_show_grid=true 时启用,在 alpha 通过的格子画红圆)
 	if debug_show_grid:
 		_draw_debug_grid(canvas_size, src_w, src_h, cell)
+
+
+# 功能:把源图色按"色相敏感的水墨色板"重新映射(M1' 核心算法,与粒子层共用语义)。
+# 说明:V 量化到 ink_levels 档墨阶 + H 决定暖冷偏向 + S 决定偏色幅度。alpha 不动。
+func _apply_ink_palette(c: Color) -> Color:
+	var levels: float = float(maxi(ink_levels, 2))
+	var ink_v: float = round(c.v * (levels - 1.0)) / (levels - 1.0)
+	var base_gray: Color = Color(ink_v, ink_v, ink_v, c.a)
+
+	var hue: float = c.h
+	var dist: float = abs(hue - ink_warm_anchor)
+	if dist > 0.5:
+		dist = 1.0 - dist
+	var warmth: float = 1.0 - dist * 2.0
+
+	var tint_color: Color = ink_warm_color if warmth > 0.5 else ink_cool_color
+	var tint_strength: float = c.s * ink_tint_strength
+
+	var result: Color = base_gray.lerp(tint_color, tint_strength)
+	result.a = c.a
+	return result
 
 
 # 功能:对源图色按 contrast_factor 做对比度强化。

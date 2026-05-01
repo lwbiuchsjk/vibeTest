@@ -12,6 +12,8 @@ const TextMosaicParticles := preload("res://scripts/ui/text_mosaic_particles.gd"
 const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
 
 # 地点 → 文字马赛克 token 数组(v1 固定映射,详见 Design/文字马赛克美术背景_MVP设计.md §7.1)。
+# **占位:以下词组为代码默认值以避免空运行,等用户从游戏内容(event_presentations / 角色状态等)
+#   提供正式 token 池后替换。文字内容是用户领域,不应当作为引擎方设计方案的一部分。**
 # v2 演进路径(剧情上下文驱动)留待 PoC 通过后实现;接口 set_text_tokens() 不变。
 # 覆盖范围:scripts/config/location_graph.csv(town_square/market/harbor)
 #       + test/config/intro_flow_test/location_graph.csv(loc_pharmacy/loc_market/loc_training_ground/loc_outskirts)。
