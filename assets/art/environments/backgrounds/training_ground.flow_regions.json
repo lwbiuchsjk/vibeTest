@@ -1,0 +1,25 @@
+{
+  "source": "training_ground.png",
+  "image_size": [1024, 576],
+  "schema_version": 1,
+  "flow_regions": [
+    {
+      "type": "rect",
+      "rect": [240, 150, 180, 200],
+      "weight": 1.0,
+      "note": "周既明躯干主带——脸下方至腰部。粒子向下流动，模拟心气下行 / 内劲循环。周线主战场是心气，这条带是视觉锚点。避开脸部（y<150）保留人物识别度"
+    },
+    {
+      "type": "rect",
+      "rect": [260, 360, 240, 200],
+      "weight": 0.7,
+      "note": "长衫下摆 + 刀——从腰部至底部。粒子较稀地继续下沉，呼应「刀光」token 与「用过力气」的尾韵"
+    }
+  ],
+  "flow_intent": {
+    "direction": "down",
+    "speed_hint": "slow",
+    "feel": "暮色练武场——内劲下行 / 心气下沉。主区在躯干，辅区延伸至刀；不流脸部（保留识别度）"
+  },
+  "_authoring_note": "周既明角色特化背景。1024×576 运行时尺寸（原图 1672×941 在 Design/attachments/）。token 池为周既明专池 loc_zhou_training_ground，由用户从角色内核抽取的 12 词构成"
+}

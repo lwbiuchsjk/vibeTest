@@ -223,8 +223,24 @@ func _draw() -> void:
 	var canvas_size: Vector2 = size
 	if canvas_size.x <= 0.0 or canvas_size.y <= 0.0:
 		return
-	var scale_x: float = canvas_size.x / _image_size.x
-	var scale_y: float = canvas_size.y / _image_size.y
+	# Cover 映射:image_size 坐标系 → canvas 坐标系,与 EventBackground.stretch_mode=6 对齐。
+	# 粒子 pos 在 image_size 坐标系下;绘制时按 cover 模式映射到 canvas,保持源图比例。
+	# 超出 canvas 比例的源图边缘被裁——表现为该区域粒子的 canvas_pos 落在 canvas 外不显示。
+	var canvas_aspect: float = canvas_size.x / canvas_size.y
+	var img_aspect: float = _image_size.x / _image_size.y
+	var draw_scale: float
+	var img_offset_x: float = 0.0
+	var img_offset_y: float = 0.0
+	if canvas_aspect > img_aspect:
+		# canvas 比图更宽:横向填满,纵向裁切上下边(居中)
+		draw_scale = canvas_size.x / _image_size.x
+		var visible_h: float = canvas_size.y / draw_scale
+		img_offset_y = (_image_size.y - visible_h) * 0.5
+	else:
+		# canvas 比图更高:纵向填满,横向裁切左右边(居中)
+		draw_scale = canvas_size.y / _image_size.y
+		var visible_w: float = canvas_size.x / draw_scale
+		img_offset_x = (_image_size.x - visible_w) * 0.5
 	var src_w: int = _source_image.get_width()
 	var src_h: int = _source_image.get_height()
 	var token_count: int = _text_tokens.size()
@@ -263,8 +279,10 @@ func _draw() -> void:
 		)
 		draw_color.a *= clampf(layer_alpha + a_jitter, 0.0, 1.0) * alpha_factor
 		# baseline 偏移使用粒子自身字号,大字粒子位置略低、小字略高
+		# Cover 映射:image_size 坐标 → canvas 像素(先减裁切偏移再 × draw_scale,与原图 cover 对齐)
 		var canvas_pos: Vector2 = Vector2(
-			pos.x * scale_x, pos.y * scale_y + p_size
+			(pos.x - img_offset_x) * draw_scale,
+			(pos.y - img_offset_y) * draw_scale + p_size
 		)
 		# 失真:位置 snap → 粒子渲染落到 N 像素网格,下落呈格子步进感
 		if pos_snap > 0:
@@ -284,7 +302,7 @@ func _draw() -> void:
 		)
 
 	if debug_show_regions:
-		_draw_debug_regions(scale_x, scale_y)
+		_draw_debug_regions(draw_scale, Vector2(img_offset_x, img_offset_y))
 
 
 # 功能:把源图色按"色相敏感的水墨色板"重新映射(M1' 核心算法)。
@@ -332,13 +350,15 @@ func _quantize_color(c: Color) -> Color:
 
 
 # 功能:在每个 region 边界画红框,验证区域定义对不对。
-func _draw_debug_regions(scale_x: float, scale_y: float) -> void:
+# 参数:draw_scale = image_size 像素 → canvas 像素的统一缩放系数(cover 模式);
+#       img_offset = 源图坐标系下被裁切的左/上边距(像素)
+func _draw_debug_regions(draw_scale: float, img_offset: Vector2) -> void:
 	for region: Dictionary in _flow_regions:
 		var rect_data: Array = region.get("rect", [0, 0, 0, 0])
 		var canvas_rect: Rect2 = Rect2(
-			float(rect_data[0]) * scale_x,
-			float(rect_data[1]) * scale_y,
-			float(rect_data[2]) * scale_x,
-			float(rect_data[3]) * scale_y
+			(float(rect_data[0]) - img_offset.x) * draw_scale,
+			(float(rect_data[1]) - img_offset.y) * draw_scale,
+			float(rect_data[2]) * draw_scale,
+			float(rect_data[3]) * draw_scale
 		)
 		draw_rect(canvas_rect, Color(1.0, 0.0, 0.0, 0.4), false, 2.0)

@@ -109,6 +109,25 @@ func _draw() -> void:
 	if src_w <= 0 or src_h <= 0:
 		return
 
+	# Cover 模式反向映射:与 EventBackground.stretch_mode=6 (KEEP_ASPECT_COVERED) 对齐,保持源图比例。
+	# canvas (cx, cy) → src (src_offset + (cx, cy) * inv_scale)。
+	# 超出 canvas 比例的源图边缘被裁切——这里表现为 mosaic 不采样那部分,与原图层视觉一致。
+	var canvas_aspect: float = canvas_size.x / canvas_size.y
+	var src_aspect: float = float(src_w) / float(src_h)
+	var inv_scale: float
+	var src_offset_x: float = 0.0
+	var src_offset_y: float = 0.0
+	if canvas_aspect > src_aspect:
+		# canvas 比图更宽:横向填满,纵向裁切上下边(居中)
+		inv_scale = float(src_w) / canvas_size.x
+		var visible_h: float = canvas_size.y * inv_scale
+		src_offset_y = (float(src_h) - visible_h) * 0.5
+	else:
+		# canvas 比图更高:纵向填满,横向裁切左右边(居中)
+		inv_scale = float(src_h) / canvas_size.y
+		var visible_w: float = canvas_size.x * inv_scale
+		src_offset_x = (float(src_w) - visible_w) * 0.5
+
 	# 网格步长(canvas 像素);clampi 防止 cell_spacing 极端值导致 0 / 负数
 	var cell: int = clampi(int(round(float(font_size) * cell_spacing)), 1, 256)
 	var token_count: int = _text_tokens.size()
@@ -119,12 +138,12 @@ func _draw() -> void:
 	var y: int = 0
 	while y < int(canvas_size.y):
 		var sy: int = clampi(
-			int(float(y) / canvas_size.y * src_h), 0, src_h - 1
+			int(src_offset_y + float(y) * inv_scale), 0, src_h - 1
 		)
 		var x: int = 0
 		while x < int(canvas_size.x):
 			var sx: int = clampi(
-				int(float(x) / canvas_size.x * src_w), 0, src_w - 1
+				int(src_offset_x + float(x) * inv_scale), 0, src_w - 1
 			)
 			var color: Color = _source_image.get_pixel(sx, sy)
 			if color.a >= density_threshold:
@@ -188,15 +207,29 @@ func _apply_contrast(c: Color) -> Color:
 func _draw_debug_grid(
 	canvas_size: Vector2, src_w: int, src_h: int, cell: int
 ) -> void:
+	# Cover 反向映射(与 _draw 一致):保持源图比例,超出 canvas 比例的源图边缘被裁切
+	var canvas_aspect: float = canvas_size.x / canvas_size.y
+	var src_aspect: float = float(src_w) / float(src_h)
+	var inv_scale: float
+	var src_offset_x: float = 0.0
+	var src_offset_y: float = 0.0
+	if canvas_aspect > src_aspect:
+		inv_scale = float(src_w) / canvas_size.x
+		var visible_h: float = canvas_size.y * inv_scale
+		src_offset_y = (float(src_h) - visible_h) * 0.5
+	else:
+		inv_scale = float(src_h) / canvas_size.y
+		var visible_w: float = canvas_size.x * inv_scale
+		src_offset_x = (float(src_w) - visible_w) * 0.5
 	var y: int = 0
 	while y < int(canvas_size.y):
 		var sy: int = clampi(
-			int(float(y) / canvas_size.y * src_h), 0, src_h - 1
+			int(src_offset_y + float(y) * inv_scale), 0, src_h - 1
 		)
 		var x: int = 0
 		while x < int(canvas_size.x):
 			var sx: int = clampi(
-				int(float(x) / canvas_size.x * src_w), 0, src_w - 1
+				int(src_offset_x + float(x) * inv_scale), 0, src_w - 1
 			)
 			var color: Color = _source_image.get_pixel(sx, sy)
 			if color.a >= density_threshold:

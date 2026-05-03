@@ -1,12 +1,12 @@
-[gd_scene load_steps=6 format=3 uid="uid://ppkmkvydqbfv"]
+[gd_scene load_steps=6 format=3]
 
-[ext_resource type="Script" uid="uid://cbx22u7e0gipa" path="res://test/event_logic_test.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/main_game.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://scripts/ui/task_summary_card.tscn" id="2_task_summary_card"]
 [ext_resource type="PackedScene" uid="uid://cgv3i7k4wqm83" path="res://scripts/ui/world_end_screen.tscn" id="3_world_end_screen"]
 [ext_resource type="Script" uid="uid://ew418ul3ih1e" path="res://scripts/ui/text_mosaic_background.gd" id="4_text_mosaic_bg"]
 [ext_resource type="Script" uid="uid://brk5yldna6t66" path="res://scripts/ui/text_mosaic_particles.gd" id="5_text_mosaic_particles"]
 
-[node name="EventLogicTest" type="Control"]
+[node name="MainGame" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -51,7 +51,7 @@ theme_override_constants/separation = 8
 
 [node name="TitleLabel" type="Label" parent="Root/RootContent/Header"]
 layout_mode = 2
-text = "Event Logic Test"
+text = "Main Game"
 horizontal_alignment = 1
 
 [node name="StatusLabel" type="Label" parent="Root/RootContent/Header"]
@@ -203,67 +203,3 @@ horizontal_scroll_mode = 0
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
-
-[node name="RightColumn" type="VSplitContainer" parent="Root/RootContent/MainSplit"]
-custom_minimum_size = Vector2(320, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-split_offset = 220
-
-[node name="RightPanel" type="PanelContainer" parent="Root/RootContent/MainSplit/RightColumn"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-
-[node name="RightMargin" type="MarginContainer" parent="Root/RootContent/MainSplit/RightColumn/RightPanel"]
-layout_mode = 2
-theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 16
-theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 16
-
-[node name="RightContent" type="VBoxContainer" parent="Root/RootContent/MainSplit/RightColumn/RightPanel/RightMargin"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-theme_override_constants/separation = 10
-
-[node name="WorldStateHeader" type="Label" parent="Root/RootContent/MainSplit/RightColumn/RightPanel/RightMargin/RightContent"]
-layout_mode = 2
-text = "世界状态"
-
-[node name="WorldStateValue" type="RichTextLabel" parent="Root/RootContent/MainSplit/RightColumn/RightPanel/RightMargin/RightContent"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-scroll_following = true
-
-[node name="BottomPanel" type="PanelContainer" parent="Root/RootContent/MainSplit/RightColumn"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-
-[node name="BottomMargin" type="MarginContainer" parent="Root/RootContent/MainSplit/RightColumn/BottomPanel"]
-layout_mode = 2
-theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 12
-theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 12
-
-[node name="BottomContent" type="VBoxContainer" parent="Root/RootContent/MainSplit/RightColumn/BottomPanel/BottomMargin"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-theme_override_constants/separation = 8
-
-[node name="LogHeader" type="Label" parent="Root/RootContent/MainSplit/RightColumn/BottomPanel/BottomMargin/BottomContent"]
-layout_mode = 2
-text = "推进日志"
-
-[node name="LogValue" type="RichTextLabel" parent="Root/RootContent/MainSplit/RightColumn/BottomPanel/BottomMargin/BottomContent"]
-custom_minimum_size = Vector2(0, 140)
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-scroll_following = true

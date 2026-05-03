@@ -49,7 +49,9 @@ var _bet_mode_options: Dictionary = {}
 
 @onready var screen_background: TextureRect = $ScreenBackground
 @onready var root_margin: MarginContainer = $Root
-@onready var right_column: VSplitContainer = $Root/RootContent/MainSplit/RightColumn
+# 测试场景特有的右侧调试面板。正式 main_game 场景已剥离,此处取值为 null,
+# 所有访问点必须 null check。保留路径变量是为了让正式 / 测试场景共用同一份脚本。
+@onready var right_column: VSplitContainer = get_node_or_null("Root/RootContent/MainSplit/RightColumn") as VSplitContainer
 @onready var status_label: Label = $Root/RootContent/Header/StatusLabel
 @onready var event_background_rect: TextureRect = $Root/RootContent/MainSplit/LeftPanel/LeftStack/EventBackground
 @onready var text_mosaic_bg: TextMosaicBackground = $Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicBackground
@@ -67,8 +69,9 @@ var _bet_mode_options: Dictionary = {}
 @onready var end_root: WorldEndScreen = $Root/RootContent/EndRoot
 @onready var continue_button: Button = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/OptionSection/ActionBar/ContinueButton
 @onready var option_list: VBoxContainer = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/OptionSection/OptionScroll/OptionList
-@onready var world_state_label: RichTextLabel = $Root/RootContent/MainSplit/RightColumn/RightPanel/RightMargin/RightContent/WorldStateValue
-@onready var log_label: RichTextLabel = $Root/RootContent/MainSplit/RightColumn/BottomPanel/BottomMargin/BottomContent/LogValue
+# 测试场景特有的调试输出节点（同上 right_column 说明）。正式场景为 null,访问点 null check。
+@onready var world_state_label: RichTextLabel = get_node_or_null("Root/RootContent/MainSplit/RightColumn/RightPanel/RightMargin/RightContent/WorldStateValue") as RichTextLabel
+@onready var log_label: RichTextLabel = get_node_or_null("Root/RootContent/MainSplit/RightColumn/BottomPanel/BottomMargin/BottomContent/LogValue") as RichTextLabel
 
 
 # 功能：初始化事件逻辑测试场景。
@@ -1072,9 +1075,12 @@ func _update_side_panels() -> void:
 	lines.append("═══ 最近历史 ═══")
 	lines.append(", ".join(_history_to_string_array(history)))
 
-	world_state_label.text = "\n".join(lines)
-	world_state_label.call_deferred("scroll_to_line", 0)
-	log_label.text = "\n".join(_event_logs)
+	# 调试输出:仅在测试场景(节点存在)时写入;正式场景节点为 null,跳过。
+	if world_state_label != null:
+		world_state_label.text = "\n".join(lines)
+		world_state_label.call_deferred("scroll_to_line", 0)
+	if log_label != null:
+		log_label.text = "\n".join(_event_logs)
 
 
 # 功能：更新左侧角色面板。
@@ -1553,8 +1559,9 @@ func _on_viewport_resized() -> void:
 	# 阶段1：比例锁定
 	ResponsiveLayout.apply_aspect_lock(layout)
 
-	# 阶段2：右栏显隐 — 高度触顶后宽度自由，右栏出现
-	right_column.visible = bool(layout.get("height_capped", false))
+	# 阶段2：右栏显隐 — 高度触顶后宽度自由，右栏出现(仅测试场景有右栏;正式场景跳过)
+	if right_column != null:
+		right_column.visible = bool(layout.get("height_capped", false))
 
 	# 阶段3：超宽居中 margin + 装饰衬底显隐
 	ResponsiveLayout.apply_margins(root_margin, layout)

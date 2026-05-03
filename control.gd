@@ -5,7 +5,9 @@ const USE_MOCK_BACKEND := true
 const BASE_URL := "http://127.0.0.1:8000"
 
 # 游戏主场景路径。替换此常量即可切换正式功能场景。
-const GAME_SCENE_PATH := "res://test/event_logic_test.tscn"
+# 正式入口走 scenes/main_game.tscn(玩家面向,剥离了测试调试面板);
+# test/event_logic_test.tscn 仍可 F6 直接跑做后续功能/文本验证。
+const GAME_SCENE_PATH := "res://scenes/main_game.tscn"
 
 @onready var login_panel: VBoxContainer = $LoginPanel
 @onready var account_input: LineEdit = $LoginPanel/AccountInput
