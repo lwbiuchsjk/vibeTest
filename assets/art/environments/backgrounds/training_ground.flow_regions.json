@@ -21,5 +21,25 @@
     "speed_hint": "slow",
     "feel": "暮色练武场——内劲下行 / 心气下沉。主区在躯干，辅区延伸至刀；不流脸部（保留识别度）"
   },
-  "_authoring_note": "周既明角色特化背景。1024×576 运行时尺寸（原图 1672×941 在 Design/attachments/）。token 池为周既明专池 loc_zhou_training_ground，由用户从角色内核抽取的 12 词构成"
+  "accent_areas": [
+    {
+      "name": "腰带绛朱",
+      "polygon": [[400, 258], [462, 256], [464, 287], [398, 289]],
+      "color": [0.72, 0.26, 0.24, 1.0],
+      "breathe_period": 3.5,
+      "breathe_min_alpha": 0.5,
+      "breathe_max_alpha": 0.92,
+      "note": "武人束腰处的绛朱腰带——虚构合理添加(原图色彩偏赭石/松烟,无真.高饱和点睛)。语义上腰带是「束」/克己,慢呼吸 3.5s 与之契合"
+    },
+    {
+      "name": "刀身寒光",
+      "polygon": [[348, 282], [378, 280], [388, 446], [358, 450]],
+      "color": [0.5, 0.72, 0.88, 1.0],
+      "breathe_period": 2.4,
+      "breathe_min_alpha": 0.45,
+      "breathe_max_alpha": 0.85,
+      "note": "刀身寒光——虚构反射的冷色高光。语义上刀是「锋利」,稍快呼吸 2.4s 呼应锋利感"
+    }
+  ],
+  "_authoring_note": "周既明角色特化背景。1024×576 运行时尺寸（原图 1672×941 在 Design/attachments/）。token 池为周既明专池 loc_zhou_training_ground，由用户从角色内核抽取的 12 词构成。accent_areas 为「点睛色」标注,由 Claude 看图后产出 polygon——原图无真.高饱和点,故为「虚构合理添加」(腰带绛朱+刀身寒光,与角色武人语义契合)"
 }

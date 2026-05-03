@@ -41,6 +41,26 @@ extends Control
 # 与 v_min_threshold 配合可定义 V 区间(高光/中调/暗部各取一段)。
 # 默认 1.0 = 无上限过滤,与原行为兼容。
 @export_range(0.0, 1.0) var v_max_threshold: float = 1.0
+# 饱和度下限阈值:cell 反向映射到源图后,源色 S < 此值的格子跳过不画。
+# 用于"点缀色层"——只在源图高饱和度区域(配饰/眼神/灯笼等)贡献字符,
+# 让美术原本设计的"焦点色"在素描灰阶画面中保留为点睛之笔。
+# 默认 0.0 = 无饱和度过滤,与原行为兼容。
+@export_range(0.0, 1.0) var saturation_threshold: float = 0.0
+
+# === 点缀色层专属(use_source_color + 呼吸动画)===
+
+# 是否用源图原色作字符颜色(跳过 ink_palette 水墨化)。
+# 用于"点缀色层":高饱和度区域保留源图原色,与素描灰阶形成"点醒"对比。
+# 默认 false = 走 ink_palette,与原行为兼容。
+@export var use_source_color: bool = false
+# 是否启用呼吸动画(整层 modulate.a 正弦变化让画面活起来)。默认 false 兼容。
+@export var breathe_enabled: bool = false
+# 呼吸周期(秒);3~4 秒为推荐值,与素描静谧感配合,不显得机械
+@export_range(0.5, 10.0) var breathe_period: float = 3.5
+# 呼吸 alpha 下限(整层 modulate.a 的最低值)
+@export_range(0.0, 1.0) var breathe_min_alpha: float = 0.4
+# 呼吸 alpha 上限(整层 modulate.a 的最高值)
+@export_range(0.0, 1.0) var breathe_max_alpha: float = 0.8
 # 对比度强化系数:用于让远看图像更清晰(>1.0 让深色更深、浅色更浅);1.0 = 不调整
 @export_range(0.1, 3.0) var contrast_factor: float = 1.0
 # 颜色模式:0=源图色 / 1=单色(用 mono_color)
@@ -73,16 +93,32 @@ var _source_texture: Texture2D = null
 var _source_image: Image = null
 var _text_tokens: PackedStringArray = PackedStringArray()
 var _font: Font = null
+# 呼吸动画累积时间(仅 breathe_enabled=true 时使用)
+var _breathe_time: float = 0.0
 
 
 # 功能:初始化节点。
 # 说明:取主题默认字体(中文渲染依赖项目主题已配置 CJK 字体);
 #       mouse_filter=IGNORE 避免拦截 LeftOverlay 的鼠标事件;
-#       监听 resized 信号:节点尺寸变化时自动 queue_redraw,响应式布局下保持密度。
+#       监听 resized 信号:节点尺寸变化时自动 queue_redraw,响应式布局下保持密度;
+#       breathe_enabled=false 时关闭 _process(避免空跑浪费帧时间)。
 func _ready() -> void:
 	_font = get_theme_default_font()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	resized.connect(queue_redraw)
+	set_process(breathe_enabled)
+
+
+# 功能:呼吸动画——整层 modulate.a 正弦变化,让"点缀色层"在素描静谧画面中"活起来"。
+# 说明:仅 breathe_enabled=true 时启用;modulate 改变不触发 _draw 重绘(GPU 端合成),
+#       性能开销可忽略。alpha 在 [breathe_min_alpha, breathe_max_alpha] 间正弦变化,
+#       周期由 breathe_period 控制(推荐 3~4 秒,与素描静谧感配合不显机械)。
+func _process(delta: float) -> void:
+	if not breathe_enabled:
+		return
+	_breathe_time += delta
+	var phase: float = sin(_breathe_time * TAU / breathe_period) * 0.5 + 0.5
+	modulate.a = lerp(breathe_min_alpha, breathe_max_alpha, phase)
 
 
 # 功能:设置源图,缓存其 Image 供 _draw 反向映射采样。
@@ -170,18 +206,24 @@ func _draw() -> void:
 				int(src_offset_x + float(x) * inv_scale), 0, src_w - 1
 			)
 			var color: Color = _source_image.get_pixel(sx, sy)
-			# V 区间过滤:[v_min_threshold, v_max_threshold] 内的 cell 才画。
-			# 暗部强化层用 v_max < 1.0、高光层用 v_min > 0.0、中调切片用两端都设。
+			# V 区间 + S 下限过滤:[v_min, v_max] ∧ s ≥ saturation_threshold 才画。
+			# 暗部强化层用 v_max < 1.0、高光层用 v_min > 0.0、中调切片用两端都设、
+			# 点缀色层用 s ≥ 0.4(只在源图高饱和度区域贡献字符做"点睛")。
 			if (
 				color.a >= density_threshold
 				and color.v >= v_min_threshold
 				and color.v <= v_max_threshold
+				and color.s >= saturation_threshold
 			):
 				var token: String = _text_tokens[token_idx % token_count]
-				# 颜色处理(color_mode==0):先 contrast 强化亮度对比,再 ink palette 水墨化色调
+				# 颜色处理(color_mode==0):先 contrast 强化亮度对比,
+				# 再走 ink palette 水墨化(默认)或保留源图原色(use_source_color,点缀色层用)
 				var draw_color: Color = mono_color
 				if color_mode == 0:
-					draw_color = _apply_ink_palette(_apply_contrast(color))
+					if use_source_color:
+						draw_color = _apply_contrast(color)
+					else:
+						draw_color = _apply_ink_palette(_apply_contrast(color))
 				# Cell-level alpha 抖动:基于 cell 坐标做确定性伪随机,每个 cell alpha 在
 				# [1.0 - density_jitter, 1.0] 内变化,破除单层规整网格感(模仿油画笔触自然疏密)
 				if density_jitter > 0.0:
@@ -280,11 +322,12 @@ func _draw_debug_grid(
 				int(src_offset_x + float(x) * inv_scale), 0, src_w - 1
 			)
 			var color: Color = _source_image.get_pixel(sx, sy)
-			# 与 _draw 主循环判定一致(包含 v_min/v_max_threshold 区间过滤)
+			# 与 _draw 主循环判定一致(包含 v_min/v_max + saturation 过滤)
 			if (
 				color.a >= density_threshold
 				and color.v >= v_min_threshold
 				and color.v <= v_max_threshold
+				and color.s >= saturation_threshold
 			):
 				draw_circle(
 					Vector2(x + cell * 0.5, y + cell * 0.5),

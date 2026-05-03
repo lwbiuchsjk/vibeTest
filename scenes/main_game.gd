@@ -8,6 +8,7 @@ const ResponsiveLayout := preload("res://scripts/ui/responsive_layout.gd")
 const ButtonTheme := preload("res://scripts/ui/button_theme.gd")
 const TextMosaicBackground := preload("res://scripts/ui/text_mosaic_background.gd")
 const TextMosaicParticles := preload("res://scripts/ui/text_mosaic_particles.gd")
+const TextMosaicAccentMarked := preload("res://scripts/ui/text_mosaic_accent_marked.gd")
 
 const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
 
@@ -93,6 +94,15 @@ var _bet_mode_options: Dictionary = {}
 @onready var text_mosaic_mid_dark: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicMidDark") as TextMosaicBackground
 @onready var text_mosaic_mid_light: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicMidLight") as TextMosaicBackground
 @onready var text_mosaic_highlight: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicHighlight") as TextMosaicBackground
+# 点缀色层:saturation_threshold + use_source_color + breathe 三件套,在源图高饱和度区域
+# (配饰/眼神/灯笼等"焦点色")保留原色字符,整层 modulate.a 正弦呼吸让画面活起来。
+# 与暗部档位/中调切片/高光层是不同语义维度——它在"S 维度"上挑出点睛位置,不参与素描灰阶。
+@onready var text_mosaic_accent: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicAccent") as TextMosaicBackground
+# 标注式点睛色层:读 flow_regions.json 中 accent_areas 字段(polygon + color + breathe 三件套),
+# 在显式标注的多边形区域内画"点睛色"字符。每个 area 独立呼吸节奏(基于全局时间+各自 period)。
+# 与 TextMosaicAccent 互补:Accent 是基于源图饱和度的"自动温和染色"(脸/手肤色),
+# 此层是"显式标注的尖锐点睛"(腰带/刀光等设计语义位置)。
+@onready var text_mosaic_accent_marked: TextMosaicAccentMarked = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicAccentMarked") as TextMosaicAccentMarked
 @onready var text_mosaic_particles: TextMosaicParticles = $Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicParticles
 @onready var character_panel: PanelContainer = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/CharacterPanel
 @onready var character_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/CharacterPanel/CharacterLabel
@@ -1644,6 +1654,10 @@ func _render_event_background(background_art_path: String) -> void:
 			text_mosaic_mid_light.set_source_image(null)
 		if text_mosaic_highlight != null:
 			text_mosaic_highlight.set_source_image(null)
+		if text_mosaic_accent != null:
+			text_mosaic_accent.set_source_image(null)
+		if text_mosaic_accent_marked != null:
+			text_mosaic_accent_marked.clear_accent_data()
 		if screen_mosaic_coarse != null:
 			screen_mosaic_coarse.set_source_image(null)
 		if screen_mosaic_medium != null:
@@ -1703,6 +1717,9 @@ func _render_event_background(background_art_path: String) -> void:
 	if text_mosaic_highlight != null:
 		text_mosaic_highlight.set_source_image(texture)
 		text_mosaic_highlight.set_text_tokens(tokens)
+	if text_mosaic_accent != null:
+		text_mosaic_accent.set_source_image(texture)
+		text_mosaic_accent.set_text_tokens(tokens)
 
 	# 屏幕级 mosaic 衬底(油画式 3 层):粗 36px → 中 18px → 细 8px,字号梯度由 .tscn 配置。
 	# 仅 main_game 场景有此节点,test 场景跳过。
@@ -1723,6 +1740,8 @@ func _render_event_background(background_art_path: String) -> void:
 	var flow_data: Dictionary = _load_flow_regions_for(normalized_path)
 	if flow_data.is_empty():
 		text_mosaic_particles.clear_flow_data()
+		if text_mosaic_accent_marked != null:
+			text_mosaic_accent_marked.clear_accent_data()
 	else:
 		var regions: Array = flow_data.get("flow_regions", [])
 		var img_size_arr: Array = flow_data.get("image_size", [0, 0])
@@ -1730,6 +1749,11 @@ func _render_event_background(background_art_path: String) -> void:
 			float(img_size_arr[0]), float(img_size_arr[1])
 		)
 		text_mosaic_particles.set_flow_data(regions, img_size)
+		# 标注式点睛色层:从同一 flow_regions.json 读 accent_areas 字段(可选,缺省 = 无点睛)
+		if text_mosaic_accent_marked != null:
+			var accent_areas: Array = flow_data.get("accent_areas", [])
+			text_mosaic_accent_marked.set_accent_data(accent_areas, img_size)
+			text_mosaic_accent_marked.set_text_tokens(tokens)
 
 
 # 功能:从背景图路径推导 flow_regions.json 路径并加载。
@@ -1788,6 +1812,10 @@ func _setup_platform_default_layers() -> void:
 			text_mosaic_mid_light.visible = true
 		if text_mosaic_highlight != null:
 			text_mosaic_highlight.visible = true
+		if text_mosaic_accent != null:
+			text_mosaic_accent.visible = true
+		if text_mosaic_accent_marked != null:
+			text_mosaic_accent_marked.visible = true
 		if screen_mosaic_coarse != null:
 			screen_mosaic_coarse.visible = true
 		if screen_mosaic_medium != null:
@@ -1831,6 +1859,10 @@ func _unhandled_input(event: InputEvent) -> void:
 					text_mosaic_mid_light.visible = show_mosaic
 				if text_mosaic_highlight != null:
 					text_mosaic_highlight.visible = show_mosaic
+				if text_mosaic_accent != null:
+					text_mosaic_accent.visible = show_mosaic
+				if text_mosaic_accent_marked != null:
+					text_mosaic_accent_marked.visible = show_mosaic
 				if screen_mosaic_coarse != null:
 					screen_mosaic_coarse.visible = show_mosaic
 				if screen_mosaic_medium != null:
