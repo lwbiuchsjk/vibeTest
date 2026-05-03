@@ -12,10 +12,23 @@ extends Control
 
 # 字号(单字符像素高度;也作为 canvas 上字符网格的基础步长)
 # 越小越像图、越大越可读但形状识别度下降。中文双字 token 实际宽 ≈ 2×font_size。
-@export_range(2, 24) var font_size: int = 8
+@export_range(2, 64) var font_size: int = 8
 # 字符间距系数:网格步长 = font_size × cell_spacing。
 # 1.0 = 字符紧密相邻;>1.0 留呼吸空隙;<1.0 强烈重叠(融合感更强)。
 @export_range(0.3, 3.0) var cell_spacing: float = 1.0
+# 网格起点相对 cell 的偏移比例(x/y 各推荐 [0, 1)):多层叠加时各层用不同 grid_phase
+# 让网格错开,避免大/中/小字号共用 (0,0) 起点产生明显的横竖间隔线。0 = 严格从左上角开始。
+@export var grid_phase: Vector2 = Vector2.ZERO
+# 单层内部 cell-level alpha 抖动幅度(0 ~ 1):破除单层等密度网格感。
+# 大字号层叠加时即使 grid_phase 错开,单层内部 cells 仍是规整网格 → 视觉固化。
+# 用 cell 坐标做确定性伪随机抖动,让每个 cell alpha 在 [1.0 - density_jitter, 1.0] 内变化,
+# 形成"有些浓有些淡"的不规整密度,模仿油画笔触自然疏密。0 = 不抖动(默认,不影响 test 场景)。
+@export_range(0.0, 1.0) var density_jitter: float = 0.0
+# 单层内部 cell-level 位置抖动幅度(0 ~ 1):破除字符严格落在 cell 网格点上的对齐感。
+# density_jitter 只让 alpha 不均(密度变化),但 cells 位置仍是规整网格;
+# position_jitter 让每个 cell 内字符 x/y 在 cell 内 ±cell*0.5*jitter 内偏移,
+# 字符不再严格在网格点上 → 彻底破除"方块矩阵"视觉。0 = 不偏移(默认)。
+@export_range(0.0, 1.0) var position_jitter: float = 0.0
 # 透明度阈值:源图采样色 alpha 低于此值的格子跳过不渲染(过滤透明背景)
 @export_range(0.0, 1.0) var density_threshold: float = 0.1
 # 对比度强化系数:用于让远看图像更清晰(>1.0 让深色更深、浅色更浅);1.0 = 不调整
@@ -135,12 +148,13 @@ func _draw() -> void:
 	# baseline 偏移:draw_string 的 pos 是基线位置,加 font_size 让字符出现在格子下沿
 	var baseline_offset: int = font_size
 
-	var y: int = 0
+	# 网格起点应用 grid_phase 偏移(单位:cell 比例),让多层叠加时网格不对齐
+	var y: int = int(round(grid_phase.y * float(cell)))
 	while y < int(canvas_size.y):
 		var sy: int = clampi(
 			int(src_offset_y + float(y) * inv_scale), 0, src_h - 1
 		)
-		var x: int = 0
+		var x: int = int(round(grid_phase.x * float(cell)))
 		while x < int(canvas_size.x):
 			var sx: int = clampi(
 				int(src_offset_x + float(x) * inv_scale), 0, src_w - 1
@@ -152,9 +166,26 @@ func _draw() -> void:
 				var draw_color: Color = mono_color
 				if color_mode == 0:
 					draw_color = _apply_ink_palette(_apply_contrast(color))
+				# Cell-level alpha 抖动:基于 cell 坐标做确定性伪随机,每个 cell alpha 在
+				# [1.0 - density_jitter, 1.0] 内变化,破除单层规整网格感(模仿油画笔触自然疏密)
+				if density_jitter > 0.0:
+					var jitter: float = (
+						sin(float(x) * 0.137 + float(y) * 0.213) * 0.5 + 0.5
+					)
+					draw_color.a *= 1.0 - density_jitter * jitter
+				# Cell-level 位置抖动:字符 x/y 在 cell 内 ±cell*0.5*position_jitter 偏移
+				# 用与 alpha 抖动不同频率(0.211/0.317)避免相关性,字符不再严格在网格点
+				var draw_x: float = float(x)
+				var draw_y: float = float(y + baseline_offset)
+				if position_jitter > 0.0:
+					var jx: float = sin(float(x) * 0.211 + float(y) * 0.317)
+					var jy: float = cos(float(x) * 0.317 + float(y) * 0.211)
+					var amp: float = float(cell) * 0.5 * position_jitter
+					draw_x += jx * amp
+					draw_y += jy * amp
 				draw_string(
 					_font,
-					Vector2(x, y + baseline_offset),
+					Vector2(draw_x, draw_y),
 					token,
 					HORIZONTAL_ALIGNMENT_LEFT,
 					-1,
@@ -221,12 +252,13 @@ func _draw_debug_grid(
 		inv_scale = float(src_h) / canvas_size.y
 		var visible_w: float = canvas_size.x * inv_scale
 		src_offset_x = (float(src_w) - visible_w) * 0.5
-	var y: int = 0
+	# 同 _draw:debug 网格也按 grid_phase 偏移起点
+	var y: int = int(round(grid_phase.y * float(cell)))
 	while y < int(canvas_size.y):
 		var sy: int = clampi(
 			int(src_offset_y + float(y) * inv_scale), 0, src_h - 1
 		)
-		var x: int = 0
+		var x: int = int(round(grid_phase.x * float(cell)))
 		while x < int(canvas_size.x):
 			var sx: int = clampi(
 				int(src_offset_x + float(x) * inv_scale), 0, src_w - 1

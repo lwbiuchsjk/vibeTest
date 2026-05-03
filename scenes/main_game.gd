@@ -48,11 +48,12 @@ var _resizing := false              # 防止窗口尺寸调整时递归触发
 var _bet_mode_options: Dictionary = {}
 
 @onready var screen_background: TextureRect = $ScreenBackground
-# 屏幕级文字马赛克衬底:全屏覆盖,与核心 LeftStack 内的 TextMosaicBackground 共享源图+tokens,
-# 但用更大字号(14 vs 8)实现稀疏低密度,与核心区形成"近紧凑/远稀疏"的层次感。
-# 仅在 main_game 场景存在(test 场景节点不存在,get_node_or_null → null)。
-# 米色 MainGameBackground 在它下层做底色,核心 LeftStack 内的 BackgroundColor 又会"挖掉"
-# 衬底 mosaic 在核心 9:16 区的部分,让中央显示核心区域、四周显示衬底 mosaic。
+# 屏幕级文字马赛克衬底(油画式 3 层):粗(36px α 0.5)→ 中(18px α 0.45)→ 细(8px α 0.4),
+# 全屏覆盖+四边 offset ±200 让节点 size 溢出屏幕(源图视觉放大但单字字号不变)。
+# 三层与核心 LeftStack 共享源图+tokens,但因字号梯度产生不同 cell 网格的错位采样,
+# 形成"层层叠叠"油画感。test 场景无这些节点,get_node_or_null → null。
+@onready var screen_mosaic_coarse: TextMosaicBackground = get_node_or_null("ScreenMosaicCoarse") as TextMosaicBackground
+@onready var screen_mosaic_medium: TextMosaicBackground = get_node_or_null("ScreenMosaicMedium") as TextMosaicBackground
 @onready var screen_mosaic_bg: TextMosaicBackground = get_node_or_null("ScreenMosaicBackground") as TextMosaicBackground
 @onready var root_margin: MarginContainer = $Root
 # 测试场景特有的右侧调试面板。正式 main_game 场景已剥离,此处取值为 null,
@@ -60,6 +61,11 @@ var _bet_mode_options: Dictionary = {}
 @onready var right_column: VSplitContainer = get_node_or_null("Root/RootContent/MainSplit/RightColumn") as VSplitContainer
 @onready var status_label: Label = $Root/RootContent/Header/StatusLabel
 @onready var event_background_rect: TextureRect = $Root/RootContent/MainSplit/LeftPanel/LeftStack/EventBackground
+# 油画式多层叠加:核心区 LeftStack 内 mosaic 由 3 层叠成,字号梯度做层次。
+# coarse(24px α 0.25)粗笔触底色 → medium(14px α 0.45)中纹 → bg(8px α 1.0)精纹主层。
+# 仅 main_game 场景有 coarse/medium,test 场景路径不存在 → null check。
+@onready var text_mosaic_coarse: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicCoarse") as TextMosaicBackground
+@onready var text_mosaic_medium: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicMedium") as TextMosaicBackground
 @onready var text_mosaic_bg: TextMosaicBackground = $Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicBackground
 @onready var text_mosaic_particles: TextMosaicParticles = $Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicParticles
 @onready var character_panel: PanelContainer = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/CharacterPanel
@@ -1590,6 +1596,14 @@ func _render_event_background(background_art_path: String) -> void:
 		text_mosaic_bg.set_source_image(null)
 		text_mosaic_particles.set_source_image(null)
 		text_mosaic_particles.clear_flow_data()
+		if text_mosaic_coarse != null:
+			text_mosaic_coarse.set_source_image(null)
+		if text_mosaic_medium != null:
+			text_mosaic_medium.set_source_image(null)
+		if screen_mosaic_coarse != null:
+			screen_mosaic_coarse.set_source_image(null)
+		if screen_mosaic_medium != null:
+			screen_mosaic_medium.set_source_image(null)
 		if screen_mosaic_bg != null:
 			screen_mosaic_bg.set_source_image(null)
 		return
@@ -1609,8 +1623,24 @@ func _render_event_background(background_art_path: String) -> void:
 	var tokens: PackedStringArray = PackedStringArray(raw_tokens)
 	text_mosaic_bg.set_text_tokens(tokens)
 
-	# 屏幕级 mosaic 衬底:与核心层共享源图+tokens,字号更大密度更稀(在 .tscn 节点属性配置)。
+	# 油画式多层叠加:核心区 coarse/medium 两层与 bg 共享源图+tokens,
+	# 字号梯度由各节点 .tscn 属性配置(24 / 14 / 8)。
+	# 仅 main_game 场景有 coarse/medium 节点,test 场景跳过。
+	if text_mosaic_coarse != null:
+		text_mosaic_coarse.set_source_image(texture)
+		text_mosaic_coarse.set_text_tokens(tokens)
+	if text_mosaic_medium != null:
+		text_mosaic_medium.set_source_image(texture)
+		text_mosaic_medium.set_text_tokens(tokens)
+
+	# 屏幕级 mosaic 衬底(油画式 3 层):粗 36px → 中 18px → 细 8px,字号梯度由 .tscn 配置。
 	# 仅 main_game 场景有此节点,test 场景跳过。
+	if screen_mosaic_coarse != null:
+		screen_mosaic_coarse.set_source_image(texture)
+		screen_mosaic_coarse.set_text_tokens(tokens)
+	if screen_mosaic_medium != null:
+		screen_mosaic_medium.set_source_image(texture)
+		screen_mosaic_medium.set_text_tokens(tokens)
 	if screen_mosaic_bg != null:
 		screen_mosaic_bg.set_source_image(texture)
 		screen_mosaic_bg.set_text_tokens(tokens)

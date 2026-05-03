@@ -35,8 +35,8 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.957, 0.925, 0.847, 1)
 
-[node name="ScreenMosaicBackground" type="Control" parent="."]
-modulate = Color(1, 1, 1, 0.4)
+[node name="ScreenMosaicCoarse" type="Control" parent="."]
+modulate = Color(1, 1, 1, 0.3)
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -49,6 +49,47 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("4_text_mosaic_bg")
+ink_tint_strength = 0.15
+font_size = 36
+grid_phase = Vector2(0.71, 0.33)
+density_jitter = 1.0
+position_jitter = 0.7
+
+[node name="ScreenMosaicMedium" type="Control" parent="."]
+modulate = Color(1, 1, 1, 0.25)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -200.0
+offset_top = -200.0
+offset_right = 200.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+ink_tint_strength = 0.15
+font_size = 18
+grid_phase = Vector2(0.23, 0.83)
+density_jitter = 0.9
+position_jitter = 0.55
+
+[node name="ScreenMosaicBackground" type="Control" parent="."]
+modulate = Color(1, 1, 1, 0.2)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -200.0
+offset_top = -200.0
+offset_right = 200.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+ink_tint_strength = 0.15
 font_size = 8
 
 [node name="Root" type="MarginContainer" parent="."]
@@ -124,6 +165,36 @@ grow_vertical = 2
 expand_mode = 1
 stretch_mode = 6
 
+[node name="TextMosaicCoarse" type="Control" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack"]
+modulate = Color(1, 1, 1, 0.55)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+font_size = 24
+grid_phase = Vector2(0.13, 0.41)
+density_jitter = 1.0
+position_jitter = 0.7
+
+[node name="TextMosaicMedium" type="Control" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack"]
+modulate = Color(1, 1, 1, 0.6)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+font_size = 14
+grid_phase = Vector2(0.59, 0.17)
+density_jitter = 0.95
+position_jitter = 0.6
+
 [node name="TextMosaicBackground" type="Control" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack"]
 layout_mode = 1
 anchors_preset = 15
@@ -133,6 +204,9 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("4_text_mosaic_bg")
+grid_phase = Vector2(0.37, 0.71)
+density_jitter = 0.3
+position_jitter = 0.45
 
 [node name="TextMosaicParticles" type="Control" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack"]
 layout_mode = 1
