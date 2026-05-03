@@ -48,6 +48,12 @@ var _resizing := false              # 防止窗口尺寸调整时递归触发
 var _bet_mode_options: Dictionary = {}
 
 @onready var screen_background: TextureRect = $ScreenBackground
+# 屏幕级文字马赛克衬底:全屏覆盖,与核心 LeftStack 内的 TextMosaicBackground 共享源图+tokens,
+# 但用更大字号(14 vs 8)实现稀疏低密度,与核心区形成"近紧凑/远稀疏"的层次感。
+# 仅在 main_game 场景存在(test 场景节点不存在,get_node_or_null → null)。
+# 米色 MainGameBackground 在它下层做底色,核心 LeftStack 内的 BackgroundColor 又会"挖掉"
+# 衬底 mosaic 在核心 9:16 区的部分,让中央显示核心区域、四周显示衬底 mosaic。
+@onready var screen_mosaic_bg: TextMosaicBackground = get_node_or_null("ScreenMosaicBackground") as TextMosaicBackground
 @onready var root_margin: MarginContainer = $Root
 # 测试场景特有的右侧调试面板。正式 main_game 场景已剥离,此处取值为 null,
 # 所有访问点必须 null check。保留路径变量是为了让正式 / 测试场景共用同一份脚本。
@@ -1584,6 +1590,8 @@ func _render_event_background(background_art_path: String) -> void:
 		text_mosaic_bg.set_source_image(null)
 		text_mosaic_particles.set_source_image(null)
 		text_mosaic_particles.clear_flow_data()
+		if screen_mosaic_bg != null:
+			screen_mosaic_bg.set_source_image(null)
 		return
 
 	var resource := ResourceLoader.load(normalized_path)
@@ -1600,6 +1608,12 @@ func _render_event_background(background_art_path: String) -> void:
 	var raw_tokens: Array = LOCATION_TEXT_TOKENS.get(location_id, DEFAULT_TEXT_TOKENS)
 	var tokens: PackedStringArray = PackedStringArray(raw_tokens)
 	text_mosaic_bg.set_text_tokens(tokens)
+
+	# 屏幕级 mosaic 衬底:与核心层共享源图+tokens,字号更大密度更稀(在 .tscn 节点属性配置)。
+	# 仅 main_game 场景有此节点,test 场景跳过。
+	if screen_mosaic_bg != null:
+		screen_mosaic_bg.set_source_image(texture)
+		screen_mosaic_bg.set_text_tokens(tokens)
 
 	# 文字马赛克粒子层:加载与 art_file 同名的 flow_regions.json,驱动粒子在主体区域内流动。
 	# JSON 不存在时清空粒子,粒子层渲染为空(不影响静态层)。
