@@ -67,10 +67,32 @@ var _bet_mode_options: Dictionary = {}
 @onready var text_mosaic_coarse: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicCoarse") as TextMosaicBackground
 @onready var text_mosaic_medium: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicMedium") as TextMosaicBackground
 @onready var text_mosaic_bg: TextMosaicBackground = $Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicBackground
-# 素描式暗部强化层:仅在 V ≤ v_max_threshold 的暗区画字符(跳过亮区)。
-# 与主层 8px 在不同 cell 位置贡献字符(grid_phase 错开),暗部累加密度产生素描感。
-# 仅 main_game 场景有此节点,test 场景跳过。
+# 素描式 V 切片多层(决策点 6 激进版):暗部 5 档 + 高光 1 档,与主层叠加形成
+# 1~6 层密度梯度。各层 v_max/v_min 阈值不均匀步长——越暗切片越细,呼应人眼对
+# 暗部分辨力强;α 阶梯 0.3 → 0.65 越深的层视觉权重越大(类比素描"反复涂死");
+# grid_phase 全错开避免 cell 重叠在同位置 → 真.密度翻倍。
+# 命中规则(自上而下递进):
+#   主层  v∈[0,1.0]  α=1.0  → 全画
+#   DarkLight  v≤0.7  α=0.3  → 中亮以下 +1 层
+#   DarkAccent v≤0.5  α=0.35 → 中暗以下 +2 层
+#   DarkDeep   v≤0.32 α=0.45 → 暗部     +3 层
+#   DarkInk    v≤0.18 α=0.55 → 深暗     +4 层
+#   DarkAbyss  v≤0.08 α=0.65 → 极暗     +5 层
+#   Highlight  v≥0.75 α=0.4  → 亮区高光斑驳(独立维度,与暗部档位互斥)
+# 仅 main_game 场景有这些节点,test 场景跳过(get_node_or_null → null)。
+@onready var text_mosaic_dark_light: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicDarkLight") as TextMosaicBackground
 @onready var text_mosaic_dark_accent: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicDarkAccent") as TextMosaicBackground
+@onready var text_mosaic_dark_deep: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicDarkDeep") as TextMosaicBackground
+@onready var text_mosaic_dark_ink: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicDarkInk") as TextMosaicBackground
+# DarkBetween 在 DarkInk(0.18) 和 DarkAbyss(0.08) 之间补一档(v_max=0.13),让深暗段过渡更细
+@onready var text_mosaic_dark_between: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicDarkBetween") as TextMosaicBackground
+@onready var text_mosaic_dark_abyss: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicDarkAbyss") as TextMosaicBackground
+# MidDark/MidLight 是中调"窗口层"(双边 v_min/v_max),用 6px 小字号在中调区
+# 增加颗粒度,与 DarkLight/DarkAccent 等单边阈值层不同——这两层只贡献自己的 V 段。
+# 配合 Coarse/Medium 加 v_max 退出亮区,中间灰阶在视觉上拉开区分度。
+@onready var text_mosaic_mid_dark: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicMidDark") as TextMosaicBackground
+@onready var text_mosaic_mid_light: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicMidLight") as TextMosaicBackground
+@onready var text_mosaic_highlight: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicHighlight") as TextMosaicBackground
 @onready var text_mosaic_particles: TextMosaicParticles = $Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicParticles
 @onready var character_panel: PanelContainer = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/CharacterPanel
 @onready var character_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/CharacterPanel/CharacterLabel
@@ -1604,8 +1626,24 @@ func _render_event_background(background_art_path: String) -> void:
 			text_mosaic_coarse.set_source_image(null)
 		if text_mosaic_medium != null:
 			text_mosaic_medium.set_source_image(null)
+		if text_mosaic_dark_light != null:
+			text_mosaic_dark_light.set_source_image(null)
 		if text_mosaic_dark_accent != null:
 			text_mosaic_dark_accent.set_source_image(null)
+		if text_mosaic_dark_deep != null:
+			text_mosaic_dark_deep.set_source_image(null)
+		if text_mosaic_dark_ink != null:
+			text_mosaic_dark_ink.set_source_image(null)
+		if text_mosaic_dark_between != null:
+			text_mosaic_dark_between.set_source_image(null)
+		if text_mosaic_dark_abyss != null:
+			text_mosaic_dark_abyss.set_source_image(null)
+		if text_mosaic_mid_dark != null:
+			text_mosaic_mid_dark.set_source_image(null)
+		if text_mosaic_mid_light != null:
+			text_mosaic_mid_light.set_source_image(null)
+		if text_mosaic_highlight != null:
+			text_mosaic_highlight.set_source_image(null)
 		if screen_mosaic_coarse != null:
 			screen_mosaic_coarse.set_source_image(null)
 		if screen_mosaic_medium != null:
@@ -1638,9 +1676,33 @@ func _render_event_background(background_art_path: String) -> void:
 	if text_mosaic_medium != null:
 		text_mosaic_medium.set_source_image(texture)
 		text_mosaic_medium.set_text_tokens(tokens)
+	if text_mosaic_dark_light != null:
+		text_mosaic_dark_light.set_source_image(texture)
+		text_mosaic_dark_light.set_text_tokens(tokens)
 	if text_mosaic_dark_accent != null:
 		text_mosaic_dark_accent.set_source_image(texture)
 		text_mosaic_dark_accent.set_text_tokens(tokens)
+	if text_mosaic_dark_deep != null:
+		text_mosaic_dark_deep.set_source_image(texture)
+		text_mosaic_dark_deep.set_text_tokens(tokens)
+	if text_mosaic_dark_ink != null:
+		text_mosaic_dark_ink.set_source_image(texture)
+		text_mosaic_dark_ink.set_text_tokens(tokens)
+	if text_mosaic_dark_between != null:
+		text_mosaic_dark_between.set_source_image(texture)
+		text_mosaic_dark_between.set_text_tokens(tokens)
+	if text_mosaic_dark_abyss != null:
+		text_mosaic_dark_abyss.set_source_image(texture)
+		text_mosaic_dark_abyss.set_text_tokens(tokens)
+	if text_mosaic_mid_dark != null:
+		text_mosaic_mid_dark.set_source_image(texture)
+		text_mosaic_mid_dark.set_text_tokens(tokens)
+	if text_mosaic_mid_light != null:
+		text_mosaic_mid_light.set_source_image(texture)
+		text_mosaic_mid_light.set_text_tokens(tokens)
+	if text_mosaic_highlight != null:
+		text_mosaic_highlight.set_source_image(texture)
+		text_mosaic_highlight.set_text_tokens(tokens)
 
 	# 屏幕级 mosaic 衬底(油画式 3 层):粗 36px → 中 18px → 细 8px,字号梯度由 .tscn 配置。
 	# 仅 main_game 场景有此节点,test 场景跳过。
@@ -1708,8 +1770,24 @@ func _setup_platform_default_layers() -> void:
 			text_mosaic_coarse.visible = true
 		if text_mosaic_medium != null:
 			text_mosaic_medium.visible = true
+		if text_mosaic_dark_light != null:
+			text_mosaic_dark_light.visible = true
 		if text_mosaic_dark_accent != null:
 			text_mosaic_dark_accent.visible = true
+		if text_mosaic_dark_deep != null:
+			text_mosaic_dark_deep.visible = true
+		if text_mosaic_dark_ink != null:
+			text_mosaic_dark_ink.visible = true
+		if text_mosaic_dark_between != null:
+			text_mosaic_dark_between.visible = true
+		if text_mosaic_dark_abyss != null:
+			text_mosaic_dark_abyss.visible = true
+		if text_mosaic_mid_dark != null:
+			text_mosaic_mid_dark.visible = true
+		if text_mosaic_mid_light != null:
+			text_mosaic_mid_light.visible = true
+		if text_mosaic_highlight != null:
+			text_mosaic_highlight.visible = true
 		if screen_mosaic_coarse != null:
 			screen_mosaic_coarse.visible = true
 		if screen_mosaic_medium != null:
@@ -1735,8 +1813,24 @@ func _unhandled_input(event: InputEvent) -> void:
 					text_mosaic_coarse.visible = show_mosaic
 				if text_mosaic_medium != null:
 					text_mosaic_medium.visible = show_mosaic
+				if text_mosaic_dark_light != null:
+					text_mosaic_dark_light.visible = show_mosaic
 				if text_mosaic_dark_accent != null:
 					text_mosaic_dark_accent.visible = show_mosaic
+				if text_mosaic_dark_deep != null:
+					text_mosaic_dark_deep.visible = show_mosaic
+				if text_mosaic_dark_ink != null:
+					text_mosaic_dark_ink.visible = show_mosaic
+				if text_mosaic_dark_between != null:
+					text_mosaic_dark_between.visible = show_mosaic
+				if text_mosaic_dark_abyss != null:
+					text_mosaic_dark_abyss.visible = show_mosaic
+				if text_mosaic_mid_dark != null:
+					text_mosaic_mid_dark.visible = show_mosaic
+				if text_mosaic_mid_light != null:
+					text_mosaic_mid_light.visible = show_mosaic
+				if text_mosaic_highlight != null:
+					text_mosaic_highlight.visible = show_mosaic
 				if screen_mosaic_coarse != null:
 					screen_mosaic_coarse.visible = show_mosaic
 				if screen_mosaic_medium != null:
