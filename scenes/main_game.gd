@@ -67,6 +67,10 @@ var _bet_mode_options: Dictionary = {}
 @onready var text_mosaic_coarse: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicCoarse") as TextMosaicBackground
 @onready var text_mosaic_medium: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicMedium") as TextMosaicBackground
 @onready var text_mosaic_bg: TextMosaicBackground = $Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicBackground
+# 素描式暗部强化层:仅在 V ≤ v_max_threshold 的暗区画字符(跳过亮区)。
+# 与主层 8px 在不同 cell 位置贡献字符(grid_phase 错开),暗部累加密度产生素描感。
+# 仅 main_game 场景有此节点,test 场景跳过。
+@onready var text_mosaic_dark_accent: TextMosaicBackground = get_node_or_null("Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicDarkAccent") as TextMosaicBackground
 @onready var text_mosaic_particles: TextMosaicParticles = $Root/RootContent/MainSplit/LeftPanel/LeftStack/TextMosaicParticles
 @onready var character_panel: PanelContainer = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/CharacterPanel
 @onready var character_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/CharacterPanel/CharacterLabel
@@ -1600,6 +1604,8 @@ func _render_event_background(background_art_path: String) -> void:
 			text_mosaic_coarse.set_source_image(null)
 		if text_mosaic_medium != null:
 			text_mosaic_medium.set_source_image(null)
+		if text_mosaic_dark_accent != null:
+			text_mosaic_dark_accent.set_source_image(null)
 		if screen_mosaic_coarse != null:
 			screen_mosaic_coarse.set_source_image(null)
 		if screen_mosaic_medium != null:
@@ -1632,6 +1638,9 @@ func _render_event_background(background_art_path: String) -> void:
 	if text_mosaic_medium != null:
 		text_mosaic_medium.set_source_image(texture)
 		text_mosaic_medium.set_text_tokens(tokens)
+	if text_mosaic_dark_accent != null:
+		text_mosaic_dark_accent.set_source_image(texture)
+		text_mosaic_dark_accent.set_text_tokens(tokens)
 
 	# 屏幕级 mosaic 衬底(油画式 3 层):粗 36px → 中 18px → 细 8px,字号梯度由 .tscn 配置。
 	# 仅 main_game 场景有此节点,test 场景跳过。
@@ -1694,6 +1703,19 @@ func _setup_platform_default_layers() -> void:
 		event_background_rect.visible = false
 		text_mosaic_bg.visible = true
 		text_mosaic_particles.visible = true
+		# 多层叠加架构下,Web 默认显示所有 mosaic 层(显式设置便于与 F9 切换语义保持一致)
+		if text_mosaic_coarse != null:
+			text_mosaic_coarse.visible = true
+		if text_mosaic_medium != null:
+			text_mosaic_medium.visible = true
+		if text_mosaic_dark_accent != null:
+			text_mosaic_dark_accent.visible = true
+		if screen_mosaic_coarse != null:
+			screen_mosaic_coarse.visible = true
+		if screen_mosaic_medium != null:
+			screen_mosaic_medium.visible = true
+		if screen_mosaic_bg != null:
+			screen_mosaic_bg.visible = true
 
 
 # 功能：F9 互斥切换"原图层"与"文字马赛克层(静态+粒子)"；F8 强制渲染周既明练武场背景。
@@ -1707,6 +1729,20 @@ func _unhandled_input(event: InputEvent) -> void:
 				var show_mosaic: bool = not text_mosaic_bg.visible
 				text_mosaic_bg.visible = show_mosaic
 				text_mosaic_particles.visible = show_mosaic
+				# 多层叠加架构下,F9 必须覆盖所有 mosaic 层,否则 A/B 对比时
+				# coarse/medium/dark_accent + 屏幕衬底 3 层会残留可见
+				if text_mosaic_coarse != null:
+					text_mosaic_coarse.visible = show_mosaic
+				if text_mosaic_medium != null:
+					text_mosaic_medium.visible = show_mosaic
+				if text_mosaic_dark_accent != null:
+					text_mosaic_dark_accent.visible = show_mosaic
+				if screen_mosaic_coarse != null:
+					screen_mosaic_coarse.visible = show_mosaic
+				if screen_mosaic_medium != null:
+					screen_mosaic_medium.visible = show_mosaic
+				if screen_mosaic_bg != null:
+					screen_mosaic_bg.visible = show_mosaic
 				event_background_rect.visible = not show_mosaic
 			KEY_F8:
 				_force_render_zhou_training_ground()

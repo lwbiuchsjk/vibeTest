@@ -31,6 +31,11 @@ extends Control
 @export_range(0.0, 1.0) var position_jitter: float = 0.0
 # 透明度阈值:源图采样色 alpha 低于此值的格子跳过不渲染(过滤透明背景)
 @export_range(0.0, 1.0) var density_threshold: float = 0.1
+# V 通道上限阈值:cell 反向映射到源图后,源色 V > 此值的格子跳过不画。
+# 用于"暗部强化层"(素描式叠加)——只在暗区贡献字符,亮区跳过让下层透出。
+# 多个 v_max 不同的层叠加 → 暗区被多层都画(密度累加)、亮区只有 1 层 → 自然形成密度梯度。
+# 默认 1.0 = 无过滤,与原行为兼容。
+@export_range(0.0, 1.0) var v_max_threshold: float = 1.0
 # 对比度强化系数:用于让远看图像更清晰(>1.0 让深色更深、浅色更浅);1.0 = 不调整
 @export_range(0.1, 3.0) var contrast_factor: float = 1.0
 # 颜色模式:0=源图色 / 1=单色(用 mono_color)
@@ -160,7 +165,8 @@ func _draw() -> void:
 				int(src_offset_x + float(x) * inv_scale), 0, src_w - 1
 			)
 			var color: Color = _source_image.get_pixel(sx, sy)
-			if color.a >= density_threshold:
+			# v_max_threshold 过滤:仅暗于阈值的格子才画(素描式暗部强化)
+			if color.a >= density_threshold and color.v <= v_max_threshold:
 				var token: String = _text_tokens[token_idx % token_count]
 				# 颜色处理(color_mode==0):先 contrast 强化亮度对比,再 ink palette 水墨化色调
 				var draw_color: Color = mono_color
@@ -264,7 +270,8 @@ func _draw_debug_grid(
 				int(src_offset_x + float(x) * inv_scale), 0, src_w - 1
 			)
 			var color: Color = _source_image.get_pixel(sx, sy)
-			if color.a >= density_threshold:
+			# 与 _draw 主循环判定一致(包含 v_max_threshold 过滤)
+			if color.a >= density_threshold and color.v <= v_max_threshold:
 				draw_circle(
 					Vector2(x + cell * 0.5, y + cell * 0.5),
 					1.0,

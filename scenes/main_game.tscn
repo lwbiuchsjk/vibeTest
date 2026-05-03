@@ -205,8 +205,25 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("4_text_mosaic_bg")
 grid_phase = Vector2(0.37, 0.71)
+density_jitter = 0.0
+position_jitter = 0.45
+contrast_factor = 1.4
+ink_levels = 32
+
+[node name="TextMosaicDarkAccent" type="Control" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack"]
+modulate = Color(1, 1, 1, 0.5)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+grid_phase = Vector2(0.83, 0.29)
 density_jitter = 0.3
 position_jitter = 0.45
+v_max_threshold = 0.4
 
 [node name="TextMosaicParticles" type="Control" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack"]
 layout_mode = 1
