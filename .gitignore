@@ -10,6 +10,9 @@ _kb_sync/
 # Local IDE settings
 .vscode/settings.json
 
+# Claude Code 本地配置（用户自管，不入仓）
+.claude/settings.local.json
+
 # Codex agent config (auto-generated)
 .codex
 
