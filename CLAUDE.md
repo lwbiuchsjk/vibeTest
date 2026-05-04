@@ -13,7 +13,6 @@ Godot 4.5，GDScript，Git 版本控制
 - assets/       资源文件（图片、音效等）
 - test/         测试文件
 - Design/       设计文档目录（路径由 `design_dir` 指定，Git submodule → 私有仓库 `vibe-test-design`）
-- _kb_sync/     在线知识库同步工具目录（访问规则见共享 CLAUDE.md）
 
 ## 路径指定
 
