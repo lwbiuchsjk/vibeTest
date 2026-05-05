@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://b82ho0jjq8xim"]
+[gd_scene load_steps=8 format=3 uid="uid://b82ho0jjq8xim"]
 
 [ext_resource type="Script" uid="uid://cbva4dsc811qs" path="res://scenes/main_game.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://scripts/ui/task_summary_card.tscn" id="2_task_summary_card"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://ew418ul3ih1e" path="res://scripts/ui/text_mosaic_background.gd" id="4_text_mosaic_bg"]
 [ext_resource type="Script" uid="uid://brk5yldna6t66" path="res://scripts/ui/text_mosaic_particles.gd" id="5_text_mosaic_particles"]
 [ext_resource type="Script" path="res://scripts/ui/text_mosaic_accent_marked.gd" id="6_text_mosaic_accent_marked"]
+[ext_resource type="Script" path="res://scripts/ui/intro_sequence.gd" id="7_intro_sequence"]
 
 [node name="MainGame" type="Control"]
 layout_mode = 3
@@ -95,6 +96,289 @@ script = ExtResource("4_text_mosaic_bg")
 ink_tint_strength = 0.15
 font_size = 8
 edge_fade_pixels = 0
+
+[node name="IntroSequence" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+script = ExtResource("7_intro_sequence")
+
+[node name="IntroBgColor" type="ColorRect" parent="IntroSequence"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.957, 0.925, 0.847, 1)
+
+[node name="MosaicLayersA" type="Control" parent="IntroSequence"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="IntroBg" type="Control" parent="IntroSequence/MosaicLayersA"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+grid_phase = Vector2(0.37, 0.71)
+density_jitter = 0.0
+position_jitter = 0.45
+contrast_factor = 1.4
+ink_levels = 32
+
+[node name="IntroCoarse" type="Control" parent="IntroSequence/MosaicLayersA"]
+modulate = Color(1, 1, 1, 0.55)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+font_size = 24
+grid_phase = Vector2(0.13, 0.41)
+density_jitter = 1.0
+position_jitter = 0.7
+v_max_threshold = 0.5
+
+[node name="IntroMedium" type="Control" parent="IntroSequence/MosaicLayersA"]
+modulate = Color(1, 1, 1, 0.6)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+font_size = 14
+grid_phase = Vector2(0.59, 0.17)
+density_jitter = 0.95
+position_jitter = 0.6
+v_max_threshold = 0.55
+
+[node name="IntroDarkLight" type="Control" parent="IntroSequence/MosaicLayersA"]
+modulate = Color(1, 1, 1, 0.3)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+grid_phase = Vector2(0.07, 0.53)
+density_jitter = 0.3
+position_jitter = 0.45
+v_max_threshold = 0.7
+
+[node name="IntroDarkAccent" type="Control" parent="IntroSequence/MosaicLayersA"]
+modulate = Color(1, 1, 1, 0.35)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+grid_phase = Vector2(0.83, 0.29)
+density_jitter = 0.3
+position_jitter = 0.45
+v_max_threshold = 0.5
+
+[node name="IntroDarkDeep" type="Control" parent="IntroSequence/MosaicLayersA"]
+modulate = Color(1, 1, 1, 0.45)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+grid_phase = Vector2(0.61, 0.89)
+density_jitter = 0.3
+position_jitter = 0.45
+v_max_threshold = 0.32
+
+[node name="IntroDarkInk" type="Control" parent="IntroSequence/MosaicLayersA"]
+modulate = Color(1, 1, 1, 0.55)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+grid_phase = Vector2(0.27, 0.23)
+density_jitter = 0.3
+position_jitter = 0.45
+v_max_threshold = 0.18
+
+[node name="IntroHighlight" type="Control" parent="IntroSequence/MosaicLayersA"]
+modulate = Color(1, 1, 1, 0.4)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+grid_phase = Vector2(0.43, 0.91)
+density_jitter = 0.3
+position_jitter = 0.45
+v_min_threshold = 0.75
+
+[node name="MosaicLayersB" type="Control" parent="IntroSequence"]
+modulate = Color(1, 1, 1, 0)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="IntroBg" type="Control" parent="IntroSequence/MosaicLayersB"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+grid_phase = Vector2(0.37, 0.71)
+density_jitter = 0.0
+position_jitter = 0.45
+contrast_factor = 1.4
+ink_levels = 32
+
+[node name="IntroCoarse" type="Control" parent="IntroSequence/MosaicLayersB"]
+modulate = Color(1, 1, 1, 0.55)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+font_size = 24
+grid_phase = Vector2(0.13, 0.41)
+density_jitter = 1.0
+position_jitter = 0.7
+v_max_threshold = 0.5
+
+[node name="IntroMedium" type="Control" parent="IntroSequence/MosaicLayersB"]
+modulate = Color(1, 1, 1, 0.6)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+font_size = 14
+grid_phase = Vector2(0.59, 0.17)
+density_jitter = 0.95
+position_jitter = 0.6
+v_max_threshold = 0.55
+
+[node name="IntroDarkLight" type="Control" parent="IntroSequence/MosaicLayersB"]
+modulate = Color(1, 1, 1, 0.3)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+grid_phase = Vector2(0.07, 0.53)
+density_jitter = 0.3
+position_jitter = 0.45
+v_max_threshold = 0.7
+
+[node name="IntroDarkAccent" type="Control" parent="IntroSequence/MosaicLayersB"]
+modulate = Color(1, 1, 1, 0.35)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+grid_phase = Vector2(0.83, 0.29)
+density_jitter = 0.3
+position_jitter = 0.45
+v_max_threshold = 0.5
+
+[node name="IntroDarkDeep" type="Control" parent="IntroSequence/MosaicLayersB"]
+modulate = Color(1, 1, 1, 0.45)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+grid_phase = Vector2(0.61, 0.89)
+density_jitter = 0.3
+position_jitter = 0.45
+v_max_threshold = 0.32
+
+[node name="IntroDarkInk" type="Control" parent="IntroSequence/MosaicLayersB"]
+modulate = Color(1, 1, 1, 0.55)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+grid_phase = Vector2(0.27, 0.23)
+density_jitter = 0.3
+position_jitter = 0.45
+v_max_threshold = 0.18
+
+[node name="IntroHighlight" type="Control" parent="IntroSequence/MosaicLayersB"]
+modulate = Color(1, 1, 1, 0.4)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_text_mosaic_bg")
+grid_phase = Vector2(0.43, 0.91)
+density_jitter = 0.3
+position_jitter = 0.45
+v_min_threshold = 0.75
 
 [node name="Root" type="MarginContainer" parent="."]
 layout_mode = 1

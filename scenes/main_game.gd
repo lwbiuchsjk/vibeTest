@@ -120,10 +120,18 @@ var _bet_mode_options: Dictionary = {}
 # 测试场景特有的调试输出节点（同上 right_column 说明）。正式场景为 null,访问点 null check。
 @onready var world_state_label: RichTextLabel = get_node_or_null("Root/RootContent/MainSplit/RightColumn/RightPanel/RightMargin/RightContent/WorldStateValue") as RichTextLabel
 @onready var log_label: RichTextLabel = get_node_or_null("Root/RootContent/MainSplit/RightColumn/BottomPanel/BottomMargin/BottomContent/LogValue") as RichTextLabel
+# intro 序列节点：main_game 场景有此节点，test 场景无此节点（get_node_or_null → null）。
+# 存在时触发 intro 动画流程；否则直接调用 _start_game_after_intro() 跳过 intro。
+@onready var intro_sequence: IntroSequence = get_node_or_null("IntroSequence") as IntroSequence
+# intro 方案 B：核心区与顶部栏需独立透明度控制（不能用 root_margin 整体隐藏，否则少女层无法独立浮现）。
+@onready var left_stack: Control = $Root/RootContent/MainSplit/LeftPanel/LeftStack
+@onready var header: VBoxContainer = $Root/RootContent/Header
 
 
-# 功能：初始化事件逻辑测试场景。
-# 说明：加载配置后先预览首个事件，不在进入场景时立刻推进 world turn。
+# 功能：初始化场景。
+# 说明：若存在 IntroSequence 节点（main_game 场景）则先播放 intro 动画，
+#       结束后通过信号回调进入正式游戏逻辑。
+#       无 IntroSequence 时（test 场景）直接调用 _start_game_after_intro() 跳过 intro。
 func _ready() -> void:
 	continue_button.pressed.connect(_on_continue_button_pressed)
 	end_root.action_requested.connect(_on_end_action_requested)
@@ -140,6 +148,40 @@ func _ready() -> void:
 		status_label.text = "加载失败: %s" % str(load_result.get("error", "unknown"))
 		return
 
+	# intro 分支：main_game 场景存在 IntroSequence 节点时进入 intro 流程
+	if intro_sequence != null:
+		# 隐藏屏幕级大字层（intro 期间用 IntroSequence 自己的文字马赛克层）
+		if screen_mosaic_coarse != null:
+			screen_mosaic_coarse.visible = false
+		if screen_mosaic_medium != null:
+			screen_mosaic_medium.visible = false
+		if screen_mosaic_bg != null:
+			screen_mosaic_bg.visible = false
+		# 隐藏核心区（LeftStack 整体透明：含 EventBackground 少女图 + BackgroundColor 米色底 + 各 mosaic 层）。
+		# reveal_core_girl 阶段整体淡入实现少女独立浮现；LeftOverlay (UI 容器) tscn 默认 visible=false，
+		# 由游戏后续逻辑（事件预览 / 创建阶段）显示，与 intro 时序解耦。
+		left_stack.modulate.a = 0.0
+		# 隐藏顶部 Header（TitleLabel/StatusLabel），reveal_ui 阶段淡入。
+		# root_margin 整体保持 modulate.a=1（不能整体隐藏，否则 LeftStack 也跟着不可见，少女无法独立显现）。
+		header.modulate.a = 0.0
+		# 连接 intro 信号到对应 handler
+		intro_sequence.intro_click_received.connect(_on_intro_click_received)
+		intro_sequence.intro_reveal_screen_mosaic.connect(_on_intro_reveal_screen_mosaic)
+		intro_sequence.intro_reveal_core_girl.connect(_on_intro_reveal_core_girl)
+		intro_sequence.intro_reveal_ui.connect(_on_intro_reveal_ui)
+		intro_sequence.intro_completed.connect(_on_intro_completed)
+		# 启动池塘涟漪动画（信号已连接完毕后调用）
+		intro_sequence.start_pond_animation()
+		return  # 跳过正式游戏启动逻辑，等待 intro_completed 信号
+
+	# test 场景（无 IntroSequence 节点）：直接进入正式游戏逻辑
+	_start_game_after_intro()
+
+
+# 功能：intro 完成后（或 test 场景）进入正式游戏逻辑。
+# 说明：原 _ready() 末尾的开局选择阶段判断 + 首个事件预览逻辑提取至此。
+#       由 _on_intro_completed 信号回调触发（main_game 场景），或 _ready() 直接调用（test 场景）。
+func _start_game_after_intro() -> void:
 	# 开局选择阶段：如果有创建配置，先进入角色创建流程。
 	if _engine.has_creation_config():
 		var creation_result: Dictionary = _engine.start_creation()
@@ -149,6 +191,74 @@ func _ready() -> void:
 			return
 	_append_log("测试环境启动，开始预览第一个事件。")
 	_preview_next_event()
+
+
+# ============================================================
+# intro 信号 handler（仅 main_game 场景有 IntroSequence 时触发）
+# ============================================================
+
+# 功能：intro_click_received 回调（t=0.0s）。
+# 说明：玩家点击瞬间，立即将核心区源图切换到少女图，利用 0.4s 缓冲期完成 GPU 上传。
+#       此时 left_stack.modulate.a=0，核心区不可见，切图操作对玩家无感知。
+func _on_intro_click_received() -> void:
+	_render_event_background("res://assets/art/environments/backgrounds/pond_girl_enter.png")
+
+
+# 功能：intro_reveal_screen_mosaic 回调（t=0.4s）。
+# 说明：IntroSequence 开始淡出的同时，屏幕级大字层（screen_mosaic_*）可见并淡入。
+#       淡入 duration 0.4s，与 IntroSequence 淡出前半段同步，形成"大字层穿透浮现"的视觉效果。
+func _on_intro_reveal_screen_mosaic() -> void:
+	# 先设为可见再淡入（先显示后 Tween alpha，顺序不可反）
+	# 各层用独立 Tween（不共享同一 Tween 实例，避免 kill 一个影响其他）
+	if screen_mosaic_coarse != null:
+		screen_mosaic_coarse.visible = true
+		screen_mosaic_coarse.modulate.a = 0.0
+		var tw_coarse: Tween = create_tween()
+		tw_coarse.tween_property(screen_mosaic_coarse, "modulate:a", 0.3, 0.4)
+	if screen_mosaic_medium != null:
+		screen_mosaic_medium.visible = true
+		screen_mosaic_medium.modulate.a = 0.0
+		var tw_medium: Tween = create_tween()
+		tw_medium.tween_property(screen_mosaic_medium, "modulate:a", 0.25, 0.4)
+	if screen_mosaic_bg != null:
+		screen_mosaic_bg.visible = true
+		screen_mosaic_bg.modulate.a = 0.0
+		var tw_bg: Tween = create_tween()
+		tw_bg.tween_property(screen_mosaic_bg, "modulate:a", 0.2, 0.4)
+
+
+# 功能：intro_reveal_core_girl 回调（t=0.8s）。
+# 说明：LeftStack 整体淡入（含 EventBackground 少女图 + BackgroundColor 米色底 + 各 mosaic 层），0.4s 完成。
+#       少女独立显现于 UI 之前；各 mosaic 层 modulate 保持 tscn 默认设计值，
+#       LeftStack 整体 alpha 0→1 让所有子层按设计比例同步浮现（不需要逐层控制）。
+func _on_intro_reveal_core_girl() -> void:
+	var tw: Tween = create_tween()
+	tw.set_trans(Tween.TRANS_SINE)
+	tw.set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(left_stack, "modulate:a", 1.0, 0.4)
+
+
+# 功能：intro_reveal_ui 回调（t=1.2s）。
+# 说明：顶部 Header（TitleLabel/StatusLabel）淡入，0.8s 完成。
+#       Header 在 tscn 默认 visible=false，必须先解锁 visible 再 Tween modulate.a，
+#       否则 alpha 从 0 变到 1 节点仍不显示（visible=false 优先级高于 modulate）。
+#       LeftOverlay（UI 容器）tscn 默认 visible=false，由游戏后续逻辑控制显示，与 intro 解耦。
+#       root_margin 在 intro 期间始终保持完全可见（modulate.a=1），不参与本阶段 Tween。
+func _on_intro_reveal_ui() -> void:
+	# 解锁 Header 可见 + 显式置初始 alpha=0（防御性，避免某些场景下 modulate 被外部改）
+	header.visible = true
+	header.modulate.a = 0.0
+	var tw: Tween = create_tween()
+	tw.set_trans(Tween.TRANS_SINE)
+	tw.set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(header, "modulate:a", 1.0, 0.8)
+
+
+# 功能：intro_completed 回调（t=2.0s）。
+# 说明：IntroSequence 已隐藏，进入正式游戏逻辑。
+#       当前叙事接入点留空（林秋禾台词 / 叙事触发由阶段 3 事件设计接管）。
+func _on_intro_completed() -> void:
+	_start_game_after_intro()
 
 
 # 功能：预览下一个事件并停留在当前界面。
