@@ -56,17 +56,9 @@ jobs:
           godot --headless --export-release "Web" output/index.html 2>&1
         timeout-minutes: 5
 
-      - name: Add coi-serviceworker
-        run: |
-          # GitHub Pages 不支持自定义响应头，用 service worker 注入
-          # Cross-Origin-Isolation 头，使 SharedArrayBuffer 可用。
-          wget --tries=3 -q \
-            -O output/coi-serviceworker.min.js \
-            "https://cdn.jsdelivr.net/npm/coi-serviceworker/coi-serviceworker.min.js" \
-          || wget --tries=3 -q \
-            -O output/coi-serviceworker.min.js \
-            "https://raw.githubusercontent.com/nicolo-ribaudo/coi-serviceworker/master/coi-serviceworker.min.js"
-          sed -i 's|<head>|<head><script src="coi-serviceworker.min.js"></script>|' output/index.html
+      # 注:thread_support=false 后不再需要 SharedArrayBuffer,
+      # 不再注入 coi-serviceworker(避免首次访问被 sw 强制 reload 整页)。
+      # 若未来重新启用 thread_support,需把这段恢复。
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
