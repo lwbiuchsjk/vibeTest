@@ -161,9 +161,16 @@ func _ready() -> void:
 		# reveal_core_girl 阶段整体淡入实现少女独立浮现；LeftOverlay (UI 容器) tscn 默认 visible=false，
 		# 由游戏后续逻辑（事件预览 / 创建阶段）显示，与 intro 时序解耦。
 		left_stack.modulate.a = 0.0
-		# 隐藏顶部 Header（TitleLabel/StatusLabel），reveal_ui 阶段淡入。
+		# === 用户尝试方案：隐藏 LeftStack 所有背景渲染节点，让核心区透出底层 ScreenMosaic 屏幕级渲染 ===
+		# 目的：让 LeftStack 区域 = LeftStack 外区域 = 整屏统一的 ScreenMosaic 视觉（同字号、同深浅、同图片尺寸）
+		# LeftOverlay (UI 容器) 默认 visible=false 由游戏后续逻辑控制，此处保留不动。
+		# 副作用：reveal_core_girl 的 LeftStack Tween 不再有视觉效果（容器内无可见节点），但 Tween 保留以备未来扩展。
+		# 恢复 LeftStack 自有渲染：删除以下 for 循环。
+		for child: Node in left_stack.get_children():
+			if child.name != "LeftOverlay":
+				child.visible = false
+		# 注：Header (TitleLabel/StatusLabel) 是 demo 期占位，tscn 默认 visible=false 不显示，无需在此控制 modulate。
 		# root_margin 整体保持 modulate.a=1（不能整体隐藏，否则 LeftStack 也跟着不可见，少女无法独立显现）。
-		header.modulate.a = 0.0
 		# 连接 intro 信号到对应 handler
 		intro_sequence.intro_click_received.connect(_on_intro_click_received)
 		intro_sequence.intro_reveal_screen_mosaic.connect(_on_intro_reveal_screen_mosaic)
@@ -205,32 +212,19 @@ func _on_intro_click_received() -> void:
 
 
 # 功能：intro_reveal_screen_mosaic 回调（t=0.4s）。
-# 说明：IntroSequence 开始淡出的同时，屏幕级大字层（screen_mosaic_*）可见并淡入。
-#       淡入 duration 0.4s，与 IntroSequence 淡出前半段同步，形成"大字层穿透浮现"的视觉效果。
+# 说明：当前为空 handler。原设计是 ScreenMosaic 屏幕级大字层浮现接管屏幕渲染；
+#       现改为 IntroSequence 13 层 mosaic 永久承担屏幕渲染（cross-fade 涟漪→girl_enter 不淡出），
+#       ScreenMosaic 不再参与（在 _ready 已 visible=false 持续保持）。
+#       本 handler 保留作为未来扩展点（信号契约不变）。
 func _on_intro_reveal_screen_mosaic() -> void:
-	# 先设为可见再淡入（先显示后 Tween alpha，顺序不可反）
-	# 各层用独立 Tween（不共享同一 Tween 实例，避免 kill 一个影响其他）
-	if screen_mosaic_coarse != null:
-		screen_mosaic_coarse.visible = true
-		screen_mosaic_coarse.modulate.a = 0.0
-		var tw_coarse: Tween = create_tween()
-		tw_coarse.tween_property(screen_mosaic_coarse, "modulate:a", 0.3, 0.4)
-	if screen_mosaic_medium != null:
-		screen_mosaic_medium.visible = true
-		screen_mosaic_medium.modulate.a = 0.0
-		var tw_medium: Tween = create_tween()
-		tw_medium.tween_property(screen_mosaic_medium, "modulate:a", 0.25, 0.4)
-	if screen_mosaic_bg != null:
-		screen_mosaic_bg.visible = true
-		screen_mosaic_bg.modulate.a = 0.0
-		var tw_bg: Tween = create_tween()
-		tw_bg.tween_property(screen_mosaic_bg, "modulate:a", 0.2, 0.4)
+	pass
 
 
 # 功能：intro_reveal_core_girl 回调（t=0.8s）。
-# 说明：LeftStack 整体淡入（含 EventBackground 少女图 + BackgroundColor 米色底 + 各 mosaic 层），0.4s 完成。
-#       少女独立显现于 UI 之前；各 mosaic 层 modulate 保持 tscn 默认设计值，
-#       LeftStack 整体 alpha 0→1 让所有子层按设计比例同步浮现（不需要逐层控制）。
+# 说明：当前无视觉效果——LeftStack 内背景节点已在 _ready 全部 visible=false 隐藏，
+#       核心区透出 IntroSequence 屏幕级渲染。Tween LeftStack.modulate.a 0→1 仍执行，
+#       让 LeftOverlay (UI 容器) 未来由游戏后续逻辑显示时 alpha 已就绪（=1），
+#       不需要后续代码额外管理 LeftStack 整体 alpha。保留作未来扩展点。
 func _on_intro_reveal_core_girl() -> void:
 	var tw: Tween = create_tween()
 	tw.set_trans(Tween.TRANS_SINE)
@@ -239,19 +233,15 @@ func _on_intro_reveal_core_girl() -> void:
 
 
 # 功能：intro_reveal_ui 回调（t=1.2s）。
-# 说明：顶部 Header（TitleLabel/StatusLabel）淡入，0.8s 完成。
-#       Header 在 tscn 默认 visible=false，必须先解锁 visible 再 Tween modulate.a，
-#       否则 alpha 从 0 变到 1 节点仍不显示（visible=false 优先级高于 modulate）。
-#       LeftOverlay（UI 容器）tscn 默认 visible=false，由游戏后续逻辑控制显示，与 intro 解耦。
-#       root_margin 在 intro 期间始终保持完全可见（modulate.a=1），不参与本阶段 Tween。
+# 说明：当前为空 handler（不浮现任何 UI 元素）。
+#       Header (TitleLabel="Main Game" + StatusLabel 动态状态) 是 demo 期占位，
+#       tscn 默认 visible=false，本阶段保持不显示。
+#       LeftOverlay (UI 容器) tscn 默认 visible=false，由游戏后续逻辑
+#       (_start_game_after_intro → _preview_next_event) 显示。
+#       root_margin 在 intro 期间始终保持完全可见 (modulate.a=1)，不参与本阶段 Tween。
+#       本 handler 保留作为未来正式 UI 浮现的扩展点 (例如新增正式 HUD 时在此 Tween 浮现)。
 func _on_intro_reveal_ui() -> void:
-	# 解锁 Header 可见 + 显式置初始 alpha=0（防御性，避免某些场景下 modulate 被外部改）
-	header.visible = true
-	header.modulate.a = 0.0
-	var tw: Tween = create_tween()
-	tw.set_trans(Tween.TRANS_SINE)
-	tw.set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(header, "modulate:a", 1.0, 0.8)
+	pass
 
 
 # 功能：intro_completed 回调（t=2.0s）。
@@ -1736,7 +1726,9 @@ func _on_viewport_resized() -> void:
 #         - TextMosaicParticles(动态粒子层,在 flow_regions JSON 定义的主体内流动)
 #       从 _engine.world_state.currentLocationId 取地点 ID 决定 token 集合。
 func _render_event_background(background_art_path: String) -> void:
-	var normalized_path := background_art_path.strip_edges()
+	# demo 期临时覆盖：girl_enter 替代所有事件底图（无论传入 path 是什么）。
+	# 未来事件正式配置 background_art_path 后，用 `background_art_path.strip_edges()` 替换下行字面量即可恢复按 path 加载。
+	var normalized_path := "res://assets/art/environments/backgrounds/pond_girl_enter.png"
 	if normalized_path.is_empty():
 		event_background_rect.texture = null
 		text_mosaic_bg.set_source_image(null)
@@ -1779,7 +1771,10 @@ func _render_event_background(background_art_path: String) -> void:
 
 	var resource := ResourceLoader.load(normalized_path)
 	var texture: Texture2D = resource if resource is Texture2D else null
-	event_background_rect.texture = texture
+	# demo 期：EventBackground TextureRect 不显示原图（girl_enter 中央条带是浅水面，会让核心区颜色偏白）。
+	# mosaic 层仍然用 texture 作 source 生成字符渲染，叠加在 BackgroundColor 米色底上保持宣纸视觉。
+	# 未来事件正式配置后，恢复 = texture 即可显示原图。
+	event_background_rect.texture = null
 
 	# 文字马赛克静态层:复用同一 Texture2D,按当前 location_id 选 tokens。
 	# 角色创建阶段 _engine 可能尚未完全初始化 world_state,此处做 null 防御。

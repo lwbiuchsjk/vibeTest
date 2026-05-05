@@ -1,9 +1,14 @@
-## 功能：intro 场景序列控制脚本。
-## 说明：全屏覆盖池塘涟漪动画，等待玩家点击后按时序发射信号，
-##       驱动 main_game 分阶段揭示大字层 → 核心区少女 → 正式 UI。
-##       自身在 intro_completed 后隐藏，不参与正式游戏流程。
+## 功能：intro 场景序列控制脚本 + 屏幕级 girl_enter 渲染承担者。
+## 说明：全屏覆盖池塘涟漪动画 → 玩家点击 → cross-fade 切到 girl_enter → 永久保持显示，
+##       由 IntroSequence 13 层 mosaic 长期承担屏幕级 girl_enter 渲染（替代 ScreenMosaic 3 层粗渲染）。
+##       LeftStack 内部背景全部隐藏（main_game._ready 中处理），核心区透出 IntroSequence 渲染，
+##       LeftOverlay (UI) 在 Root 内渲染层级高于 IntroSequence 不会被遮挡。
+##       3 个 reveal 信号 (screen_mosaic / core_girl / ui) 在新设计下无视觉效果，
+##       保留作为未来叙事接入扩展点（信号契约稳定）。
 ##       双层 A/B 架构：任意时刻 A+B 两套 modulate.a 之和 ≈ 1.0，
 ##       彻底消除单层 cross-fade 的"米色闪烁"问题。
+##       A/B 两套各含 13 层 mosaic（对标 LeftStack 实际渲染层数，
+##       AccentMarked / Particles 因需特殊数据而不纳入）。
 class_name IntroSequence
 extends Control
 
@@ -35,13 +40,13 @@ const INTRO_TEXT_TOKENS: Array = [
 # 信号（后续叙事接入点，供 main_game 连接）
 # ============================================================
 
-## 玩家点击瞬间发出（t=0.0s），main_game 立即后台加载少女图
+## 玩家点击瞬间发出（t=0.0s），main_game 调 _render_event_background(girl_enter) 后台喂图给 14 层
 signal intro_click_received()
-## 点击后 0.4s 发出，main_game 淡入大字层（screen_mosaic_*）
+## 点击后 0.4s 发出（IntroSequence 同时启动 cross-fade 切 girl_enter）；main_game handler 当前为空，保留作扩展点
 signal intro_reveal_screen_mosaic()
-## 点击后 0.8s 发出，main_game 切换核心区少女图并淡入
+## 点击后 0.8s 发出；main_game handler 仍 Tween LeftStack.modulate.a 0→1（无视觉效果，让未来 LeftOverlay 显示时 alpha 已就绪）
 signal intro_reveal_core_girl()
-## 点击后 1.2s 发出，main_game 淡入 Root（正式 UI）
+## 点击后 1.2s 发出；main_game handler 当前为空，保留作扩展点（UI 实际由游戏后续逻辑控制）
 signal intro_reveal_ui()
 ## 点击后 2.0s 发出，叙事系统接入点（当前留空）
 signal intro_completed()
@@ -89,6 +94,8 @@ var _still_tex: Texture2D = null
 var _ripple1_tex: Texture2D = null
 var _ripple2_tex: Texture2D = null
 var _ripple3_tex: Texture2D = null
+## 少女入画图 Texture2D 缓存（CLICKED 阶段 cross-fade 切到此图永久显示，接管屏幕级渲染）
+var _girl_enter_tex: Texture2D = null
 
 # ============================================================
 # 子节点引用（@onready，路径与 tscn 中节点名一致）
@@ -99,25 +106,45 @@ var _ripple3_tex: Texture2D = null
 ## B 套容器（初始隐藏，modulate.a=0）
 @onready var mosaic_layers_b: Control     = $MosaicLayersB
 
-## A 套 8 层 TextMosaicBackground
-@onready var intro_bg_a: Control          = $MosaicLayersA/IntroBg
-@onready var intro_coarse_a: Control      = $MosaicLayersA/IntroCoarse
-@onready var intro_medium_a: Control      = $MosaicLayersA/IntroMedium
-@onready var intro_dark_light_a: Control  = $MosaicLayersA/IntroDarkLight
-@onready var intro_dark_accent_a: Control = $MosaicLayersA/IntroDarkAccent
-@onready var intro_dark_deep_a: Control   = $MosaicLayersA/IntroDarkDeep
-@onready var intro_dark_ink_a: Control    = $MosaicLayersA/IntroDarkInk
-@onready var intro_highlight_a: Control   = $MosaicLayersA/IntroHighlight
+## A 套 13 层 TextMosaicBackground
+@onready var intro_bg_a: Control            = $MosaicLayersA/IntroBg
+@onready var intro_coarse_a: Control        = $MosaicLayersA/IntroCoarse
+@onready var intro_medium_a: Control        = $MosaicLayersA/IntroMedium
+@onready var intro_dark_light_a: Control    = $MosaicLayersA/IntroDarkLight
+@onready var intro_dark_accent_a: Control   = $MosaicLayersA/IntroDarkAccent
+@onready var intro_dark_deep_a: Control     = $MosaicLayersA/IntroDarkDeep
+@onready var intro_dark_ink_a: Control      = $MosaicLayersA/IntroDarkInk
+## 新增：对标 LeftStack TextMosaicDarkBetween（极暗区下边界，v_max=0.13）
+@onready var intro_dark_between_a: Control  = $MosaicLayersA/IntroDarkBetween
+## 新增：对标 LeftStack TextMosaicDarkAbyss（最暗区，v_max=0.08）
+@onready var intro_dark_abyss_a: Control    = $MosaicLayersA/IntroDarkAbyss
+## 新增：对标 LeftStack TextMosaicMidDark（中暗区，v_min=0.4 v_max=0.55，font_size=6）
+@onready var intro_mid_dark_a: Control      = $MosaicLayersA/IntroMidDark
+## 新增：对标 LeftStack TextMosaicMidLight（中亮区，v_min=0.55 v_max=0.75，font_size=6）
+@onready var intro_mid_light_a: Control     = $MosaicLayersA/IntroMidLight
+@onready var intro_highlight_a: Control     = $MosaicLayersA/IntroHighlight
+## 新增：对标 LeftStack TextMosaicAccent（彩色强调层，use_source_color=true）
+@onready var intro_accent_a: Control        = $MosaicLayersA/IntroAccent
 
-## B 套 8 层 TextMosaicBackground
-@onready var intro_bg_b: Control          = $MosaicLayersB/IntroBg
-@onready var intro_coarse_b: Control      = $MosaicLayersB/IntroCoarse
-@onready var intro_medium_b: Control      = $MosaicLayersB/IntroMedium
-@onready var intro_dark_light_b: Control  = $MosaicLayersB/IntroDarkLight
-@onready var intro_dark_accent_b: Control = $MosaicLayersB/IntroDarkAccent
-@onready var intro_dark_deep_b: Control   = $MosaicLayersB/IntroDarkDeep
-@onready var intro_dark_ink_b: Control    = $MosaicLayersB/IntroDarkInk
-@onready var intro_highlight_b: Control   = $MosaicLayersB/IntroHighlight
+## B 套 13 层 TextMosaicBackground（参数与 A 套完全一致；容器整体 modulate.a=0 已隐藏）
+@onready var intro_bg_b: Control            = $MosaicLayersB/IntroBg
+@onready var intro_coarse_b: Control        = $MosaicLayersB/IntroCoarse
+@onready var intro_medium_b: Control        = $MosaicLayersB/IntroMedium
+@onready var intro_dark_light_b: Control    = $MosaicLayersB/IntroDarkLight
+@onready var intro_dark_accent_b: Control   = $MosaicLayersB/IntroDarkAccent
+@onready var intro_dark_deep_b: Control     = $MosaicLayersB/IntroDarkDeep
+@onready var intro_dark_ink_b: Control      = $MosaicLayersB/IntroDarkInk
+## 新增：对标 LeftStack TextMosaicDarkBetween
+@onready var intro_dark_between_b: Control  = $MosaicLayersB/IntroDarkBetween
+## 新增：对标 LeftStack TextMosaicDarkAbyss
+@onready var intro_dark_abyss_b: Control    = $MosaicLayersB/IntroDarkAbyss
+## 新增：对标 LeftStack TextMosaicMidDark
+@onready var intro_mid_dark_b: Control      = $MosaicLayersB/IntroMidDark
+## 新增：对标 LeftStack TextMosaicMidLight
+@onready var intro_mid_light_b: Control     = $MosaicLayersB/IntroMidLight
+@onready var intro_highlight_b: Control     = $MosaicLayersB/IntroHighlight
+## 新增：对标 LeftStack TextMosaicAccent
+@onready var intro_accent_b: Control        = $MosaicLayersB/IntroAccent
 
 
 # ============================================================
@@ -162,10 +189,11 @@ func start_pond_animation() -> void:
 
 ## 功能：预加载 4 张涟漪纹理，避免首次切帧时 ResourceLoader 阻塞导致掉帧。
 func _preload_textures() -> void:
-	_still_tex   = ResourceLoader.load(STILL_PATH)    as Texture2D
-	_ripple1_tex = ResourceLoader.load(RIPPLE_1_PATH) as Texture2D
-	_ripple2_tex = ResourceLoader.load(RIPPLE_2_PATH) as Texture2D
-	_ripple3_tex = ResourceLoader.load(RIPPLE_3_PATH) as Texture2D
+	_still_tex      = ResourceLoader.load(STILL_PATH)      as Texture2D
+	_ripple1_tex    = ResourceLoader.load(RIPPLE_1_PATH)   as Texture2D
+	_ripple2_tex    = ResourceLoader.load(RIPPLE_2_PATH)   as Texture2D
+	_ripple3_tex    = ResourceLoader.load(RIPPLE_3_PATH)   as Texture2D
+	_girl_enter_tex = ResourceLoader.load(GIRL_ENTER_PATH) as Texture2D
 
 
 # ============================================================
@@ -267,7 +295,7 @@ func _get_texture_for_frame(frame_index: int) -> Texture2D:
 
 
 ## 功能：将同一 Texture2D 设置到指定层数组并触发重绘。
-## 参数 layers：目标层节点数组（A 套、B 套或全 16 层）。
+## 参数 layers：目标层节点数组（A 套 13 层、B 套 13 层或全 26 层）。
 ## 参数 tex：要渲染的源图纹理。
 ## 说明：set_source_image 内部已调用 queue_redraw，此处不重复调用。
 func _set_layers_image(layers: Array[Control], tex: Texture2D) -> void:
@@ -282,35 +310,50 @@ func _set_layers_image(layers: Array[Control], tex: Texture2D) -> void:
 # 层数组辅助方法（A/B 套导航）
 # ============================================================
 
-## 功能：返回当前活跃套（可见套）的 8 个 mosaic 子节点数组。
+## 功能：返回当前活跃套（可见套）的 13 个 mosaic 子节点数组。
+## 说明：新增 IntroDarkBetween / IntroDarkAbyss / IntroMidDark / IntroMidLight / IntroAccent，
+##       与 LeftStack 实际渲染层数对齐，确保 intro 全屏和核心区 cover 字符密度一致。
 func _get_active_layers() -> Array[Control]:
 	if _active_is_a:
 		return [
 			intro_bg_a, intro_coarse_a, intro_medium_a,
 			intro_dark_light_a, intro_dark_accent_a,
-			intro_dark_deep_a, intro_dark_ink_a, intro_highlight_a,
+			intro_dark_deep_a, intro_dark_ink_a,
+			intro_dark_between_a, intro_dark_abyss_a,
+			intro_mid_dark_a, intro_mid_light_a,
+			intro_highlight_a, intro_accent_a,
 		]
 	else:
 		return [
 			intro_bg_b, intro_coarse_b, intro_medium_b,
 			intro_dark_light_b, intro_dark_accent_b,
-			intro_dark_deep_b, intro_dark_ink_b, intro_highlight_b,
+			intro_dark_deep_b, intro_dark_ink_b,
+			intro_dark_between_b, intro_dark_abyss_b,
+			intro_mid_dark_b, intro_mid_light_b,
+			intro_highlight_b, intro_accent_b,
 		]
 
 
-## 功能：返回当前非活跃套（隐藏套）的 8 个 mosaic 子节点数组。
+## 功能：返回当前非活跃套（隐藏套）的 13 个 mosaic 子节点数组。
+## 说明：非活跃套容器 modulate.a=0，子节点不可见；cross-fade 前在此套预设新帧内容。
 func _get_inactive_layers() -> Array[Control]:
 	if _active_is_a:
 		return [
 			intro_bg_b, intro_coarse_b, intro_medium_b,
 			intro_dark_light_b, intro_dark_accent_b,
-			intro_dark_deep_b, intro_dark_ink_b, intro_highlight_b,
+			intro_dark_deep_b, intro_dark_ink_b,
+			intro_dark_between_b, intro_dark_abyss_b,
+			intro_mid_dark_b, intro_mid_light_b,
+			intro_highlight_b, intro_accent_b,
 		]
 	else:
 		return [
 			intro_bg_a, intro_coarse_a, intro_medium_a,
 			intro_dark_light_a, intro_dark_accent_a,
-			intro_dark_deep_a, intro_dark_ink_a, intro_highlight_a,
+			intro_dark_deep_a, intro_dark_ink_a,
+			intro_dark_between_a, intro_dark_abyss_a,
+			intro_mid_dark_a, intro_mid_light_a,
+			intro_highlight_a, intro_accent_a,
 		]
 
 
@@ -330,15 +373,23 @@ func _get_inactive_container() -> Control:
 		return mosaic_layers_a
 
 
-## 功能：返回 A 套和 B 套全部 16 层节点数组（用于同时初始化两套内容）。
+## 功能：返回 A 套和 B 套全部 26 层节点数组（用于同时初始化两套内容）。
+## 说明：A + B 各 13 层，共 26 层；start_pond_animation 调用此方法一次性给全部层设置 still 图，
+##       确保首次 cross-fade 时 B 套不渲染空白。
 func _get_all_mosaic_layers() -> Array[Control]:
 	return [
 		intro_bg_a, intro_coarse_a, intro_medium_a,
 		intro_dark_light_a, intro_dark_accent_a,
-		intro_dark_deep_a, intro_dark_ink_a, intro_highlight_a,
+		intro_dark_deep_a, intro_dark_ink_a,
+		intro_dark_between_a, intro_dark_abyss_a,
+		intro_mid_dark_a, intro_mid_light_a,
+		intro_highlight_a, intro_accent_a,
 		intro_bg_b, intro_coarse_b, intro_medium_b,
 		intro_dark_light_b, intro_dark_accent_b,
-		intro_dark_deep_b, intro_dark_ink_b, intro_highlight_b,
+		intro_dark_deep_b, intro_dark_ink_b,
+		intro_dark_between_b, intro_dark_abyss_b,
+		intro_mid_dark_b, intro_mid_light_b,
+		intro_highlight_b, intro_accent_b,
 	]
 
 
@@ -398,10 +449,12 @@ func _start_breathe_tween() -> void:
 # 点击输入处理
 # ============================================================
 
-## 功能：捕获未处理的输入事件，鼠标点击触发 CLICKED 阶段。
-## 说明：mouse_filter = MOUSE_FILTER_STOP 让 IntroSequence 控件捕获所有点击，
-##       不会漏传到下层节点。CLICKED 和 DONE 状态忽略输入。
-func _gui_input(event: InputEvent) -> void:
+## 功能：捕获鼠标点击触发 CLICKED 阶段。
+## 说明：用 _input（节点级原始事件）而非 _gui_input，绕过 GUI 事件分发系统：
+##       Root (MarginContainer) 默认 mouse_filter=STOP 在渲染层位于 IntroSequence 之上，
+##       会先吞掉 GUI 鼠标事件，导致 _gui_input 收不到点击。_input 不依赖 mouse_filter。
+##       CLICKED 和 DONE 状态忽略输入。
+func _input(event: InputEvent) -> void:
 	if _state != State.RIPPLE_ANIM:
 		return
 	if event is InputEventMouseButton:
@@ -453,30 +506,29 @@ func _enter_clicked_phase() -> void:
 	var seq: Tween = create_tween()
 	seq.set_trans(Tween.TRANS_LINEAR)
 
-	# t=0.4s：开始 IntroSequence 自身淡出（0.8s 完成，即 t=1.2s 时完全透明）
+	# t=0.4s：cross-fade 涟漪当前帧 → girl_enter（IntroSequence 13 层永久承担屏幕渲染，不淡出）
 	seq.tween_callback(Callable(self, "_on_start_fade_out")).set_delay(0.4)
 
-	# t=0.4s：发射 reveal_screen_mosaic
+	# t=0.4s：发射 reveal_screen_mosaic（无视觉效果，扩展点）
 	seq.tween_callback(Callable(self, "_emit_reveal_screen_mosaic")).set_delay(0.0)
 
-	# t=0.8s：发射 reveal_core_girl（距上一节点 0.4s）
+	# t=0.8s：发射 reveal_core_girl（无视觉效果，扩展点；距上一节点 0.4s）
 	seq.tween_callback(Callable(self, "_emit_reveal_core_girl")).set_delay(0.4)
 
-	# t=1.2s：发射 reveal_ui（距上一节点 0.4s）
+	# t=1.2s：发射 reveal_ui（无视觉效果，扩展点；距上一节点 0.4s）
 	seq.tween_callback(Callable(self, "_emit_reveal_ui")).set_delay(0.4)
 
-	# t=2.0s：发射 completed 并隐藏自身（距上一节点 0.8s）
+	# t=2.0s：发射 completed（IntroSequence 保持显示作为屏幕渲染；距上一节点 0.8s）
 	seq.tween_callback(Callable(self, "_emit_completed")).set_delay(0.8)
 
 
-## 功能：t=0.4s 时触发，开始 IntroSequence 整体淡出。
+## 功能：t=0.4s 时触发，cross-fade 涟漪当前帧切到 girl_enter，IntroSequence 永久保持显示。
+## 说明：原设计是 IntroSequence 整体淡出让 ScreenMosaic 浮现接管屏幕渲染。
+##       现改为 IntroSequence 不淡出，用 13 层 mosaic 永久承担屏幕级 girl_enter 渲染
+##       （ScreenMosaic 3 层粗渲染体系不再参与），实现 intro 期间与之后视觉风格一致。
+##       函数名 _on_start_fade_out 保留以避免改动 Callable；实际行为是切图。
 func _on_start_fade_out() -> void:
-	# 独立 Tween 驱动淡出，不占用时序 Tween 的插值轨道
-	var fade: Tween = create_tween()
-	fade.set_trans(Tween.TRANS_SINE)
-	fade.set_ease(Tween.EASE_IN_OUT)
-	# modulate.a 1→0，0.8s，EaseInOut（t=0.4s 开始，t=1.2s 结束）
-	fade.tween_property(self, "modulate:a", 0.0, 0.8)
+	_crossfade_to_image(_girl_enter_tex)
 
 
 ## 功能：t=0.4s 时发射 reveal_screen_mosaic 信号。
@@ -494,9 +546,9 @@ func _emit_reveal_ui() -> void:
 	intro_reveal_ui.emit()
 
 
-## 功能：t=2.0s 时发射 completed 信号并隐藏自身。
+## 功能：t=2.0s 时发射 completed 信号；IntroSequence 保持显示作为屏幕级 girl_enter 渲染。
 func _emit_completed() -> void:
 	_state = State.DONE
 	intro_completed.emit()
-	# 隐藏自身，让正式 UI 完整呈现
-	visible = false
+	# 不再隐藏自身：IntroSequence 13 层 mosaic 接管屏幕级 girl_enter 渲染，永久保持。
+	# LeftOverlay (UI) 在 Root 内，渲染顺序在 IntroSequence 之上，不会被遮挡。
