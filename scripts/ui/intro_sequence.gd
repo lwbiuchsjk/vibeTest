@@ -94,6 +94,15 @@ var _is_first_still: bool = true
 ## 当前活跃层标识：true = A 套显示（modulate.a=1），false = B 套显示
 var _active_is_a: bool = true
 
+## 第一次 3 帧涟漪循环（ripple_1→2→3→still）是否已完成，用于触发开始按钮渐显
+var _first_ripple_cycle_done: bool = false
+## 开始按钮渐显 Tween（一次性，0→1 over 0.8s）
+var _button_appear_tween: Tween = null
+## 开始按钮 alpha 呼吸 Tween（循环 sin 脉动，黑色字与背景的"深→淡→深"循环）
+var _button_breathe_alpha_tween: Tween = null
+## 开始按钮淡出 Tween（点击后 0.5s 淡出，淡出完成才启动 girl_enter cross-fade）
+var _button_fade_out_tween: Tween = null
+
 ## 已加载的涟漪图 Texture2D 缓存（避免每次切帧重复加载）
 var _still_tex: Texture2D = null
 var _ripple1_tex: Texture2D = null
@@ -150,6 +159,10 @@ var _girl_enter_tex: Texture2D = null
 @onready var intro_highlight_b: Control     = $MosaicLayersB/IntroHighlight
 ## 新增：对标 LeftStack TextMosaicAccent
 @onready var intro_accent_b: Control        = $MosaicLayersB/IntroAccent
+
+## 开始按钮（Label，IntroSequence 直接子节点，渲染在所有 mosaic 层之上）
+## mouse_filter=IGNORE 不拦截鼠标事件，玩家点击按钮位置由 IntroSequence._input 全局监听处理
+@onready var start_button: Label = $StartButton
 
 
 # ============================================================
@@ -311,13 +324,53 @@ func _crossfade_to_image(tex: Texture2D) -> void:
 
 
 ## 功能：cross-fade 完成回调，翻转活跃层标识并调度下一次帧切换 Timer。
+## 副作用：第一次 3 帧涟漪循环完成（ripple_3 → still 的 cross-fade 结束）触发开始按钮渐显。
 func _on_crossfade_done() -> void:
 	if _state != State.RIPPLE_ANIM:
 		return
 	# 翻转活跃层：原来的非活跃层已完全显示，成为新的活跃层
 	_active_is_a = not _active_is_a
 	var is_still: bool = (_ripple_frame_index == -1)
+	# 第一次回到 still 即"涟漪 1→2→3→still 一轮跑完"，触发按钮渐显（一次性）
+	if is_still and not _first_ripple_cycle_done:
+		_first_ripple_cycle_done = true
+		_trigger_button_appearance()
 	_schedule_next_ripple_cycle(is_still)
+
+
+## 功能：开始按钮渐显（modulate.a 0→1 over 0.8s），结束后启动循环呼吸 A+B。
+## 时机：第一次 3 帧涟漪循环完成（约 t≈5.6s = 2s 首 still + 3 × 1.2s 涟漪 + 4 次 cross-fade × 0.5s）。
+## 设计依据：[[intro_开始按钮_MVP]]——按钮纯视觉引导，全局点击监听不依赖按钮。
+func _trigger_button_appearance() -> void:
+	if start_button == null:
+		return
+	# 杀已有 Tween 防御（理论上不会重叠，但 _first_ripple_cycle_done 守护已防多次触发）
+	if _button_appear_tween != null and _button_appear_tween.is_valid():
+		_button_appear_tween.kill()
+	_button_appear_tween = create_tween()
+	_button_appear_tween.set_trans(Tween.TRANS_SINE)
+	_button_appear_tween.set_ease(Tween.EASE_OUT)
+	_button_appear_tween.tween_property(start_button, "modulate:a", 1.0, 0.8)
+	# 渐显结束后才启动循环呼吸，避免起始相位混乱
+	_button_appear_tween.tween_callback(_start_button_breathe)
+
+
+## 功能：启动按钮 alpha 呼吸循环（黑色字与背景的"深→淡→深"循环）。
+## 说明：modulate.a 在 [0.4, 1.0] sin 脉动，单次 1.2s × 2 = 周期 2.4s。
+##       下限 0.4 让"淡"更明显（实机迭代后从 0.7 降至 0.4）；上限 1.0 = 满黑色对比度。
+##       位置呼吸暂未启用（用户反馈不要上下浮动），后续可叠加字符级抖动
+##       （详见 [[intro_开始按钮_MVP]] §4.2）。
+func _start_button_breathe() -> void:
+	if start_button == null:
+		return
+	if _button_breathe_alpha_tween != null and _button_breathe_alpha_tween.is_valid():
+		_button_breathe_alpha_tween.kill()
+	_button_breathe_alpha_tween = create_tween()
+	_button_breathe_alpha_tween.set_loops()
+	_button_breathe_alpha_tween.set_trans(Tween.TRANS_SINE)
+	_button_breathe_alpha_tween.set_ease(Tween.EASE_IN_OUT)
+	_button_breathe_alpha_tween.tween_property(start_button, "modulate:a", 0.4, 1.2)
+	_button_breathe_alpha_tween.tween_property(start_button, "modulate:a", 1.0, 1.2)
 
 
 ## 功能：根据帧索引返回对应 Texture2D。
@@ -532,6 +585,21 @@ func _enter_clicked_phase() -> void:
 	if _crossfade_tween != null and _crossfade_tween.is_valid():
 		_crossfade_tween.kill()
 
+	# 停止按钮渐显 / 呼吸 Tween，启动 0.5s 淡出（用户反馈：点击后按钮不要直接消失，要淡出过渡）
+	# 淡出与 cross-fade 时序：按钮 0~0.5s 淡出，cross-fade 在 t=0.5s 启动（见下方 sequence Tween）
+	if _button_appear_tween != null and _button_appear_tween.is_valid():
+		_button_appear_tween.kill()
+	if _button_breathe_alpha_tween != null and _button_breathe_alpha_tween.is_valid():
+		_button_breathe_alpha_tween.kill()
+	if start_button != null:
+		if _button_fade_out_tween != null and _button_fade_out_tween.is_valid():
+			_button_fade_out_tween.kill()
+		_button_fade_out_tween = create_tween()
+		_button_fade_out_tween.set_trans(Tween.TRANS_SINE)
+		_button_fade_out_tween.set_ease(Tween.EASE_IN)
+		_button_fade_out_tween.tween_property(start_button, "modulate:a", 0.0, 0.5)
+		_button_fade_out_tween.tween_callback(_on_button_fade_out_done)
+
 	# 重置中间层 alpha 到静态值，防止 Tween kill 后 alpha 锁定在意外值
 	# 注意：A/B 两套均重置，无论当前哪套活跃
 	intro_coarse_a.modulate.a = 0.55
@@ -546,10 +614,11 @@ func _enter_clicked_phase() -> void:
 	var seq: Tween = create_tween()
 	seq.set_trans(Tween.TRANS_LINEAR)
 
-	# t=0.4s：cross-fade 涟漪当前帧 → girl_enter（IntroSequence 13 层永久承担屏幕渲染，不淡出）
-	seq.tween_callback(Callable(self, "_on_start_fade_out")).set_delay(0.4)
+	# t=0.5s：按钮淡出完成后启动 cross-fade 涟漪当前帧 → girl_enter
+	# （原本 0.4s，因加按钮淡出 0.5s 而推迟 0.1s——girl_enter 入场等按钮先淡掉）
+	seq.tween_callback(Callable(self, "_on_start_fade_out")).set_delay(0.5)
 
-	# t=0.4s：发射 reveal_screen_mosaic（无视觉效果，扩展点）
+	# t=0.5s：发射 reveal_screen_mosaic（无视觉效果，扩展点）
 	seq.tween_callback(Callable(self, "_emit_reveal_screen_mosaic")).set_delay(0.0)
 
 	# t=0.8s：发射 reveal_core_girl（无视觉效果，扩展点；距上一节点 0.4s）
@@ -562,7 +631,13 @@ func _enter_clicked_phase() -> void:
 	seq.tween_callback(Callable(self, "_emit_completed")).set_delay(0.8)
 
 
-## 功能：t=0.4s 时触发，cross-fade 涟漪当前帧切到 girl_enter，IntroSequence 永久保持显示。
+## 功能：按钮淡出 Tween 完成回调，释放节点 visible（alpha 已为 0，visible=false 节省渲染）。
+func _on_button_fade_out_done() -> void:
+	if start_button != null:
+		start_button.visible = false
+
+
+## 功能：t=0.5s 时触发，cross-fade 涟漪当前帧切到 girl_enter，IntroSequence 永久保持显示。
 ## 说明：原设计是 IntroSequence 整体淡出让 ScreenMosaic 浮现接管屏幕渲染。
 ##       现改为 IntroSequence 不淡出，用 13 层 mosaic 永久承担屏幕级 girl_enter 渲染
 ##       （ScreenMosaic 3 层粗渲染体系不再参与），实现 intro 期间与之后视觉风格一致。

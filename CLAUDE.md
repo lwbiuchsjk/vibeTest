@@ -63,6 +63,14 @@ Godot 4.5，GDScript，Git 版本控制
 
 新增或修改引擎功能后，在批量配置前，先用该功能的**首批用例**逐项检查功能覆盖度，确认是否存在超出当前实现能力的变体。
 
+### 美术素材入库与 mask 工程对接
+
+新事件背景图（触发 `main_game.gd::_render_event_background` 流转的图）入库时，**须评估是否需要配套 face mask 抑制大字号字符落脸**——若图含人物面部出现在核心区，会有 IntroCoarse/IntroMedium 等大字号字符盖脸的违和问题。
+
+工程通道已经就位：`text_mosaic_background.gd` 的 `set_exclude_mask` / `clear_exclude_mask` 数据通道；事件配置层未来需要加 `exclude_mask_path` 字段，由 `main_game.gd::_render_event_background` 在切图时调用对应背景层的 `set_exclude_mask`，不需要时调 `clear_exclude_mask`。详见 [[intro_face_mask_抑制大字号_MVP]] §六.1。
+
+**此流程应自动化触发**——新美术资产入库时由工具链或 hook 自动评估 + 触发 mask 生产（按 [[mask生成工作流]]）+ 配置写入，而非每张图人工记起去做。具体自动化设计（触发点 / 评估逻辑 / 配置注入路径）待后续美术素材规模化引入时讨论，当前仅记录规范方向。
+
 ## CSV 配置流水线（Step 3）执行规范
 
 - **批量文件并行处理**：事件卡数量超过 10 个时，从读取阶段就使用并行 Agent 分批处理，不要串行逐个读取。
