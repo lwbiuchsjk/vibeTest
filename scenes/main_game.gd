@@ -1657,6 +1657,7 @@ func _render_event_background(background_art_path: String) -> void:
 		if text_mosaic_accent != null:
 			text_mosaic_accent.set_source_image(null)
 		if text_mosaic_accent_marked != null:
+			text_mosaic_accent_marked.set_source_image(null)
 			text_mosaic_accent_marked.clear_accent_data()
 		if screen_mosaic_coarse != null:
 			screen_mosaic_coarse.set_source_image(null)
@@ -1741,6 +1742,7 @@ func _render_event_background(background_art_path: String) -> void:
 	if flow_data.is_empty():
 		text_mosaic_particles.clear_flow_data()
 		if text_mosaic_accent_marked != null:
+			text_mosaic_accent_marked.set_source_image(null)
 			text_mosaic_accent_marked.clear_accent_data()
 	else:
 		var regions: Array = flow_data.get("flow_regions", [])
@@ -1750,8 +1752,11 @@ func _render_event_background(background_art_path: String) -> void:
 		)
 		text_mosaic_particles.set_flow_data(regions, img_size)
 		# 标注式点睛色层:从同一 flow_regions.json 读 accent_areas 字段(可选,缺省 = 无点睛)
+		# accent_layers 的 mix_source > 0 时需要源图,这里同步注入(与 set_accent_data 顺序无关,
+		# 但 set_source_image 在前更直观——先有源图,再有 area 数据)
 		if text_mosaic_accent_marked != null:
 			var accent_areas: Array = flow_data.get("accent_areas", [])
+			text_mosaic_accent_marked.set_source_image(texture)
 			text_mosaic_accent_marked.set_accent_data(accent_areas, img_size)
 			text_mosaic_accent_marked.set_text_tokens(tokens)
 
@@ -1788,7 +1793,9 @@ func _setup_platform_default_layers() -> void:
 	if OS.has_feature("web"):
 		event_background_rect.visible = false
 		text_mosaic_bg.visible = true
-		text_mosaic_particles.visible = true
+		# 粒子飘落层 + accent_marked 点睛层已停用(决策点 7 收口 + 视觉简化决定)
+		# 节点保留供未来重启,但默认 visible=false,F9 切层也不再覆盖
+		text_mosaic_particles.visible = false
 		# 多层叠加架构下,Web 默认显示所有 mosaic 层(显式设置便于与 F9 切换语义保持一致)
 		if text_mosaic_coarse != null:
 			text_mosaic_coarse.visible = true
@@ -1814,8 +1821,9 @@ func _setup_platform_default_layers() -> void:
 			text_mosaic_highlight.visible = true
 		if text_mosaic_accent != null:
 			text_mosaic_accent.visible = true
+		# accent_marked 已停用(同上),Web 默认强制 false 防回潮
 		if text_mosaic_accent_marked != null:
-			text_mosaic_accent_marked.visible = true
+			text_mosaic_accent_marked.visible = false
 		if screen_mosaic_coarse != null:
 			screen_mosaic_coarse.visible = true
 		if screen_mosaic_medium != null:
@@ -1834,7 +1842,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_F9:
 				var show_mosaic: bool = not text_mosaic_bg.visible
 				text_mosaic_bg.visible = show_mosaic
-				text_mosaic_particles.visible = show_mosaic
+				# 粒子飘落层 + accent_marked 点睛层已停用(决策点 7 收口 + 视觉简化决定)
+				# F9 不再切换这两层,显式锁 false 防止某次 visible 被外部置 true 后回潮
+				text_mosaic_particles.visible = false
 				# 多层叠加架构下,F9 必须覆盖所有 mosaic 层,否则 A/B 对比时
 				# coarse/medium/dark_accent + 屏幕衬底 3 层会残留可见
 				if text_mosaic_coarse != null:
@@ -1861,8 +1871,9 @@ func _unhandled_input(event: InputEvent) -> void:
 					text_mosaic_highlight.visible = show_mosaic
 				if text_mosaic_accent != null:
 					text_mosaic_accent.visible = show_mosaic
+				# accent_marked 已停用,锁 false 防回潮
 				if text_mosaic_accent_marked != null:
-					text_mosaic_accent_marked.visible = show_mosaic
+					text_mosaic_accent_marked.visible = false
 				if screen_mosaic_coarse != null:
 					screen_mosaic_coarse.visible = show_mosaic
 				if screen_mosaic_medium != null:

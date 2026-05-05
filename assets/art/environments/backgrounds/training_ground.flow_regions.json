@@ -1,7 +1,7 @@
 {
   "source": "training_ground.png",
   "image_size": [1024, 576],
-  "schema_version": 1,
+  "schema_version": 2,
   "flow_regions": [
     {
       "type": "rect",
@@ -23,23 +23,21 @@
   },
   "accent_areas": [
     {
-      "name": "腰带绛朱",
-      "polygon": [[400, 258], [462, 256], [464, 287], [398, 289]],
+      "name": "left_eye",
+      "mask_path": "res://assets/art/environments/backgrounds/training_ground_accent_eye.png",
       "color": [0.72, 0.26, 0.24, 1.0],
       "breathe_period": 3.5,
-      "breathe_min_alpha": 0.5,
-      "breathe_max_alpha": 0.92,
-      "note": "武人束腰处的绛朱腰带——虚构合理添加(原图色彩偏赭石/松烟,无真.高饱和点睛)。语义上腰带是「束」/克己,慢呼吸 3.5s 与之契合"
-    },
-    {
-      "name": "刀身寒光",
-      "polygon": [[348, 282], [378, 280], [388, 446], [358, 450]],
-      "color": [0.5, 0.72, 0.88, 1.0],
-      "breathe_period": 2.4,
-      "breathe_min_alpha": 0.45,
-      "breathe_max_alpha": 0.85,
-      "note": "刀身寒光——虚构反射的冷色高光。语义上刀是「锋利」,稍快呼吸 2.4s 呼应锋利感"
+      "breathe_min_alpha": 0.4,
+      "breathe_max_alpha": 0.8,
+      "accent_layers": [
+        {"font_size": 3, "alpha_mul": 0.5,  "grid_phase": [0.07, 0.13], "mix_source": 0.0},
+        {"font_size": 4, "alpha_mul": 0.6,  "grid_phase": [0.41, 0.83], "mix_source": 0.25},
+        {"font_size": 5, "alpha_mul": 0.75, "grid_phase": [0.71, 0.29], "mix_source": 0.5},
+        {"font_size": 6, "alpha_mul": 0.85, "grid_phase": [0.23, 0.59], "mix_source": 0.3},
+        {"font_size": 8, "alpha_mul": 1.0,  "grid_phase": [0.89, 0.47], "mix_source": 0.0}
+      ],
+      "note": "PoC 多层激进版(决策点 7 阶段 4 第 2 轮):mask LangSAM 选定(human-eyes b0_c0 左眼 ~15 src px),单层薄绛朱→升级 5 层叠加。字号梯度 3/4/5/6/8 让小区域承接更多字符密度;mix_source 0/0.25/0.5/0.3/0 形成「纯绛朱→融瞳孔色→纯绛朱锚定」回归节奏,让点睛在保留 area 主色同时融合源图原色(眼球深褐/周围皮肤暖棕);grid_phase 全无理错开避免层间网格抖动。schema v2:mask_path + accent_layers 优先,polygon 为 fallback(本 area 未填)"
     }
   ],
-  "_authoring_note": "周既明角色特化背景。1024×576 运行时尺寸（原图 1672×941 在 Design/attachments/）。token 池为周既明专池 loc_zhou_training_ground，由用户从角色内核抽取的 12 词构成。accent_areas 为「点睛色」标注,由 Claude 看图后产出 polygon——原图无真.高饱和点,故为「虚构合理添加」(腰带绛朱+刀身寒光,与角色武人语义契合)"
+  "_authoring_note": "周既明角色特化背景。1024×576 运行时尺寸（原图 1672×941 在 Design/attachments/）。token 池为周既明专池 loc_zhou_training_ground，由用户从角色内核抽取的 12 词构成。accent_areas 决策点 7 阶段 4:从 polygon 路径升级为 LangSAM mask 路径(腰带/刀身 polygon 已删除——精度不足)。schema v2 加 mask_path 字段(相对项目根 res:// 协议),引擎优先 mask 路径,polygon 保留作 fallback"
 }

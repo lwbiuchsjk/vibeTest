@@ -46,6 +46,15 @@ extends Control
 # 让美术原本设计的"焦点色"在素描灰阶画面中保留为点睛之笔。
 # 默认 0.0 = 无饱和度过滤,与原行为兼容。
 @export_range(0.0, 1.0) var saturation_threshold: float = 0.0
+# 边缘柔和过渡区宽度(canvas 像素):仅对 cell 中心已**超出** canvas 的字符做 alpha 衰减,
+# canvas 内字符不衰减(避免 grid_phase 偏移产生的贴边 cell 被淡化复发白边)。
+# 公式:fade = clamp(1 + min(min_dist, 0) / fade_pixels, 0, 1)。
+#   - min_dist ≥ 0(cell 中心在 canvas 内) → fade = 1.0(完整 alpha,无白边)
+#   - min_dist ∈ [-fade, 0)(cell 中心溢出 0~fade 像素) → 按比例渐隐
+#   - min_dist ≤ -fade → fade = 0(完全溢出,clip_contents 兜底)
+# 配合父容器 clip_contents 把"硬切"变"渐隐",边界过渡柔和。默认 8 px = 1 默认 cell 宽,
+# 核心区视觉自然;衬底层(ScreenMosaic*)期望溢出 ±200 不需要 fade,显式设为 0 关闭。
+@export_range(0, 64) var edge_fade_pixels: int = 8
 
 # === 点缀色层专属(use_source_color + 呼吸动画)===
 
@@ -194,13 +203,16 @@ func _draw() -> void:
 	# baseline 偏移:draw_string 的 pos 是基线位置,加 font_size 让字符出现在格子下沿
 	var baseline_offset: int = font_size
 
-	# 网格起点应用 grid_phase 偏移(单位:cell 比例),让多层叠加时网格不对齐
-	var y: int = int(round(grid_phase.y * float(cell)))
+	# 网格起点应用 grid_phase 偏移(单位:cell 比例),让多层叠加时网格不对齐。
+	# 起点从 phase*cell - cell 开始(向左/上扩展一格):配合父容器 LeftStack 的 clip_contents,
+	# 让左/上边缘 cell 也能贡献字符,外溢部分被 GPU 裁——同时解决"grid_phase 正向偏移导致
+	# 左/上白边"和"position_jitter 让边缘字符部分超出容器进入背景"两个问题。
+	var y: int = int(round(grid_phase.y * float(cell))) - cell
 	while y < int(canvas_size.y):
 		var sy: int = clampi(
 			int(src_offset_y + float(y) * inv_scale), 0, src_h - 1
 		)
-		var x: int = int(round(grid_phase.x * float(cell)))
+		var x: int = int(round(grid_phase.x * float(cell))) - cell
 		while x < int(canvas_size.x):
 			var sx: int = clampi(
 				int(src_offset_x + float(x) * inv_scale), 0, src_w - 1
@@ -241,6 +253,24 @@ func _draw() -> void:
 					var amp: float = float(cell) * 0.5 * position_jitter
 					draw_x += jx * amp
 					draw_y += jy * amp
+				# 边缘柔和过渡:仅对 cell 中心已超出 canvas 的字符按距离渐隐(取代 clip 硬切)。
+				# canvas 内字符 fade=1.0 不衰减(避免贴边 cell 被淡化复发白边——grid_phase
+				# 偏移让某些层"贴边 cell"距边只有 1~7 px,旧公式会把它们误判为 fade 区)。
+				if edge_fade_pixels > 0:
+					var cx: float = float(x) + float(cell) * 0.5
+					var cy: float = float(y) + float(cell) * 0.5
+					var dist_l: float = cx
+					var dist_r: float = canvas_size.x - cx
+					var dist_t: float = cy
+					var dist_b: float = canvas_size.y - cy
+					var min_dist: float = min(
+						min(dist_l, dist_r), min(dist_t, dist_b)
+					)
+					var fade_factor: float = clampf(
+						1.0 + min(min_dist, 0.0) / float(edge_fade_pixels),
+						0.0, 1.0
+					)
+					draw_color.a *= fade_factor
 				draw_string(
 					_font,
 					Vector2(draw_x, draw_y),
@@ -310,13 +340,13 @@ func _draw_debug_grid(
 		inv_scale = float(src_h) / canvas_size.y
 		var visible_w: float = canvas_size.x * inv_scale
 		src_offset_x = (float(src_w) - visible_w) * 0.5
-	# 同 _draw:debug 网格也按 grid_phase 偏移起点
-	var y: int = int(round(grid_phase.y * float(cell)))
+	# 同 _draw:debug 网格也按 grid_phase 偏移起点 + 向左/上扩展一格
+	var y: int = int(round(grid_phase.y * float(cell))) - cell
 	while y < int(canvas_size.y):
 		var sy: int = clampi(
 			int(src_offset_y + float(y) * inv_scale), 0, src_h - 1
 		)
-		var x: int = int(round(grid_phase.x * float(cell)))
+		var x: int = int(round(grid_phase.x * float(cell))) - cell
 		while x < int(canvas_size.x):
 			var sx: int = clampi(
 				int(src_offset_x + float(x) * inv_scale), 0, src_w - 1

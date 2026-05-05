@@ -55,6 +55,7 @@ font_size = 36
 grid_phase = Vector2(0.71, 0.33)
 density_jitter = 1.0
 position_jitter = 0.7
+edge_fade_pixels = 0
 
 [node name="ScreenMosaicMedium" type="Control" parent="."]
 modulate = Color(1, 1, 1, 0.25)
@@ -75,6 +76,7 @@ font_size = 18
 grid_phase = Vector2(0.23, 0.83)
 density_jitter = 0.9
 position_jitter = 0.55
+edge_fade_pixels = 0
 
 [node name="ScreenMosaicBackground" type="Control" parent="."]
 modulate = Color(1, 1, 1, 0.2)
@@ -92,6 +94,7 @@ mouse_filter = 2
 script = ExtResource("4_text_mosaic_bg")
 ink_tint_strength = 0.15
 font_size = 8
+edge_fade_pixels = 0
 
 [node name="Root" type="MarginContainer" parent="."]
 layout_mode = 1
@@ -142,6 +145,7 @@ size_flags_vertical = 3
 ratio = 0.5625
 
 [node name="LeftStack" type="Control" parent="Root/RootContent/MainSplit/LeftPanel"]
+clip_contents = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
@@ -372,6 +376,7 @@ breathe_min_alpha = 0.4
 breathe_max_alpha = 0.8
 
 [node name="TextMosaicAccentMarked" type="Control" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack"]
+visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -382,6 +387,7 @@ mouse_filter = 2
 script = ExtResource("6_text_mosaic_accent_marked")
 
 [node name="TextMosaicParticles" type="Control" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack"]
+visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
