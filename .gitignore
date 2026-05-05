@@ -37,3 +37,9 @@ output/
 # Python cache
 tools/__pycache__/
 *.pyc
+
+# ML model weights (LangSAM / SAM / etc 自动下载到 ~/.cache,不入仓)
+*.pt
+*.pth
+*.safetensors
+*.bin
