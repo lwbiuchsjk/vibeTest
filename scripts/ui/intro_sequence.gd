@@ -26,6 +26,11 @@ const RIPPLE_2_PATH := "res://assets/art/environments/backgrounds/pond_ripple_2.
 const RIPPLE_3_PATH := "res://assets/art/environments/backgrounds/pond_ripple_3.png"
 ## 少女形象（点击后由 main_game 加载到核心区）
 const GIRL_ENTER_PATH := "res://assets/art/environments/backgrounds/pond_girl_enter.png"
+## girl_enter 脸部 mask（LangSAM 生成的二值 mask）：
+## 通过 background.gd 的 set_exclude_mask 注入到 IntroCoarse（24px 最大字号层）；
+## 该层在 mask 区跳 cell 不画字符，效果是脸部缺大字号"骨架"，其他细字层照常渲染，
+## 与"在 mask 内被抑制的层不画任何字符"语义对齐。
+const GIRL_ENTER_FACE_MASK_PATH := "res://assets/art/environments/backgrounds/pond_girl_enter_face_mask.png"
 
 # ============================================================
 # intro 涟漪场景专用词汇（水墨池塘氛围，内联，不依赖 LOCATION_TEXT_TOKENS）
@@ -158,6 +163,9 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	# 预加载所有涟漪纹理到内存（_ready 阶段加载，避免首帧切换卡顿）
 	_preload_textures()
+	# 脸部 mask 注入推迟到 _on_start_fade_out（即将装载 girl_enter 时），
+	# 涟漪期 A/B 套 IntroFaceMask 都不挂 mask——涟漪 cross-fade 切帧时
+	# B 套 alpha 0→1 不会带出米色块污染涟漪画面。
 
 
 # ============================================================
@@ -194,6 +202,38 @@ func _preload_textures() -> void:
 	_ripple2_tex    = ResourceLoader.load(RIPPLE_2_PATH)   as Texture2D
 	_ripple3_tex    = ResourceLoader.load(RIPPLE_3_PATH)   as Texture2D
 	_girl_enter_tex = ResourceLoader.load(GIRL_ENTER_PATH) as Texture2D
+
+
+## 功能：给"即将装载 girl_enter 的非活跃套" IntroCoarse / IntroMedium 两层注入 exclude mask。
+## 时机：_on_start_fade_out 内 _crossfade_to_image(_girl_enter_tex) 之前调用。
+## 设计依据：[[intro_face_mask_抑制大字号_MVP]]——被抑制层在 mask 区不画字符。
+##         背景层 background.gd 的 _draw 主循环每 cell 自查 _exclude_mask_image：
+##         alpha > 阈值则跳过该 cell 不落字符。
+##         **保留 IntroBg 不抑制**：IntroBg ink_levels=32 是高色阶层承担脸部色彩信息，
+##         抑制后脸部丢失色彩。仅抑制 IntroCoarse 24px / IntroMedium 14px 两层
+##         （这两层带 v_max_threshold 是暗部骨架字符，落脸上违和）。
+##         注入只对非活跃套（即将随 cross-fade 显现 girl_enter 的那套）的两层生效，
+##         涟漪期两层都没挂 mask → 涟漪 cross-fade 切帧时不带出抑制效果。
+##         未来其他背景图各自挂 mask：流程独立调用 set_exclude_mask 注入对应图的 mask；
+##         不需要抑制的图调 clear_exclude_mask 恢复全 cell 渲染。
+##         mask 文件未入库时跳过并 push_warning，不阻断游戏运行。
+func _setup_face_mask_for_girl_enter() -> void:
+	if not FileAccess.file_exists(GIRL_ENTER_FACE_MASK_PATH):
+		push_warning(
+			"intro_face_mask: mask 资源未入库 %s；脸部抑制跳过。"
+			% GIRL_ENTER_FACE_MASK_PATH
+			+ "按 [[mask生成工作流]] 五步流程从 attachments 挑选并 cp 到 assets。"
+		)
+		return
+	# 当前非活跃套即将装载 girl_enter；把 mask 注入该套的 IntroCoarse / IntroMedium 两层
+	# 不注入 IntroBg：该层 ink_levels=32 承担色彩，抑制会让脸部丢色彩信息
+	var suppress_layers: Array[Control] = []
+	if _active_is_a:
+		suppress_layers = [intro_coarse_b, intro_medium_b]
+	else:
+		suppress_layers = [intro_coarse_a, intro_medium_a]
+	for layer: Control in suppress_layers:
+		layer.call("set_exclude_mask", GIRL_ENTER_FACE_MASK_PATH)
 
 
 # ============================================================
@@ -528,6 +568,8 @@ func _enter_clicked_phase() -> void:
 ##       （ScreenMosaic 3 层粗渲染体系不再参与），实现 intro 期间与之后视觉风格一致。
 ##       函数名 _on_start_fade_out 保留以避免改动 Callable；实际行为是切图。
 func _on_start_fade_out() -> void:
+	# 先给即将装载 girl_enter 的非活跃套注入脸部 mask；该套 IntroFaceMask 随 cross-fade alpha 同步显现
+	_setup_face_mask_for_girl_enter()
 	_crossfade_to_image(_girl_enter_tex)
 
 

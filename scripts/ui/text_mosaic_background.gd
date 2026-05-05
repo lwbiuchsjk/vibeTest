@@ -8,6 +8,13 @@
 # 设计依据:Design/文字马赛克美术背景_MVP设计.md(架构 B 路径:Godot 原生 draw_string)
 extends Control
 
+# === 常量 ===
+
+# Exclude mask alpha 判定阈值(与 text_mosaic_accent_marked.gd 一致):
+# cell 反向映射到源图坐标后,若 exclude mask 在该位置 alpha > 此值,则该 cell 跳过不画字符。
+# LangSAM 输出 mask 是二值(0 或 255),0.5 阈值稳健。
+const EXCLUDE_MASK_ALPHA_THRESHOLD: float = 0.5
+
 # === 调试参数(开发期通过 Inspector 调节,不进玩家 UI)===
 
 # 字号(单字符像素高度;也作为 canvas 上字符网格的基础步长)
@@ -104,6 +111,12 @@ var _text_tokens: PackedStringArray = PackedStringArray()
 var _font: Font = null
 # 呼吸动画累积时间(仅 breathe_enabled=true 时使用)
 var _breathe_time: float = 0.0
+# Exclude mask Image 缓存(可选,默认 null = 无抑制全 cell 渲染)。
+# 用途:背景图配套有"抑制 mask"时,在 mask 区(如角色脸部)跳过 cell 不画字符,
+#       避免大字号字符落在脸上等关键视觉区域。mask 与源图同尺寸,cover 反向映射后直接查询。
+# 数据流:由外部流程(如 IntroSequence._on_start_fade_out)在切换背景图时调用 set_exclude_mask 注入,
+#       不再适用时调 clear_exclude_mask 恢复。每张图各自挂自己的 mask,层只感知"当前图的 mask"。
+var _exclude_mask_image: Image = null
 
 
 # 功能:初始化节点。
@@ -158,6 +171,35 @@ func set_text_tokens(tokens: PackedStringArray) -> void:
 
 # 功能:调试参数变化时重绘(Inspector 调节后由开发者手动调用)。
 func refresh() -> void:
+	queue_redraw()
+
+
+# 功能:加载 exclude mask Image 缓存。mask 区(alpha > 阈值)的 cell 在 _draw 中跳过不画字符。
+# 参数 mask_path:res:// 路径;空字符串等同 clear_exclude_mask。
+# 说明:mask 用 res:// 协议,通过 ProjectSettings.globalize_path 转绝对路径后用 Image.load_from_file 读 PNG。
+#       mask 与源图同尺寸(常 1024×576),cell 反向映射后的 src 坐标直接查询。
+#       开发期 OK;若导出 PCK 后需改走 ResourceLoader 加载。
+# 时机:背景图切换时由外部流程注入,例如 IntroSequence._on_start_fade_out 给"即将装载
+#       girl_enter 的非活跃套 IntroCoarse"注入脸部 mask,使脸部不落 24px 大字号字符。
+func set_exclude_mask(mask_path: String) -> void:
+	if mask_path == "":
+		clear_exclude_mask()
+		return
+	var abs_path: String = ProjectSettings.globalize_path(mask_path)
+	var img: Image = Image.load_from_file(abs_path)
+	if img == null:
+		push_warning(
+			"TextMosaicBackground: exclude mask 加载失败 %s -> %s" % [mask_path, abs_path]
+		)
+		return
+	_exclude_mask_image = img
+	queue_redraw()
+
+
+# 功能:清空 exclude mask 缓存,恢复全 cell 渲染(无抑制)。
+# 时机:背景图切回不需要抑制的图时调用,例如 intro 完成后未来某事件重置背景。
+func clear_exclude_mask() -> void:
+	_exclude_mask_image = null
 	queue_redraw()
 
 
@@ -227,6 +269,19 @@ func _draw() -> void:
 				and color.v <= v_max_threshold
 				and color.s >= saturation_threshold
 			):
+				# Exclude mask 检查:cell 反向映射到 src 后,若 mask alpha > 阈值则跳过不画。
+				# 用途:背景图配套抑制 mask 时(如 girl_enter 脸部 mask),
+				#      让被抑制层(如 IntroCoarse)在 mask 区不落字符。
+				if _exclude_mask_image != null:
+					var mw: int = _exclude_mask_image.get_width()
+					var mh: int = _exclude_mask_image.get_height()
+					if sx >= 0 and sx < mw and sy >= 0 and sy < mh:
+						if (
+							_exclude_mask_image.get_pixel(sx, sy).a
+							> EXCLUDE_MASK_ALPHA_THRESHOLD
+						):
+							x += cell
+							continue
 				var token: String = _text_tokens[token_idx % token_count]
 				# 颜色处理(color_mode==0):先 contrast 强化亮度对比,
 				# 再走 ink palette 水墨化(默认)或保留源图原色(use_source_color,点缀色层用)
