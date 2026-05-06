@@ -11,10 +11,10 @@ const SealPanel := preload("res://scripts/ui/seal_panel.gd")
 # UI 字体分工(参见 Design/进度/UI风格快速翻调_demo期进度.md):
 # - 默认全局字体走 default_theme.tres 设的霞鹜文楷 Light(楷体,与 mosaic 素描笔触同源)
 # - 印章字 / 叙事标题用思源宋体(方头宋体作"骨",与楷体"血肉"形成宋楷搭配)
-const FONT_SERIF_BOLD := preload("res://font/SourceHanSerifCN-Bold.otf")
-const FONT_SERIF_MEDIUM := preload("res://font/SourceHanSerifCN-Medium.otf")
+const FONT_SERIF_BOLD: Font = preload("res://font/SourceHanSerifCN-Bold.otf")
+const FONT_SERIF_MEDIUM: Font = preload("res://font/SourceHanSerifCN-Medium.otf")
 # 青鸟华光简美黑:笔画粗壮、毛笔/书法感强,印章主字与装饰位用
-const FONT_QINGNIAO_MEIHEI := preload("res://font/QingNiaoHuaGuangJianMeiHei-2.ttf")
+const FONT_QINGNIAO_MEIHEI: Font = preload("res://font/QingNiaoHuaGuangJianMeiHei-2.ttf")
 const TextMosaicBackground := preload("res://scripts/ui/text_mosaic_background.gd")
 const TextMosaicParticles := preload("res://scripts/ui/text_mosaic_particles.gd")
 const TextMosaicAccentMarked := preload("res://scripts/ui/text_mosaic_accent_marked.gd")
