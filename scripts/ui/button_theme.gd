@@ -26,16 +26,22 @@ const PRESET_RELATION_DISTRUST := "relation_distrust"  # 自省关系调整：+�
 #   autowrap      — bool，是否开启自动换行
 #   alignment     — int，水平对齐（HorizontalAlignment 枚举值）
 static var _presets: Dictionary = {
+	# UI 风格快速翻调 Phase 1:常规选项按钮承担"玩家伸手"语义,
+	# 底色用 panel_paper(米白半透,与 main_game.gd UI_PANEL_PAPER 同源),
+	# 字色用 accent_zhu(朱砂红,与 main_game.gd UI_ACCENT_ZHU 同源)。
+	# 朱色在整张 mosaic 画面里是唯一饱和色,自带"玩家可介入"的强信号。
+	# hover/pressed 通过提高 panel_paper alpha 让纸面更"实",而非换色。
+	# 注:与 main_game.gd 顶层 UI_* 常量手动同步;Phase 3 提取 ui_palette.gd 后消除重复。
 	PRESET_DEFAULT: {
-		"bg_normal": Color(0.18, 0.20, 0.25, 1.0),
-		"bg_hover": Color(0.26, 0.28, 0.34, 1.0),
-		"bg_pressed": Color(0.14, 0.16, 0.20, 1.0),
-		"bg_disabled": Color(0.12, 0.12, 0.14, 0.7),
+		"bg_normal": Color(0.957, 0.925, 0.847, 0.75),
+		"bg_hover": Color(0.957, 0.925, 0.847, 0.88),
+		"bg_pressed": Color(0.957, 0.925, 0.847, 0.95),
+		"bg_disabled": Color(0.957, 0.925, 0.847, 0.30),
 		"border_color": Color.TRANSPARENT,
-		"font_color": Color.WHITE,
-		"font_disabled_color": Color(0.45, 0.45, 0.50, 1.0),
+		"font_color": Color(0.698, 0.180, 0.149, 1.0),
+		"font_disabled_color": Color(0.353, 0.310, 0.271, 0.5),
 		"font_size": 0,
-		"corner_radius": 6,
+		"corner_radius": 2,
 		"margin_left": 14, "margin_right": 14,
 		"margin_top": 10, "margin_bottom": 10,
 		"min_height": 54,

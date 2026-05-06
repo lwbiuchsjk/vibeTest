@@ -6,11 +6,30 @@ const WorldEventEngine := preload("res://scripts/systems/world_event_engine.gd")
 const WorldEndScreen := preload("res://scripts/ui/world_end_screen.gd")
 const ResponsiveLayout := preload("res://scripts/ui/responsive_layout.gd")
 const ButtonTheme := preload("res://scripts/ui/button_theme.gd")
+const SealPanel := preload("res://scripts/ui/seal_panel.gd")
+
+# UI 字体分工(参见 Design/进度/UI风格快速翻调_demo期进度.md):
+# - 默认全局字体走 default_theme.tres 设的霞鹜文楷 Light(楷体,与 mosaic 素描笔触同源)
+# - 印章字 / 叙事标题用思源宋体(方头宋体作"骨",与楷体"血肉"形成宋楷搭配)
+const FONT_SERIF_BOLD := preload("res://font/SourceHanSerifCN-Bold.otf")
+const FONT_SERIF_MEDIUM := preload("res://font/SourceHanSerifCN-Medium.otf")
+# 青鸟华光简美黑:笔画粗壮、毛笔/书法感强,印章主字与装饰位用
+const FONT_QINGNIAO_MEIHEI := preload("res://font/QingNiaoHuaGuangJianMeiHei-2.ttf")
 const TextMosaicBackground := preload("res://scripts/ui/text_mosaic_background.gd")
 const TextMosaicParticles := preload("res://scripts/ui/text_mosaic_particles.gd")
 const TextMosaicAccentMarked := preload("res://scripts/ui/text_mosaic_accent_marked.gd")
 
 const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
+
+# UI 同源色板(参见 Design/进度/UI风格快速翻调_demo期进度.md § 颜色 Token 表)。
+# 哲学锚点:碑刻+札记杂交风格,UI 复用底层 mosaic 的"字、墨、纸、朱"四原色,不引入异质材质。
+# panel_paper 与 BackgroundColor #F4ECD8 完全同色 + 半透,叠加视觉是"局部纸面更干净"而非"灰布"。
+# accent_zhu 仅用于"玩家伸手"位(选项 / 继续 / 朱批),其余位置克制使用,避免稀释"伸手"语义。
+# 注:button_theme.gd PRESET_DEFAULT 字段含同色字面量,改这里也要同步那边;Phase 3 提取 ui_palette.gd 后消除重复。
+const UI_PANEL_PAPER := Color(0.957, 0.925, 0.847, 0.75)
+const UI_TEXT_PRIMARY := Color(0.180, 0.161, 0.141, 1.0)
+const UI_TEXT_SECONDARY := Color(0.353, 0.310, 0.271, 1.0)
+const UI_ACCENT_ZHU := Color(0.698, 0.180, 0.149, 1.0)
 
 # 地点 → 文字马赛克 token 数组(v1 固定映射,详见 Design/文字马赛克美术背景_MVP设计.md §7.1)。
 # **占位:以下词组为代码默认值以避免空运行,等用户从游戏内容(event_presentations / 角色状态等)
@@ -136,6 +155,7 @@ func _ready() -> void:
 	continue_button.pressed.connect(_on_continue_button_pressed)
 	end_root.action_requested.connect(_on_end_action_requested)
 	_setup_overlay_styles()
+	_setup_seal_row_mock()  # Phase 1.5 mock:验证印章式状态条形态后整体重构
 	_setup_screen_background()
 	_setup_platform_default_layers()
 	# 响应式布局初始化：注册 viewport 监听并触发首次布局。
@@ -1622,7 +1642,7 @@ func _add_option_section_label(text: String) -> void:
 	var label := Label.new()
 	label.text = text
 	label.add_theme_font_size_override("font_size", 13)
-	label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.65, 1.0))
+	label.add_theme_color_override("font_color", UI_TEXT_SECONDARY)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	option_list.add_child(label)
 
@@ -1633,20 +1653,24 @@ func _add_option_hint(text: String) -> void:
 	var hint_label := Label.new()
 	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint_label.text = text
-	hint_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.55, 1.0))
+	hint_label.add_theme_color_override("font_color", UI_TEXT_SECONDARY)
 	option_list.add_child(hint_label)
 
 
-# 功能：初始化左侧叠加层各区域的半透明样式。
-# 说明：所有覆盖在背景图上的面板统一使用半透明深色底 + 圆角，确保在图上可读。
+# 功能:初始化左侧叠加层各区域的样式(UI 风格快速翻调 Phase 1)。
+# 说明:从"半透明深色面板 + 浅色字"翻转为"米白半透纸面 + 深褐墨字",
+#       上层 UI 与底层文字马赛克同源(共用 BackgroundColor 的米白纸面色),
+#       视觉上是"局部 mosaic 字符稀疏化"而非"灰布贴在画上"。
+#       三个面板共享同一种 panel_paper 颜色:层级靠透明度/字号/间距区分,不靠颜色拼贴。
 func _setup_overlay_styles() -> void:
-	# 通用半透明面板样式工厂
+	# 通用米白半透纸面样式工厂
 	var base_panel_style := StyleBoxFlat.new()
-	base_panel_style.bg_color = Color(0.05, 0.05, 0.08, 0.65)
-	base_panel_style.corner_radius_top_left = 8
-	base_panel_style.corner_radius_top_right = 8
-	base_panel_style.corner_radius_bottom_left = 8
-	base_panel_style.corner_radius_bottom_right = 8
+	base_panel_style.bg_color = UI_PANEL_PAPER
+	# 圆角降到极小(2px),保留极轻微圆角避免硬切感,但不再像"卡片"
+	base_panel_style.corner_radius_top_left = 2
+	base_panel_style.corner_radius_top_right = 2
+	base_panel_style.corner_radius_bottom_left = 2
+	base_panel_style.corner_radius_bottom_right = 2
 	base_panel_style.content_margin_left = 14
 	base_panel_style.content_margin_right = 14
 	base_panel_style.content_margin_top = 10
@@ -1654,29 +1678,94 @@ func _setup_overlay_styles() -> void:
 
 	# 角色面板
 	character_panel.add_theme_stylebox_override("panel", base_panel_style)
-	character_label.add_theme_color_override("font_color", Color(0.92, 0.90, 0.82, 0.95))
+	character_label.add_theme_color_override("font_color", UI_TEXT_PRIMARY)
 	character_label.add_theme_font_size_override("font_size", 13)
 
-	# 世界面板
+	# 世界面板(与角色面板同 stylebox 复用,同源色板下不再做多色面板)
 	var world_style: StyleBoxFlat = base_panel_style.duplicate()
-	world_style.bg_color = Color(0.04, 0.06, 0.10, 0.60)
 	world_panel.add_theme_stylebox_override("panel", world_style)
-	world_label.add_theme_color_override("font_color", Color(0.80, 0.85, 0.92, 0.90))
+	world_label.add_theme_color_override("font_color", UI_TEXT_PRIMARY)
 	world_label.add_theme_font_size_override("font_size", 13)
 
-	# 叙事面板
+	# 叙事面板(承担当前事件焦点,视觉权重最重):
+	#   - alpha 0.85 比状态条 0.75 略实,纸面更"凝",焦点感出来
+	#   - 标题用焦墨色 + 22px,与正文 17px 拉开内部层级
+	#   - padding 比状态条更舒展
+	# 不引入朱色到标题:朱色严格只给"玩家伸手"位(选项/继续),标题是事件信息不破规。
 	var narrative_style: StyleBoxFlat = base_panel_style.duplicate()
-	narrative_style.bg_color = Color(0.0, 0.0, 0.0, 0.6)
+	narrative_style.bg_color = Color(0.957, 0.925, 0.847, 0.85)
 	narrative_style.content_margin_left = 16
 	narrative_style.content_margin_right = 16
 	narrative_style.content_margin_top = 12
 	narrative_style.content_margin_bottom = 12
 	narrative_panel.add_theme_stylebox_override("panel", narrative_style)
-	event_title_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.95))
-	event_detail_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.90, 0.9))
+	# 焦墨:比 text_primary(深褐墨)更深的标题色,与正文形成层级压差
+	var ink_focal_color := Color(0.102, 0.086, 0.071, 1.0)
+	event_title_label.add_theme_color_override("font_color", ink_focal_color)
+	event_title_label.add_theme_font_size_override("font_size", 22)
+	# 标题用思源宋体 Bold,方头字形与印章字呼应("宋骨楷血"搭配)
+	event_title_label.add_theme_font_override("font", FONT_SERIF_BOLD)
+	event_detail_label.add_theme_color_override("font_color", UI_TEXT_PRIMARY)
+	event_detail_label.add_theme_font_size_override("font_size", 17)
 
-	# 选项区标题
-	option_header_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95, 0.9))
+	# 选项区标题(次级文字用 text_secondary 淡墨)
+	option_header_label.add_theme_color_override("font_color", UI_TEXT_SECONDARY)
+
+
+# 功能：Phase 1.5 印章式状态条 mock(参见 [[UI风格快速翻调_demo期进度]] § 印章方向讨论)。
+# 说明：暂时隐藏 CharacterPanel/WorldPanel,在 LeftContent 顶部插入 5 枚朱印 PanelContainer
+#       占位,看"小尖锐朱印 vs 大叙事面板"的视觉权重对比是否对路。
+#       内容用现有标签+数值占位(不做 icon 字 / 定性化,那是用户领域,确认形态后单独议题)。
+#       哲学锚点:朱印是国画的内置语言(鉴藏印 / 钤印 / 题款印),与"修行者凝视画里世界 +
+#       留下行动痕迹"哲学契合;朱色语义从"玩家伸手"扩展为"看画人 / 修行者的痕迹"。
+#       回退方法:注释掉 _ready() 中本函数调用 + 删除/隐藏 SealRow_Mock 节点即可恢复原状态条。
+#       后续:形态确认后由大模型美术出图(朱印 PNG 资产)优化精致度。
+func _setup_seal_row_mock() -> void:
+	# 隐藏现有状态面板(原 CharacterPanel / WorldPanel 数值仍由后续逻辑更新但不显示)
+	character_panel.visible = false
+	world_panel.visible = false
+
+	# 朱印占位内容:5 枚,主字 + 副字独立配置(主字大、青鸟美黑;副字小、宋体 Medium)。
+	# icon 字取核心义("命/力/金/心/回"是 Claude 占位选字,最终由用户裁断);
+	# 数值 2 位处理:>99 capped / 1 位前导 0 / 负号占位 → 各印章宽度相近便于排版观察。
+	var seal_items: Array = [
+		{"main": "命", "value": "99"},
+		{"main": "力", "value": "99"},
+		{"main": "金", "value": "30"},
+		{"main": "心", "value": "-2"},
+		{"main": "回", "value": "01"},
+	]
+
+	# 墨印阴刻 SealPanel(自定义 Control,三层叠加渲染:实色墨底 + 斑驳墨层 + 反白主字)
+	# 哲学锚点(2026-05-06 用户设计修订):
+	#   状态 = 修行者内观自己 → 墨色(与画面 mosaic 字符同源,含蓄内向)
+	#   选项 = 修行者伸手介入 → 朱色(独一份,关键时刻用在刀刃上)
+	#   斑驳墨层用 sin(x,y,seed) noise 驱动字符密度,模拟印泥不均;各印章 seed 不同
+	#   产生各异斑驳模式 —— 与 text_mosaic_background.gd 同源算法的简化版,
+	#   把"印章质感"做到美术资源 80% 效果(余 20% 等出图后替换 SealPanel 实现)。
+	# 朱印容器:HBoxContainer + 右对齐 + separation 10(用户反馈紧凑些)
+	var seal_row := HBoxContainer.new()
+	seal_row.name = "SealRow_Mock"
+	seal_row.add_theme_constant_override("separation", 10)
+	seal_row.alignment = BoxContainer.ALIGNMENT_END
+	seal_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	for i in range(seal_items.size()):
+		var item: Dictionary = seal_items[i]
+		var seal: SealPanel = SealPanel.new()
+		# 主字青鸟美黑 22(粗壮书法感) + 副字宋体 Medium 11(规整数字);各印章 seed 不同
+		seal.set_seal(
+			item["main"], item["value"],
+			FONT_QINGNIAO_MEIHEI, 22,
+			FONT_SERIF_MEDIUM, 15,
+			i
+		)
+		seal_row.add_child(seal)
+
+	# 插入到 LeftContent 顶部(原 character_panel 位置)
+	var left_content: Node = character_panel.get_parent()
+	left_content.add_child(seal_row)
+	left_content.move_child(seal_row, 0)
 
 
 # 功能：初始化全屏装饰衬底。
