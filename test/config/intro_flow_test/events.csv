@@ -1,5 +1,5 @@
 event_id,title,background_art,base_weight,continuation_policy,choice_point_id,tags,task_links,is_ending_event,type
-sys_reflection,自省,,10,ReturnToScheduler,,system;reflection,,FALSE,reflection
+sys_reflection,自省,res://assets/art/environments/backgrounds/pond_girl_enter.png,10,ReturnToScheduler,,system;reflection,,FALSE,reflection
 evt_s2_sk_01,前辈的影子,,10,ReturnToScheduler,cp_evt_s2_sk_01,skeleton;stage2,advance:task_meet_cheng,FALSE,
 evt_s2_sk_02,正路的入口,,10,ReturnToScheduler,cp_evt_s2_sk_02,skeleton;stage2,advance:task_meet_lu,FALSE,
 evt_s2_sk_03,同行者的背影,,10,ReturnToScheduler,cp_evt_s2_sk_03,skeleton;stage2,advance:task_meet_zhou,FALSE,

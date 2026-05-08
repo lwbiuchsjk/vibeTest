@@ -1956,9 +1956,11 @@ func _on_viewport_resized() -> void:
 #         - TextMosaicParticles(动态粒子层,在 flow_regions JSON 定义的主体内流动)
 #       从 _engine.world_state.currentLocationId 取地点 ID 决定 token 集合。
 func _render_event_background(background_art_path: String) -> void:
-	# demo 期临时覆盖：girl_enter 替代所有事件底图（无论传入 path 是什么）。
-	# 未来事件正式配置 background_art_path 后，用 `background_art_path.strip_edges()` 替换下行字面量即可恢复按 path 加载。
-	var normalized_path := "res://assets/art/environments/backgrounds/pond_girl_enter.png"
+	# Step 3：消费引擎已解析的最终背景路径（事件 backgroundArt → 地点 art_file → 空字符串）。
+	# 路径为空时进入空白底兜底分支，清空所有 mosaic 层。
+	# 自省事件（sys_*_reflection）通过 events.csv background_art 字段配 pond_girl_enter.png，
+	# 走引擎 fallback 链产出 girl_enter 路径，复用 IntroSequence 终态视觉（不需 Consumer 特判）。
+	var normalized_path := background_art_path.strip_edges()
 	if normalized_path.is_empty():
 		event_background_rect.texture = null
 		text_mosaic_bg.set_source_image(null)
@@ -2001,9 +2003,11 @@ func _render_event_background(background_art_path: String) -> void:
 
 	var resource := ResourceLoader.load(normalized_path)
 	var texture: Texture2D = resource if resource is Texture2D else null
-	# demo 期：EventBackground TextureRect 不显示原图（girl_enter 中央条带是浅水面，会让核心区颜色偏白）。
-	# mosaic 层仍然用 texture 作 source 生成字符渲染，叠加在 BackgroundColor 米色底上保持宣纸视觉。
-	# 未来事件正式配置后，恢复 = texture 即可显示原图。
+	# Step 3 决策（方案 A）：原图层显隐策略延后到 Step 4/5 美术资产入库阶段定。
+	# 当前所有事件背景统一走 mosaic 层渲染（texture 仅作 source 生成字符），
+	# EventBackground TextureRect 保持 null，叠加 BackgroundColor 米色底保持宣纸视觉。
+	# 多事件原图引入时（Step 4/5），按事件类型差异化是否显示原图（如 reflection 走 girl_enter
+	# 时 EventBackground 仍 null 避免浅水面偏白；其他场景按设计开启）。
 	event_background_rect.texture = null
 
 	# 文字马赛克静态层:复用同一 Texture2D,按当前 location_id 选 tokens。
