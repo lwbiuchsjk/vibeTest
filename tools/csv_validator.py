@@ -72,6 +72,24 @@ KNOWN_CONDITION_TYPES = {
     "required_npc", "required_location", "required_location_flag",
 }
 
+# event_presentations 的合法 presents 值（Step 2 新增）
+# 来源：Design/配置翻译指南.md 锚点 presents_values
+# demo 期引擎/UI 仅实现 text 与 location_select 两种渲染分支；
+# adjust_relation / focus_select / focus_remove 配置层留口、运行时未实现，
+# 出现即提示设计/配置错误（demo 期 reflection 事件不应配置这些值）。
+KNOWN_PRESENTS_VALUES = {
+    "text",
+    "location_select",
+    "adjust_relation",
+    "focus_select",
+    "focus_remove",
+}
+DEMO_UNSUPPORTED_PRESENTS = {
+    "adjust_relation",
+    "focus_select",
+    "focus_remove",
+}
+
 # 旧版关系 key 的正则（affinity.player_001->npc_xxx）——已废弃，仅用于识别误用
 AFFINITY_KEY_RE = re.compile(r"^affinity\.\w+->\w+$")
 
@@ -164,6 +182,9 @@ def validate(csv_dir: Path, ref_dir: Path) -> ValidationResult:
     event_presentations = load_csv(csv_dir / "event_presentations.csv")
     options = load_csv(csv_dir / "options.csv")
     option_rules = load_csv(csv_dir / "option_rules.csv")
+    # Step 2 新增：可选表（缺失时静默跳过对应校验）。
+    transition_text_pool = load_csv(csv_dir / "transition_text_pool.csv")
+    location_graph_rows = load_csv(csv_dir / "location_graph.csv")
 
     # ── 加载参考数据 ──
     attribute_keys = load_attribute_keys(ref_dir)
@@ -249,6 +270,70 @@ def validate(csv_dir: Path, ref_dir: Path) -> ValidationResult:
         if ct and ct not in KNOWN_CONDITION_TYPES:
             eid = row.get("event_id", "")
             result.add_p2(f"event_conditions: '{eid}' 使用未知 condition_type '{ct}'")
+
+    # ── 检查 6.5: event_presentations.presents 合法性（Step 2 新增）──
+    # presents 字段空 → 引擎默认 text；非空必须在 KNOWN_PRESENTS_VALUES 白名单内。
+    # demo 期不应出现 DEMO_UNSUPPORTED_PRESENTS 中的值（引擎/UI 渲染分支未实现）。
+    for row in event_presentations:
+        presents = row.get("presents", "").strip()
+        if not presents:
+            continue
+        pid = row.get("presentation_id", "")
+        if presents not in KNOWN_PRESENTS_VALUES:
+            result.add_p1(
+                f"event_presentations: '{pid}' 使用未知 presents '{presents}'"
+            )
+        elif presents in DEMO_UNSUPPORTED_PRESENTS:
+            result.add_p2(
+                f"event_presentations: '{pid}' 使用 demo 期未实现的 presents '{presents}' "
+                "（引擎/UI 渲染分支待正式期补，demo 期 reflection 事件不应配置）"
+            )
+        # presents=location_select 行必须 text 非空（同屏渲染需要叙事文本作 caption）
+        if presents == "location_select":
+            text = row.get("text", "").strip()
+            if not text:
+                result.add_p1(
+                    f"event_presentations: '{pid}' presents=location_select 但 text 为空"
+                    "（同屏渲染需要末段叙事文本作 caption）"
+                )
+
+    # ── 检查 6.6: transition_text_pool.csv 结构 + location_id 一致性（Step 2 新增）──
+    # 文件可选（demo 期可能尚未创建）；存在时校验：
+    #   - pool_id / location_id / text 非空，seq 为正整数
+    #   - location_id 必须存在于 location_graph.csv（防止配置漂移）
+    if transition_text_pool:
+        # 构建 location_graph location_id 集合（也校验 location_graph.csv 自身存在性）。
+        location_ids: set[str] = set()
+        if location_graph_rows:
+            location_ids = {
+                r.get("location_id", "").strip() for r in location_graph_rows
+                if r.get("location_id", "").strip()
+            }
+        else:
+            result.add_p2(
+                "transition_text_pool.csv 存在但 location_graph.csv 为空/缺失，"
+                "无法做 location_id 一致性校验"
+            )
+
+        for idx, row in enumerate(transition_text_pool, start=1):
+            pool_id = row.get("pool_id", "").strip()
+            location_id = row.get("location_id", "").strip()
+            seq_raw = row.get("seq", "").strip()
+            text = row.get("text", "")
+            row_label = f"transition_text_pool 第 {idx} 行"
+            if not pool_id:
+                result.add_p1(f"{row_label}: pool_id 为空")
+            if not location_id:
+                result.add_p1(f"{row_label}: location_id 为空")
+            if not text.strip():
+                result.add_p1(f"{row_label}: text 为空（或仅空白字符）")
+            if not seq_raw or not seq_raw.lstrip("-").isdigit() or int(seq_raw) <= 0:
+                result.add_p1(f"{row_label}: seq 必须为正整数（当前 '{seq_raw}'）")
+            if location_id and location_ids and location_id not in location_ids:
+                result.add_p1(
+                    f"{row_label}: location_id '{location_id}' 不存在于 location_graph.csv"
+                )
+        result.stats["过渡叙事行"] = len(transition_text_pool)
 
     # ── 检查 7: cost / resolution key 合法性 ──
     # 语义分工（与 world_event_config_assembler._apply_effect_or_resolution_action 对齐）：

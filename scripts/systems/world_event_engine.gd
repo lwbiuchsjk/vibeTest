@@ -246,35 +246,49 @@ func preview_next_turn() -> Dictionary:
 			"awaiting_input": true
 		}
 
-	# 叙事包联动：检查包是否已结束，需要触发自省。
+	# 叙事包联动：检查包是否已结束，需要触发自省 / 收口 / 普通地点选择。
 	if _is_pack_finished():
-		var pack_ctx: Dictionary = _dict_or_empty(world_state.get("packContext", {}))
-		var should_reflect := not bool(pack_ctx.get("interrupted", false))
-		# chain 打断后，检查是否有 pendingReflectionAfterChain 标记。
-		if bool(pack_ctx.get("interrupted", false)) and bool(world_state.get("pendingReflectionAfterChain", false)):
-			should_reflect = true
-			world_state.erase("pendingReflectionAfterChain")
-		if should_reflect:
-			# 强制插入自省事件。
-			var reflection_def: Dictionary = _event_map.get("sys_reflection", {})
-			if not reflection_def.is_empty():
-				_pending_turn_context = _create_pending_turn_context(
-					"sys_reflection", "pack_end_reflection", "", reflection_def
-				)
-				return _build_pending_turn_response(_pending_turn_context)
-		# 不触发自省（chain 打断且无 triggerReflection），直接清空包进入地点选择。
-		_clear_pack_context()
-		# 清空后进入地点选择（_is_pack_awaiting_location 此时必定为 true），内联构建返回值避免递归。
-		var loc_event_fallback: Dictionary = _build_location_select_event()
-		return {
-			"ok": true,
-			"phase": "location_select",
-			"event_id": "_location_select",
-			"title": str(loc_event_fallback.get("title", "")),
-			"type": "location_select",
-			"options": loc_event_fallback.get("options", []),
-			"awaiting_input": true
-		}
+		# Step 2 P1-2：末位池消费完后 _apply_event_effects 已写入收口 forced（如拜师 chain 入口），
+		# 此处不应再注入中段自省 / location_select fallback 覆盖，否则会绕过 Step 1 的
+		# "消耗完立即触发收口"语义。让出条件：forcedNextEventId 非空且不指向 sys_reflection 自身。
+		# 让出后清空 packContext + fall through 到下方 _select_next_event，由 forced 路径处理。
+		var forced_id_pre_reflect: String = str(world_state.get("forcedNextEventId", ""))
+		var forced_takeover: bool = (
+			not forced_id_pre_reflect.is_empty()
+			and forced_id_pre_reflect != "sys_reflection"
+		)
+		if forced_takeover:
+			print("[叙事包] 包结束时检测到收口 forced=%s，让出 forced 路径" % forced_id_pre_reflect)
+			_clear_pack_context()
+			# 不 return，fall through 到下方 _check_auto_accept_tasks + _select_next_event。
+		else:
+			var pack_ctx: Dictionary = _dict_or_empty(world_state.get("packContext", {}))
+			var should_reflect := not bool(pack_ctx.get("interrupted", false))
+			# chain 打断后，检查是否有 pendingReflectionAfterChain 标记。
+			if bool(pack_ctx.get("interrupted", false)) and bool(world_state.get("pendingReflectionAfterChain", false)):
+				should_reflect = true
+				world_state.erase("pendingReflectionAfterChain")
+			if should_reflect:
+				# 强制插入自省事件。
+				var reflection_def: Dictionary = _event_map.get("sys_reflection", {})
+				if not reflection_def.is_empty():
+					_pending_turn_context = _create_pending_turn_context(
+						"sys_reflection", "pack_end_reflection", "", reflection_def
+					)
+					return _build_pending_turn_response(_pending_turn_context)
+			# 不触发自省（chain 打断且无 triggerReflection），直接清空包进入地点选择。
+			_clear_pack_context()
+			# 清空后进入地点选择（_is_pack_awaiting_location 此时必定为 true），内联构建返回值避免递归。
+			var loc_event_fallback: Dictionary = _build_location_select_event()
+			return {
+				"ok": true,
+				"phase": "location_select",
+				"event_id": "_location_select",
+				"title": str(loc_event_fallback.get("title", "")),
+				"type": "location_select",
+				"options": loc_event_fallback.get("options", []),
+				"awaiting_input": true
+			}
 
 	# 说明：先自动接取任务，确保本回合事件选择能立即吃到 task_links 权重。
 	_check_auto_accept_tasks()
@@ -327,6 +341,103 @@ func confirm_location_select(location_id: String) -> Dictionary:
 		"pack_capacity": int(_pack_config.get("defaultCapacity", 3))
 	}
 
+
+# 功能：自省末屏地点选择确认（Step 2 新增）。
+# 说明：处理 reflection 事件 presents=location_select 末屏的玩家地点选择。流程：
+#       1. 校验当前确实处于自省末屏 + 地点合法（邻居或当前地点）；
+#       2. 写入 visited_locations 跨自省持久状态 + 切换 currentLocationId；
+#       3. 按 transition_text_pool[reflection_transition][location_id] 抽过渡叙事文本组，
+#          作为 _dynamic=true 的虚拟 presentation 行追加到当前事件 presentation 数组；
+#       4. 推进 presentation_index 到下一行（即过渡叙事第 1 屏，或末屏完成时切 confirm）。
+#       新包启动延迟到事件结算后（见 _resolve_pending_turn 处理 reflection 事件结算）。
+#       设计基线见 [[当前版本完整主路径_MVP设计]] §三·节点 2 "Step 2 实施落地细节"。
+func confirm_reflection_location_select(location_id: String) -> Dictionary:
+	if _is_world_ended():
+		return _build_world_ended_response()
+	var loc_id: String = location_id.strip_edges()
+	if loc_id.is_empty():
+		return {"ok": false, "error": "location_id is empty"}
+	if _pending_turn_context.is_empty():
+		return {"ok": false, "error": "no pending reflection event"}
+
+	var phase: String = str(_pending_turn_context.get("phase", ""))
+	if phase != "presentation":
+		return {"ok": false, "error": "reflection location select requires presentation phase, current=%s" % phase}
+
+	var event_id: String = str(_pending_turn_context.get("event_id", ""))
+	var event_def: Dictionary = _event_map.get(event_id, {})
+	if event_def.is_empty():
+		return {"ok": false, "error": "pending event not found: %s" % event_id}
+	if str(event_def.get("type", "")) != "reflection":
+		return {"ok": false, "error": "current event is not reflection: %s" % event_id}
+
+	var presentation_items: Array = _get_event_presentation(event_def)
+	var current_index: int = int(_pending_turn_context.get("presentation_index", 0))
+	if current_index < 0 or current_index >= presentation_items.size():
+		return {"ok": false, "error": "presentation index out of range: %d" % current_index}
+	var current_item: Dictionary = presentation_items[current_index]
+	if str(current_item.get("presents", "text")) != "location_select":
+		return {"ok": false, "error": "current presentation row is not location_select"}
+
+	# Step 2 P2-2：校验地点合法 = 必须在 get_reflection_location_options() 当前候选集合内。
+	# 不再复用 confirm_location_select 的"邻居图"语义——intro 模式候选来自全量地点（按
+	# reflection_mode + visited_locations 过滤），与 UI 渲染按钮的来源一致，避免"UI 显示
+	# 全量地点但确认按邻居拒绝"的状态错位。regular 模式 get_reflection_location_options
+	# 内部仍用邻居图，行为不变。
+	var allowed_options: Array = get_reflection_location_options()
+	var valid: bool = false
+	for opt_variant in allowed_options:
+		var opt_dict: Dictionary = opt_variant
+		if str(opt_dict.get("location_id", "")) == loc_id:
+			valid = true
+			break
+	if not valid:
+		var current_location: String = str(world_state.get("currentLocationId", ""))
+		return {"ok": false, "error": "location %s is not in reflection options (current=%s, mode=%s)" % [
+			loc_id, current_location, str(world_state.get("reflection_mode", ""))
+		]}
+
+	# 写 visited_locations（去重）+ 切 currentLocationId。
+	var visited: Array = _array_or_empty(world_state.get("visited_locations", []))
+	if not (loc_id in visited):
+		visited.append(loc_id)
+	world_state["visited_locations"] = visited
+	world_state["currentLocationId"] = loc_id
+
+	# 按 transition_text_pool 抽过渡叙事，追加为虚拟 presentation 行（_dynamic=true）。
+	var pool: Dictionary = _dict_or_empty(world_state.get("transitionTextPool", {}))
+	var by_location: Dictionary = _dict_or_empty(pool.get("reflection_transition", {}))
+	var transition_texts: Array = _array_or_empty(by_location.get(loc_id, []))
+	if not transition_texts.is_empty():
+		var max_seq: int = 0
+		for it_var in presentation_items:
+			var it: Dictionary = it_var
+			max_seq = max(max_seq, int(it.get("order", 0)))
+		for i in range(transition_texts.size()):
+			presentation_items.append({
+				"id": "%s_transition_%d" % [event_id, i + 1],
+				"order": max_seq + i + 1,
+				"type": "text",
+				"speaker": "",
+				"text": str(transition_texts[i]),
+				"presents": "text",
+				"_dynamic": true
+			})
+		event_def["presentation"] = presentation_items
+		_event_map[event_id] = event_def
+		print("[自省] 末屏地点选择 %s → 追加过渡叙事 %d 条" % [loc_id, transition_texts.size()])
+	else:
+		print("[自省] 末屏地点选择 %s → 无对应过渡叙事池（pool=reflection_transition）" % loc_id)
+
+	# 推进 presentation_index 到下一行；若已到末尾切 confirm phase。
+	var next_index: int = current_index + 1
+	_pending_turn_context["presentation_index"] = next_index
+	if next_index >= presentation_items.size():
+		_advance_pending_phase_after_presentation(event_def)
+
+	return _build_pending_turn_response(_pending_turn_context)
+
+
 # 功能：执行一个回合。
 # 说明：若已有待处理事件，则继续推进当前阶段；否则先选出事件，再通过统一的待处理上下文完成展示、选择或确认。
 func run_turn(selected_option_id: String = "") -> Dictionary:
@@ -377,8 +488,21 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 
 	if phase == "presentation":
 		# 说明：展示阶段只负责逐条推进展示文本，不执行事件效果，也不推进回合。
+		# Step 2 P1-1：当前 presentation 行 presents=location_select 时拒绝普通 confirm，
+		# 防止外部 Consumer 绕过 confirm_reflection_location_select 跳过地点选择 →
+		# visited_locations 不写但后续仍启动新包的状态机错位。强制走专用 API。
 		var presentation_items := _get_event_presentation(event_def)
-		var next_index := int(_pending_turn_context.get("presentation_index", 0)) + 1
+		var current_index: int = int(_pending_turn_context.get("presentation_index", 0))
+		if current_index >= 0 and current_index < presentation_items.size():
+			var current_pres_item: Dictionary = presentation_items[current_index]
+			if str(current_pres_item.get("presents", "text")) == "location_select":
+				return {
+					"ok": false,
+					"error": "current presentation is location_select; use confirm_reflection_location_select() instead",
+					"phase": "presentation",
+					"event_id": event_id
+				}
+		var next_index := current_index + 1
 		if next_index < presentation_items.size():
 			_pending_turn_context["presentation_index"] = next_index
 		else:
@@ -459,14 +583,34 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 	_record_history(event_id)
 	# 叙事包联动：使用缓存的 deferred 状态，避免链退出后 chainContext 被清空导致误判。
 	var was_deferred := bool(_pending_turn_context.get("_was_in_deferred_chain", false))
-	if not was_deferred:
+	# Step 2：reflection 事件不算包内回合，不应推进 world turn / tick tasks / 推 packContext.turnsElapsed。
+	# 走 _resolve_pending_turn confirm 分支的 reflection 事件即 demo 期 resolution_mode=event_effects
+	# 的自省（presentation 全程驱动，无状态机）。老 resolution_mode=reflection 路径不经过此分支。
+	var is_reflection: bool = str(event_def.get("type", "")) == "reflection"
+	if not was_deferred and not is_reflection:
 		_tick_tasks_after_turn()
 	var ended_this_turn := false
 	if bool(event_def.get("isEndingEvent", false)):
 		_finalize_world(event_id)
 		ended_this_turn = true
 	if not ended_this_turn:
-		if not was_deferred:
+		if is_reflection:
+			# 自省事件结算特化（Step 2 新增）：不推 turn，不推包内回合。
+			# 若 presentation 含 presents=location_select 行 → 玩家在末屏已选定地点（由
+			# confirm_reflection_location_select 写入 currentLocationId 与 visited_locations）→
+			# 启动新包；否则（如最终自省）不启动新包，由调用方按 isEndingEvent 等机制收口。
+			var triggers_new_pack: bool = false
+			var pres_check: Array = _get_event_presentation(event_def)
+			for it_var in pres_check:
+				var it: Dictionary = it_var
+				if str(it.get("presents", "")) == "location_select":
+					triggers_new_pack = true
+					break
+			if triggers_new_pack:
+				_clear_pack_context()
+				_start_new_pack(str(world_state.get("currentLocationId", "")))
+				print("[自省] 末屏地点选择闭环 → 启动新包 location=%s" % str(world_state.get("currentLocationId", "")))
+		elif not was_deferred:
 			world_state["turn"] = int(world_state.get("turn", 0)) + 1
 			# 叙事包联动：推进包内回合计数。
 			_advance_pack_turn()
@@ -616,11 +760,40 @@ func _create_pending_turn_context(
 	var has_choice := false
 	var phase := "confirm"
 
-	# 功能：自省事件使用独立的 resolution_mode，跳过 choice / effects 流程。
+	# 自省事件 resolution_mode 决策（Step 2 改造）：
+	# - 老路径（reflection_state_machine）：presentation 含 adjust_relation / focus_* 时启用，
+	#   或 presentation 为空（沿用旧 EMPTY_REFLECTION 逻辑）。
+	# - 新路径（presentation 全程驱动）：presentation 仅含 text / location_select 时，与普通
+	#   事件一致走 event_effects 路径；末屏 presents=location_select 由 main_game UI 层
+	#   渲染同屏地点按钮，玩家选地点后引擎追加过渡叙事文本继续推进。设计基线见
+	#   [[当前版本完整主路径_MVP设计]] §三·节点 2 "Step 2 实施落地细节"。
 	var event_type := str(event_def.get("type", "")).strip_edges()
 	if event_type == "reflection":
-		resolution_mode = "reflection"
-		phase = "reflection"
+		# 进入新一次 reflection 事件前清除上次 confirm_reflection_location_select 动态追加的
+		# 过渡叙事行（标记 _dynamic=true），避免同一 event_id 跨次触发时虚拟行累积。
+		var raw_pres: Array = event_def.get("presentation", [])
+		var cleaned_pres: Array = []
+		for raw_item_variant in raw_pres:
+			var raw_item: Dictionary = raw_item_variant
+			if not bool(raw_item.get("_dynamic", false)):
+				cleaned_pres.append(raw_item)
+		if cleaned_pres.size() != raw_pres.size():
+			event_def["presentation"] = cleaned_pres
+			_event_map[event_id] = event_def
+
+		var pres_items_for_check: Array = _get_event_presentation(event_def)
+		var requires_state_machine: bool = pres_items_for_check.is_empty()
+		for item_variant in pres_items_for_check:
+			var item: Dictionary = item_variant
+			var item_presents: String = str(item.get("presents", "text"))
+			if item_presents == "adjust_relation" or item_presents == "focus_select" or item_presents == "focus_remove":
+				requires_state_machine = true
+				break
+		if requires_state_machine:
+			resolution_mode = "reflection"
+			phase = "reflection"
+		# else: demo 期典型路径——保持 resolution_mode = "event_effects"（默认），
+		# presentation 走完直接结算，无需 reflection 状态机。
 
 	var choice_point_id := str(event_def.get("choicePointId", "")).strip_edges()
 	if not choice_point_id.is_empty():
@@ -1158,6 +1331,10 @@ func _mark_final_pool_consumed(pool_tag: String, event_id: String) -> void:
 	list.append(event_id)
 	all_consumed[pool_tag] = list
 	world_state["finalEventPoolConsumed"] = all_consumed
+	# Step 2 联动：同步写 last_consumed_skeleton_event_id 供中段自省 presentation 差分。
+	# 字段名沿用 MVP 设计文档（"skeleton" 暗示骨架场景），实际任意末位池消耗都会写；
+	# 未来若需要按 tag 区分差分键，可改为按 tag 分组（{ tag → last_id }）的字典结构。
+	world_state["last_consumed_skeleton_event_id"] = event_id
 	print("[叙事包] 末尾位池 %s 标记消耗: %s（累计 %d）" % [pool_tag, event_id, list.size()])
 
 
@@ -1444,6 +1621,16 @@ func _weighted_pick(candidates: Array) -> String:
 			return str(candidate.get("id", ""))
 
 	return str((candidates[0] as Dictionary).get("id", ""))
+
+# 功能：检查指定 event_id 是否存在于事件池（Step 2 新增）。
+# 说明：供调用方（如 main_game.gd 注入开场 forcedNextEventId 前）做存在性校验，
+#       避免对缺失事件 ID 的 forcedNextEventId 写入触发 _select_next_event 的
+#       missing_event_def fatal。
+func has_event(event_id: String) -> bool:
+	if event_id.strip_edges().is_empty():
+		return false
+	return _event_map.has(event_id.strip_edges())
+
 
 # 功能：选择兜底事件。
 # 说明：优先 evt_idle，其次取事件池中第一个可用 id。
@@ -3212,6 +3399,19 @@ func _init_pack_config() -> void:
 	# 结构：{ tag → [event_id, ...] }；首次加载时初始化空字典。
 	if not world_state.has("finalEventPoolConsumed") or typeof(world_state.get("finalEventPoolConsumed", null)) != TYPE_DICTIONARY:
 		world_state["finalEventPoolConsumed"] = {}
+
+	# Step 2 自省事件结构改造相关字段（设计基线见 [[当前版本完整主路径_MVP设计]] §三·节点 2）。
+	# visited_locations：跨自省持久；玩家在自省末屏选完地点后追加；导入阶段模式下用于地点选择 UI 过滤。
+	# reflection_mode：驱动地点筛选模式（"intro"=导入阶段，逐次变短；"regular"=正式期，全量显示）。
+	# last_consumed_skeleton_event_id：上一被消耗的末位池事件 event_id；
+	#   由 _mark_final_pool_consumed 自动写入；中段自省 presentation 按 condition 选差分叙事。
+	if not world_state.has("visited_locations") or typeof(world_state.get("visited_locations", null)) != TYPE_ARRAY:
+		world_state["visited_locations"] = []
+	if not world_state.has("reflection_mode") or str(world_state.get("reflection_mode", "")).is_empty():
+		# 默认 intro（当前版本走导入阶段模式）；正式期切 regular 由 world_seed 配置或运行时切换。
+		world_state["reflection_mode"] = "intro"
+	if not world_state.has("last_consumed_skeleton_event_id"):
+		world_state["last_consumed_skeleton_event_id"] = ""
 	print("[叙事包] packConfig 已加载: %s" % str(_pack_config))
 
 
@@ -3382,6 +3582,70 @@ func _build_location_select_event() -> Dictionary:
 		"type": "location_select",
 		"options": options
 	}
+
+
+# 功能：构建自省末屏地点选择候选（Step 2 新增）。
+# 说明：候选地点来源按 reflection_mode 分化：
+#       - reflection_mode="intro"（导入阶段模式）：从 location_graph 全量地点构建候选
+#         （MVP §二·原则 8 要求"首个自省 4 地点全可选"，玩家选过的地点逐次过滤），
+#         不依赖当前地点的邻居关系；
+#       - reflection_mode="regular"（正式期模式）：复用 _build_location_select_event 的
+#         邻居图候选（与现有移动语义一致）。
+#       两种模式均返回与 _build_location_select_event option 一致的字典结构（带 location_id /
+#       text / npc_present / has_pending_forced 等字段）以便 UI 复用渲染。
+func get_reflection_location_options() -> Array:
+	var mode: String = str(world_state.get("reflection_mode", "intro"))
+	if mode == "regular":
+		var loc_event: Dictionary = _build_location_select_event()
+		return loc_event.get("options", [])
+
+	# intro 模式：全量地点构建 + 过滤 visited_locations。
+	if _location_graph == null:
+		return []
+	var visited: Array = _array_or_empty(world_state.get("visited_locations", []))
+	var current_location: String = str(world_state.get("currentLocationId", ""))
+	var npc_presence: Dictionary = _dict_or_empty(world_state.get("npcPresence", {}))
+	var forced_id: String = str(world_state.get("forcedNextEventId", ""))
+	var forced_def: Dictionary = _event_map.get(forced_id, {})
+	var forced_locations: Array = []
+	if not forced_def.is_empty():
+		forced_locations = forced_def.get("eligibility", {}).get("requiredLocations", [])
+
+	var all_ids: Array = _location_graph.get_all_location_ids()
+	var out: Array = []
+	var display_order := 1
+	for loc_id_variant in all_ids:
+		var loc_id: String = str(loc_id_variant)
+		if loc_id.is_empty():
+			continue
+		if loc_id in visited:
+			continue
+		var display_name: String = _location_graph.get_display_name(loc_id)
+		if display_name.is_empty():
+			display_name = loc_id
+		var npc_list: Array = _array_or_empty(npc_presence.get(loc_id, []))
+		var has_pending_forced: bool = (
+			not forced_id.is_empty()
+			and not forced_locations.is_empty()
+			and (loc_id in forced_locations)
+		)
+		var is_current: bool = (loc_id == current_location)
+		var option_text: String = display_name
+		if is_current:
+			option_text = "%s（当前所在）" % display_name
+		out.append({
+			"id": "loc_select_%s" % loc_id,
+			"location_id": loc_id,
+			"text": option_text,
+			"display_order": display_order,
+			"npc_present": npc_list,
+			"has_pending_forced": has_pending_forced,
+			"is_current": is_current,
+			"visible": true,
+			"selectable": true
+		})
+		display_order += 1
+	return out
 
 
 # ── 自省与关系调整系统 ──────────────────────────────────────────

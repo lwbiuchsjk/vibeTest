@@ -286,8 +286,16 @@ func _on_intro_reveal_ui() -> void:
 
 # 功能：intro_completed 回调（t=2.0s）。
 # 说明：IntroSequence 已隐藏，进入正式游戏逻辑。
-#       当前叙事接入点留空（林秋禾台词 / 叙事触发由阶段 3 事件设计接管）。
+#       Step 2：注入 sys_opening_reflection 作为开场首个事件（首个自省，含池塘开场叙事 +
+#       4 地点选择末屏）。事件不存在时引擎在 _select_next_event 报 missing_event_def fatal，
+#       配置者应确保 CSV 中存在该 event_id；老 demo 配置无此事件时直接跳过 forced 注入。
 func _on_intro_completed() -> void:
+	const OPENING_REFLECTION_EVENT_ID := "sys_opening_reflection"
+	# 注入前先用 has_event 校验存在性，避免老 demo 配置（无 sys_opening_reflection）触发
+	# _select_next_event 的 missing_event_def fatal。仅在外部 forced 字段未占用时注入，
+	# 避免覆盖既有 forced 安排。
+	if _engine.has_event(OPENING_REFLECTION_EVENT_ID) and _engine.world_state.get("forcedNextEventId", "") == "":
+		_engine.world_state["forcedNextEventId"] = OPENING_REFLECTION_EVENT_ID
 	_start_game_after_intro()
 
 
@@ -355,6 +363,13 @@ func _render_current_event(turn_result: Dictionary) -> void:
 
 	_clear_option_list()
 	if phase == "presentation":
+		# Step 2：检测末屏 presents=location_select → 同屏渲染叙事文本 + 地点按钮组
+		# （由 confirm_reflection_location_select API 处理玩家选择并追加过渡叙事）。
+		var current_presents: String = str(presentation_item.get("presents", "text"))
+		if current_presents == "location_select":
+			status_label.text = "选择前往的地点。"
+			_render_reflection_location_buttons(turn_result)
+			return
 		status_label.text = "当前处于展示阶段，点击继续查看下一条文本。"
 		_show_continue_footer("继续 ›")
 		return
@@ -779,6 +794,46 @@ func _on_location_select_pressed(location_id: String) -> void:
 		return
 	_append_log("前往地点: %s（包容量 %d）" % [location_id, int(result.get("pack_capacity", 0))])
 	_preview_next_event()
+
+
+# 功能：渲染自省末屏地点选择按钮组（Step 2 新增）。
+# 说明：与 _render_location_select 的差别：
+#       1. 候选地点由 engine.get_reflection_location_options() 提供（已按 reflection_mode +
+#          visited_locations 过滤），区别于独立 location_select phase 的全量邻居；
+#       2. 按钮 connect 到 _on_reflection_location_select_pressed，调用引擎
+#          confirm_reflection_location_select API（写 visited_locations + 切地点 +
+#          追加过渡叙事虚拟 presentation 行）；
+#       3. 不显示"继续"按钮——末屏的"继续"被地点选择替代。
+#       叙事文本仍由上层 _render_current_event 中的 narrative panel 渲染（同屏共存）。
+func _render_reflection_location_buttons(_turn_result: Dictionary) -> void:
+	var options: Array = _engine.get_reflection_location_options()
+	if options.is_empty():
+		_add_option_hint("无可选地点（visited_locations 已覆盖全图或邻居为空）。")
+		return
+	for opt_variant in options:
+		var opt: Dictionary = opt_variant
+		var location_id := str(opt.get("location_id", ""))
+		var option_text := str(opt.get("text", location_id))
+		var btn := Button.new()
+		btn.text = option_text
+		btn.pressed.connect(_on_reflection_location_select_pressed.bind(location_id))
+		ButtonTheme.apply(btn)
+		option_list.add_child(btn)
+
+
+# 功能：处理自省末屏地点选择按钮点击（Step 2 新增）。
+# 说明：调用引擎 confirm_reflection_location_select，引擎处理：写 visited_locations + 切
+#       currentLocationId + 抽 transition_text_pool 追加为虚拟 presentation 行 + 推进 index。
+#       返回的 turn_result 即更新后的 pending presentation 状态，按 _handle_preview_turn_result
+#       常规渲染（下一屏可能是过渡叙事 text 或 confirm 阶段）。
+func _on_reflection_location_select_pressed(location_id: String) -> void:
+	var result: Dictionary = _engine.confirm_reflection_location_select(location_id)
+	if not result.get("ok", false):
+		status_label.text = "自省地点选择失败: %s" % str(result.get("error", "unknown"))
+		_update_side_panels()
+		return
+	_append_log("自省末屏选地点: %s" % location_id)
+	_handle_preview_turn_result(result)
 
 
 # ── 选项与押注 UI ────────────────────────────────────────────────

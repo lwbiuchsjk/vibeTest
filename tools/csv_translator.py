@@ -577,7 +577,11 @@ def parse_condition_expr(expr: str) -> dict[str, str] | None:
 
 
 def generate_event_presentations_csv(cards: list[dict[str, Any]]) -> list[dict[str, str]]:
-    """生成 event_presentations.csv 行。"""
+    """生成 event_presentations.csv 行。
+
+    presents 字段默认填 "text"（纯叙事）；非默认值（如 location_select）需在拆解稿
+    手动指定，由翻译者按 presents_values 契约白名单填写，不在脚本自动生成范围。
+    """
     rows: list[dict[str, str]] = []
     for card in cards:
         event_id = card["event_id"]
@@ -589,6 +593,7 @@ def generate_event_presentations_csv(cards: list[dict[str, Any]]) -> list[dict[s
                 "item_type": "text",
                 "speaker": "旁白",
                 "text": para,
+                "presents": "text",
             })
     return rows
 
@@ -784,7 +789,7 @@ CSV_HEADERS = {
     ],
     "event_presentations.csv": [
         "event_id", "presentation_id", "display_order", "item_type",
-        "speaker", "text",
+        "speaker", "text", "presents",
     ],
     "options.csv": [
         "option_id", "choice_point_id", "text", "display_order",

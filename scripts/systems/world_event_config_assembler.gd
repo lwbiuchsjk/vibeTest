@@ -46,6 +46,12 @@ static func compile_from_csv_dir(csv_dir_path: String) -> Dictionary:
 	if not events_result.get("ok", false):
 		return events_result
 
+	# Step 2：装配过渡叙事文本池并写入 world_state.transitionTextPool。
+	# 结构：{ pool_id: { location_id: [text1, text2, ...] }（按 seq 升序） }；
+	# 文件缺失时为空字典，引擎在自省末屏选完地点后查不到对应池则跳过过渡叙事段。
+	var transition_pool: Dictionary = _assemble_transition_text_pool(tables)
+	world_result["world_state"]["transitionTextPool"] = transition_pool
+
 	return {
 		"ok": true,
 		"data": {
@@ -56,6 +62,55 @@ static func compile_from_csv_dir(csv_dir_path: String) -> Dictionary:
 			"task_evaluation": task_eval_result["task_evaluation"]
 		}
 	}
+
+
+# 功能：装配过渡叙事文本池（Step 2 新增）。
+# 说明：从 transition_text_pool.csv 读取，按 pool_id / location_id 分组，按 seq 升序排序文本；
+#       静默跳过格式异常行，避免单行错误阻断整体加载。
+static func _assemble_transition_text_pool(tables: Dictionary) -> Dictionary:
+	var rows: Array = tables.get("transition_text_pool.csv", [])
+	# 中间结构：{ pool_id: { location_id: [{seq: int, text: String}, ...] } }
+	var staging: Dictionary = {}
+	for row_variant in rows:
+		var row: Dictionary = row_variant
+		var pool_id: String = str(row.get("pool_id", "")).strip_edges()
+		var location_id: String = str(row.get("location_id", "")).strip_edges()
+		var seq_text: String = str(row.get("seq", "")).strip_edges()
+		var text: String = str(row.get("text", ""))
+		if pool_id.is_empty() or location_id.is_empty() or text.is_empty():
+			continue
+		if seq_text.is_empty() or not seq_text.is_valid_int():
+			continue
+		var seq: int = int(seq_text)
+		if not staging.has(pool_id):
+			staging[pool_id] = {}
+		var by_location: Dictionary = staging[pool_id]
+		if not by_location.has(location_id):
+			by_location[location_id] = []
+		var entries: Array = by_location[location_id]
+		entries.append({"seq": seq, "text": text})
+		by_location[location_id] = entries
+		staging[pool_id] = by_location
+
+	# 排序并扁平化为 { pool_id: { location_id: [text, ...] } }
+	var out: Dictionary = {}
+	for pool_id_variant in staging.keys():
+		var pool_id_key: String = str(pool_id_variant)
+		var by_location: Dictionary = staging[pool_id_key]
+		var pool_out: Dictionary = {}
+		for location_id_variant in by_location.keys():
+			var location_id_key: String = str(location_id_variant)
+			var entries: Array = by_location[location_id_key]
+			entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+				return int(a.get("seq", 0)) < int(b.get("seq", 0))
+			)
+			var texts: Array = []
+			for entry_variant in entries:
+				var entry: Dictionary = entry_variant
+				texts.append(str(entry.get("text", "")))
+			pool_out[location_id_key] = texts
+		out[pool_id_key] = pool_out
+	return out
 
 
 # 功能：读取编译所需的 6 张核心 CSV 表。
@@ -74,7 +129,10 @@ static func _load_tables(base: String) -> Dictionary:
 		"task_eval_grades.csv",
 		"task_eval_indicators.csv",
 		"task_eval_grade_overrides.csv",
-		"task_eval_effects.csv"
+		"task_eval_effects.csv",
+		# Step 2 自省过渡叙事文本池（设计基线见 [[当前版本完整主路径_MVP设计]] §三·节点 2）。
+		# 字段：pool_id / location_id / seq / text；缺失时引擎跳过过渡叙事段。
+		"transition_text_pool.csv"
 	]
 
 	var tables: Dictionary = {}
@@ -717,6 +775,17 @@ static func _apply_event_presentations(event_map: Dictionary, rows: Array) -> Di
 		if text.is_empty():
 			return {"ok": false, "error": "event presentation text is empty: %s" % presentation_id}
 
+		# Step 2 新增：presents 字段表达 presentation 行承担的 UI 功能（设计基线见
+		# [[当前版本完整主路径_MVP设计]] §三·节点 2 "Step 2 实施落地细节"）。
+		# 合法值见 [[配置翻译指南]] 锚点 presents_values；空 / 缺省 → 默认 "text"。
+		# 引擎仅识别白名单内的值；非白名单值降级为 "text" 并保留警告（不阻断加载）。
+		var presents_raw := str(row.get("presents", "")).strip_edges()
+		var presents := presents_raw if not presents_raw.is_empty() else "text"
+		var allowed_presents: Array = ["text", "location_select", "adjust_relation", "focus_select", "focus_remove"]
+		if not (presents in allowed_presents):
+			push_warning("event_presentations: unknown presents '%s' on %s, fallback to 'text'" % [presents, presentation_id])
+			presents = "text"
+
 		used_presentation_ids[presentation_id] = true
 		var event_def: Dictionary = event_map[event_id]
 		var presentation: Array = event_def.get("presentation", [])
@@ -726,7 +795,8 @@ static func _apply_event_presentations(event_map: Dictionary, rows: Array) -> Di
 				"order": int(display_order_text),
 				"type": item_type,
 				"speaker": str(row.get("speaker", "")).strip_edges(),
-				"text": text
+				"text": text,
+				"presents": presents
 			}
 		)
 		_sort_presentation_items(presentation)

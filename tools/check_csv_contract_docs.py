@@ -29,6 +29,7 @@ REQUIRED_ANCHORS = [
     "resolution_target_routing",
     "rule_types",
     "condition_types",
+    "presents_values",
 ]
 
 

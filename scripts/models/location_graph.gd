@@ -26,6 +26,15 @@ func get_neighbors(location_id: String) -> Array[String]:
 		out.append(str(n))
 	return out
 
+
+# 功能：返回图中全部已知 location_id 列表（Step 2 新增）。
+# 说明：供"导入阶段模式"自省事件构建全量地点候选（不限于当前地点的邻居）使用。
+func get_all_location_ids() -> Array[String]:
+	var out: Array[String] = []
+	for key_variant in adjacency.keys():
+		out.append(str(key_variant))
+	return out
+
 # 移动判定：同地点可达，否则必须在邻接列表中。
 func is_neighbor(from_location_id: String, to_location_id: String) -> bool:
 	if from_location_id == to_location_id:
