@@ -7,6 +7,7 @@ const WorldEndScreen := preload("res://scripts/ui/world_end_screen.gd")
 const ResponsiveLayout := preload("res://scripts/ui/responsive_layout.gd")
 const ButtonTheme := preload("res://scripts/ui/button_theme.gd")
 const SealPanel := preload("res://scripts/ui/seal_panel.gd")
+const OptionCard := preload("res://scripts/ui/option_card.gd")
 
 # UI 字体分工(参见 Design/进度/UI风格快速翻调_demo期进度.md):
 # - 默认全局字体走 default_theme.tres 设的霞鹜文楷 Light(楷体,与 mosaic 素描笔触同源)
@@ -55,6 +56,16 @@ const LOCATION_TEXT_TOKENS: Dictionary = {
 # 未匹配 location_id 时的 fallback token,避免文字层完全无渲染。
 const DEFAULT_TEXT_TOKENS: Array = ["风", "云", "山", "水", "城", "镇", "人", "事"]
 
+# 通用 mosaic 词库:供"装饰性 mosaic"层(选项卡阴影 / 印章斑驳层 等)复用,
+# 与地点专属 LOCATION_TEXT_TOKENS 解耦。文字内容是用户领域,工程方仅提供数据结构与默认占位。
+# 选词原则:泛用诗意双字词,不偏向任何具体地点 / 角色 / 事件;与背景层 mosaic 文风同源。
+# 用户后续可从《标签体系》或核心设计文档抽取正式词库后替换此占位。
+const COMMON_MOSAIC_TOKENS: Array = [
+	"春秋", "寒暑", "风霜", "晨昏",
+	"山水", "云月", "烟波", "草木",
+	"光阴", "岁月", "朝夕", "枯荣",
+]
+
 # F8 调试键专用：周既明练武场背景图与对应 location_id。
 # 用途：在不改 CSV 事件配置的前提下，验证 M1' 色相敏感算法在真实暖色调美术资源上的视觉效果。
 const ZHOU_TRAINING_GROUND_PATH: String = "res://assets/art/environments/backgrounds/training_ground.png"
@@ -66,6 +77,10 @@ var _current_turn_result: Dictionary = {}
 var _resizing := false              # 防止窗口尺寸调整时递归触发
 # 主动押注切换状态：按选项 ID 记录各选项的押注模式（true=押注，false=默认）。
 var _bet_mode_options: Dictionary = {}
+# 议题 B 聚合面板的"继续"页脚回调路由：不同 phase（普通事件 / 开局选择 narrating / 开局选择 outcome）
+# 共享同一个 ContinueButton 节点,通过 _show_continue_footer 切换 _continue_handler 实现行为分流。
+# 默认指向普通事件的 _on_continue_button_pressed,phase 切换时由 _show_continue_footer 重设。
+var _continue_handler: Callable = Callable()
 
 @onready var screen_background: TextureRect = $ScreenBackground
 # 屏幕级文字马赛克衬底(油画式 3 层):粗(36px α 0.5)→ 中(18px α 0.45)→ 细(8px α 0.4),
@@ -130,12 +145,13 @@ var _bet_mode_options: Dictionary = {}
 @onready var narrative_panel: PanelContainer = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/NarrativePanel
 @onready var event_title_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/NarrativePanel/NarrativeContent/EventTitle
 @onready var event_detail_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/NarrativePanel/NarrativeContent/EventDetail
-@onready var option_header_label: Label = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/OptionSection/OptionHeader
 @onready var task_summary_card: TaskSummaryCard = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/TaskSummaryCard
 @onready var main_split: HSplitContainer = $Root/RootContent/MainSplit
 @onready var end_root: WorldEndScreen = $Root/RootContent/EndRoot
-@onready var continue_button: Button = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/OptionSection/ActionBar/ContinueButton
-@onready var option_list: VBoxContainer = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/OptionSection/OptionScroll/OptionList
+# 议题 B:聚合面板结构 —— 继续按钮退化为叙事面板底部页脚朱字(SHRINK_END 右对齐 + flat=true 无 stylebox);
+# OptionList 移入 NarrativeContent 内,选项 + 继续都属于"叙事面板下半部"的"伸手位"。
+@onready var continue_button: Button = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/NarrativePanel/NarrativeContent/ContinueButton
+@onready var option_list: VBoxContainer = $Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/NarrativePanel/NarrativeContent/OptionList
 # 测试场景特有的调试输出节点（同上 right_column 说明）。正式场景为 null,访问点 null check。
 @onready var world_state_label: RichTextLabel = get_node_or_null("Root/RootContent/MainSplit/RightColumn/RightPanel/RightMargin/RightContent/WorldStateValue") as RichTextLabel
 @onready var log_label: RichTextLabel = get_node_or_null("Root/RootContent/MainSplit/RightColumn/BottomPanel/BottomMargin/BottomContent/LogValue") as RichTextLabel
@@ -152,7 +168,11 @@ var _bet_mode_options: Dictionary = {}
 #       结束后通过信号回调进入正式游戏逻辑。
 #       无 IntroSequence 时（test 场景）直接调用 _start_game_after_intro() 跳过 intro。
 func _ready() -> void:
-	continue_button.pressed.connect(_on_continue_button_pressed)
+	# 议题 B:ContinueButton pressed 经由路由 handler 分发,通过 _continue_handler 切换不同 phase 的回调
+	continue_button.pressed.connect(_on_continue_footer_pressed_router)
+	# 议题 B 调整 4:整张叙事面板作为"继续"扩展点击区域,仅 ContinueButton 可见时启用
+	# (handler 内部检查 continue_button.visible 决定是否转发)
+	narrative_panel.gui_input.connect(_on_narrative_panel_gui_input)
 	end_root.action_requested.connect(_on_end_action_requested)
 	_setup_overlay_styles()
 	_setup_seal_row_mock()  # Phase 1.5 mock:验证印章式状态条形态后整体重构
@@ -334,11 +354,9 @@ func _render_current_event(turn_result: Dictionary) -> void:
 	narrative_panel.visible = has_narrative
 
 	_clear_option_list()
-	continue_button.visible = false
-	continue_button.disabled = true
 	if phase == "presentation":
 		status_label.text = "当前处于展示阶段，点击继续查看下一条文本。"
-		_add_continue_button_to_option_list("继续")
+		_show_continue_footer("继续 ›")
 		return
 
 	# 心性风险入口：孤注一掷
@@ -381,11 +399,13 @@ func _render_current_event(turn_result: Dictionary) -> void:
 		_render_choice_options(full_options, risk_profile)
 	else:
 		status_label.text = "当前事件待确认，点击继续后结算并预览下一个事件。"
-		_add_continue_button_to_option_list("确认结算，进入下一个事件")
+		_show_continue_footer("确认结算 ›")
 
 
 # 功能：渲染心性风险入口的接受/放弃按钮对（孤注一掷专用）。
 # 说明：两个按钮分别绑定 "accept" 和 "reject"，走正常的 confirm_pending_turn 分流。
+#       孤注一掷入口属于系统级风险交互(独立色彩 PRESET_DESPERATE),不在议题 B"普通选项"
+#       范围内,刻意保留 Button 路径,议题 E(选项效果精调)再评估迁移。
 func _render_risk_entry_buttons(accept_text: String, reject_text: String) -> void:
 	_add_option_section_label("— 心性风险入口 —")
 
@@ -426,24 +446,24 @@ func _render_creation_phase(result: Dictionary) -> void:
 	_clear_option_list()
 
 	if phase == "narrating":
-		# narrating 阶段：仅展示【继续】按钮，不渲染选项。
-		var btn := Button.new()
-		btn.text = "继续"
-		btn.pressed.connect(_on_creation_continue_pressed)
-		ButtonTheme.apply(btn)
-		option_list.add_child(btn)
+		# narrating 阶段：仅展示页脚朱字"继续 ›"（议题 B 状态 A）
+		_show_continue_footer("继续 ›", Callable(self, "_on_creation_continue_pressed"))
 	else:
-		# choosing 阶段：渲染选项按钮（当前逻辑）。
+		# choosing 阶段：渲染 OptionCard 选项卡片堆（议题 B 状态 B）
+		var shadow_tokens: PackedStringArray = PackedStringArray(COMMON_MOSAIC_TOKENS)
 		var actions: Array = result.get("available_actions", [])
+		var idx: int = 0
 		for action_variant in actions:
 			var action: Dictionary = action_variant
-			var btn := Button.new()
-			btn.text = str(action.get("label", ""))
-			btn.disabled = not bool(action.get("enabled", true))
-			var option_id := str(action.get("action", ""))
-			btn.pressed.connect(_on_creation_option_pressed.bind(option_id))
-			ButtonTheme.apply(btn)
-			option_list.add_child(btn)
+			var label_text: String = str(action.get("label", ""))
+			var option_id: String = str(action.get("action", ""))
+			var enabled: bool = bool(action.get("enabled", true))
+			var card: OptionCard = OptionCard.new()
+			option_list.add_child(card)
+			var seed_val: int = (idx + 1) * 137 + abs(hash(option_id)) % 100
+			card.set_option(label_text, option_id, null, 17, enabled, seed_val, shadow_tokens)
+			card.pressed.connect(_on_creation_option_pressed.bind(option_id))
+			idx += 1
 
 	_update_side_panels()
 
@@ -464,11 +484,8 @@ func _render_creation_outcome(result: Dictionary) -> void:
 	var outcome_text := str(result.get("outcome_text", ""))
 	event_detail_label.text = outcome_text
 	_clear_option_list()
-	var btn := Button.new()
-	btn.text = "继续"
-	btn.pressed.connect(_on_creation_outcome_confirmed)
-	ButtonTheme.apply(btn)
-	option_list.add_child(btn)
+	# 议题 B：开局后果是状态 A（无真选项），用页脚朱字承担"继续"
+	_show_continue_footer("继续 ›", Callable(self, "_on_creation_outcome_confirmed"))
 	_update_side_panels()
 
 
@@ -848,6 +865,8 @@ func _build_bet_info_for_option(option_def: Dictionary) -> Dictionary:
 # 说明：遍历完整选项定义，对满足押注条件的选项渲染切换组件，其余渲染普通按钮。
 func _render_choice_options(full_options: Array, risk_profile: Dictionary) -> void:
 	var visible_count := 0
+	# OptionCard 阴影 mosaic 词库:议题 B 用通用诗意词,与背景 mosaic 同源风格
+	var shadow_tokens: PackedStringArray = PackedStringArray(COMMON_MOSAIC_TOKENS)
 	for option_variant in full_options:
 		var option_def: Dictionary = option_variant
 		var state := str(option_def.get("state", "disabled"))
@@ -859,16 +878,24 @@ func _render_choice_options(full_options: Array, risk_profile: Dictionary) -> vo
 		var can_bet := _can_option_trigger_bet(option_def, risk_profile)
 
 		if can_bet:
-			# 该选项支持主动押注，渲染带切换的选项组
+			# 该选项支持主动押注，渲染带切换的选项组(保留旧 Button 路径,带 cost/check 议题再扩展)
 			_render_option_with_bet_toggle(option_def, risk_profile)
 		else:
-			# 普通选项按钮
-			var option_button := Button.new()
-			option_button.text = _build_option_button_text(option_def)
-			option_button.disabled = state != "selectable"
-			option_button.pressed.connect(_on_option_pressed.bind(option_id))
-			ButtonTheme.apply(option_button)
-			option_list.add_child(option_button)
+			# 议题 B 纯文本选项 → OptionCard(mosaic 阴影 + 米白底 + 朱字)
+			# 各卡 noise_seed 用 visible_count + option_id hash,确保各异斑驳模式
+			var card: OptionCard = OptionCard.new()
+			option_list.add_child(card)
+			var seed_val: int = visible_count * 137 + abs(hash(option_id)) % 100
+			card.set_option(
+				str(option_def.get("text", "")),
+				option_id,
+				null,  # font=null:OptionCard 内部 fallback 到主题字体(霞鹜文楷)
+				17,
+				state == "selectable",
+				seed_val,
+				shadow_tokens
+			)
+			card.pressed.connect(_on_option_pressed.bind(option_id))
 
 	if visible_count == 0:
 		_add_option_hint("当前事件没有可见选项。")
@@ -1619,21 +1646,62 @@ func _append_log(line: String) -> void:
 		_event_logs.pop_front()
 
 
-# 功能：清空选项列表。
-# 说明：切换到新事件前先移除旧按钮和提示文本。
+# 功能：清空选项列表 + 隐藏继续页脚。
+# 说明：切换到新事件前先移除旧选项卡 / 按钮 / 提示文本,并默认隐藏底部继续朱字。
+#       具体路径会按需通过 _show_continue_footer 重新显示继续页脚。
+#       同时清空 _continue_handler 防御 stale callback —— 即使未来有路径绕过 _show_continue_footer
+#       直接将 continue_button.visible 改回 true,旧 phase 的回调也不会被静默触发。
 func _clear_option_list() -> void:
 	for child in option_list.get_children():
 		child.queue_free()
+	# 议题 B:每次清空时默认隐藏继续页脚,由调用方按状态决定是否再显示
+	if continue_button != null:
+		continue_button.visible = false
+		continue_button.disabled = true
+	_continue_handler = Callable()
 
 
-# 功能：在选项列表中动态创建"继续"按钮，复用统一样式。
-# 说明：替代场景中静态 ContinueButton，使继续操作与选项按钮视觉一致。
-func _add_continue_button_to_option_list(label_text: String) -> void:
-	var btn := Button.new()
-	btn.text = label_text
-	btn.pressed.connect(_on_continue_button_pressed)
-	ButtonTheme.apply(btn)
-	option_list.add_child(btn)
+# 功能：议题 B 聚合面板的"继续"页脚 —— 显示叙事面板底部的小朱字提示。
+# 说明：替代旧 _add_continue_button_to_option_list（不再把"继续"作为列表项渲染）;
+#       状态 A（无真选项）调用此函数显示"继续 ›";
+#       状态 B（有真选项）不调用,由 _clear_option_list 默认隐藏。
+# 参数 callback:可选回调（默认走普通事件 _on_continue_button_pressed）;
+#       开局选择 / 开局后果等 phase 传入对应的 advance/confirm 回调。
+func _show_continue_footer(label_text: String, callback: Callable = Callable()) -> void:
+	if continue_button == null:
+		return
+	continue_button.text = label_text
+	continue_button.visible = true
+	continue_button.disabled = false
+	# 路由切换:回调有效则改 _continue_handler,否则回到默认普通事件路径
+	if callback.is_valid():
+		_continue_handler = callback
+	else:
+		_continue_handler = Callable(self, "_on_continue_button_pressed")
+
+
+# 功能：ContinueButton.pressed 信号的统一路由器。
+# 说明：根据当前 phase 的 _continue_handler 分流到对应回调（普通事件 / 创建 narrating / 创建 outcome）;
+#       _continue_handler 未设置时兜底走普通事件路径,避免开局阶段误触导致 null 调用。
+func _on_continue_footer_pressed_router() -> void:
+	if _continue_handler.is_valid():
+		_continue_handler.call()
+	else:
+		_on_continue_button_pressed()
+
+
+# 功能：议题 B 调整 4 —— 把整张叙事面板作为"继续"扩展点击区域。
+# 说明：仅 continue_button 可见时(状态 A)接收转发；状态 B(有 OptionCard)时 continue_button 隐藏,handler 直接 return。
+#       OptionCard 自身 mouse_filter=STOP 会拦截卡片区域点击,NarrativePanel 只收到空白区点击,与 OptionCard 不冲突。
+#       依赖 EventDetail / EventTitle 的 mouse_filter=IGNORE(在 tscn 中配置),让事件传递到 NarrativePanel。
+func _on_narrative_panel_gui_input(event: InputEvent) -> void:
+	if continue_button == null or not continue_button.visible:
+		return
+	if event is InputEventMouseButton:
+		var mb: InputEventMouseButton = event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed:
+			_on_continue_footer_pressed_router()
+			accept_event()
 
 
 # 功能：在选项列表中插入分隔标签。
@@ -1688,16 +1756,28 @@ func _setup_overlay_styles() -> void:
 	world_label.add_theme_font_size_override("font_size", 13)
 
 	# 叙事面板(承担当前事件焦点,视觉权重最重):
-	#   - alpha 0.85 比状态条 0.75 略实,纸面更"凝",焦点感出来
-	#   - 标题用焦墨色 + 22px,与正文 17px 拉开内部层级
+	#   - alpha 0.85 比状态条 0.75 略实,纸面更"凝",焦点感出来 ← 调 alpha 改这一行第 4 个分量
+	#   - 标题用焦墨色 + 22px,与正文 17px 拉开内部层级(标题已隐藏,保留逻辑兼容)
 	#   - padding 比状态条更舒展
+	#   - 信笺风格描边:细线浅墨 1px + 极小圆角 2px,模拟"内嵌细边"的纸面信笺感,
+	#     与底层 mosaic 字符同源(都是 ink),不引入异质材质
 	# 不引入朱色到标题:朱色严格只给"玩家伸手"位(选项/继续),标题是事件信息不破规。
 	var narrative_style: StyleBoxFlat = base_panel_style.duplicate()
-	narrative_style.bg_color = Color(0.957, 0.925, 0.847, 0.85)
+	narrative_style.bg_color = Color(0.957, 0.925, 0.847, 0.75)
 	narrative_style.content_margin_left = 16
 	narrative_style.content_margin_right = 16
 	narrative_style.content_margin_top = 12
 	narrative_style.content_margin_bottom = 12
+	# 信笺细描边
+	narrative_style.border_color = Color(0.353, 0.310, 0.271, 0.55)
+	narrative_style.border_width_left = 1
+	narrative_style.border_width_right = 1
+	narrative_style.border_width_top = 1
+	narrative_style.border_width_bottom = 1
+	narrative_style.corner_radius_top_left = 2
+	narrative_style.corner_radius_top_right = 2
+	narrative_style.corner_radius_bottom_left = 2
+	narrative_style.corner_radius_bottom_right = 2
 	narrative_panel.add_theme_stylebox_override("panel", narrative_style)
 	# 焦墨:比 text_primary(深褐墨)更深的标题色,与正文形成层级压差
 	var ink_focal_color := Color(0.102, 0.086, 0.071, 1.0)
@@ -1708,8 +1788,14 @@ func _setup_overlay_styles() -> void:
 	event_detail_label.add_theme_color_override("font_color", UI_TEXT_PRIMARY)
 	event_detail_label.add_theme_font_size_override("font_size", 17)
 
-	# 选项区标题(次级文字用 text_secondary 淡墨)
-	option_header_label.add_theme_color_override("font_color", UI_TEXT_SECONDARY)
+	# 继续按钮(议题 B 聚合面板页脚朱字):flat=true 已让按钮无 stylebox,这里只控字色 + 字号,
+	# 视觉降级为"叙事末尾的小提示" —— 朱色保留"伸手"语义,字号小于正文减弱权重。
+	# 状态 A(无真选项):显示"继续 ›";状态 B(有真选项):隐藏(由 _render_choice_options 路径控制)。
+	continue_button.add_theme_color_override("font_color", UI_ACCENT_ZHU)
+	continue_button.add_theme_color_override("font_hover_color", UI_ACCENT_ZHU)
+	continue_button.add_theme_color_override("font_pressed_color", UI_ACCENT_ZHU)
+	continue_button.add_theme_color_override("font_focus_color", UI_ACCENT_ZHU)
+	continue_button.add_theme_font_size_override("font_size", 14)
 
 
 # 功能：Phase 1.5 印章式状态条 mock(参见 [[UI风格快速翻调_demo期进度]] § 印章方向讨论)。

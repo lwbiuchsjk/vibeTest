@@ -539,6 +539,7 @@ breathe_enabled = true
 [node name="StartButton" type="Label" parent="IntroSequence"]
 modulate = Color(1, 1, 1, 0)
 layout_mode = 1
+anchors_preset = -1
 anchor_left = 0.5
 anchor_top = 0.6667
 anchor_right = 0.5
@@ -549,7 +550,6 @@ offset_right = 120.0
 offset_bottom = 25.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 2
 theme_override_colors/font_color = Color(0.05, 0.05, 0.05, 1)
 theme_override_font_sizes/font_size = 36
 text = "开  始"
@@ -896,47 +896,35 @@ layout_mode = 2
 size_flags_vertical = 3
 
 [node name="NarrativePanel" type="PanelContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent"]
+custom_minimum_size = Vector2(0, 290)
 layout_mode = 2
 size_flags_horizontal = 3
 
 [node name="NarrativeContent" type="VBoxContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/NarrativePanel"]
 layout_mode = 2
-theme_override_constants/separation = 6
+size_flags_vertical = 3
+theme_override_constants/separation = 12
 
 [node name="EventTitle" type="Label" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/NarrativePanel/NarrativeContent"]
+visible = false
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 
 [node name="EventDetail" type="Label" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/NarrativePanel/NarrativeContent"]
 layout_mode = 2
+size_flags_vertical = 0
 autowrap_mode = 3
 
-[node name="OptionSection" type="VBoxContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent"]
-custom_minimum_size = Vector2(0, 260)
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 8
-
-[node name="OptionHeader" type="Label" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/OptionSection"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 16
-text = "选项"
-
-[node name="ActionBar" type="HBoxContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/OptionSection"]
-layout_mode = 2
-
-[node name="ContinueButton" type="Button" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/OptionSection/ActionBar"]
-visible = false
-layout_mode = 2
-text = "继续"
-
-[node name="OptionScroll" type="ScrollContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/OptionSection"]
+[node name="OptionList" type="VBoxContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/NarrativePanel/NarrativeContent"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-horizontal_scroll_mode = 0
+theme_override_constants/separation = 0
 
-[node name="OptionList" type="VBoxContainer" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/OptionSection/OptionScroll"]
+[node name="ContinueButton" type="Button" parent="Root/RootContent/MainSplit/LeftPanel/LeftStack/LeftOverlay/LeftContent/NarrativePanel/NarrativeContent"]
+visible = false
 layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 8
+size_flags_horizontal = 8
+size_flags_vertical = 8
+text = "继续 ›"
+flat = true
