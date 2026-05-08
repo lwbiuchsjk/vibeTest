@@ -1,4 +1,5 @@
-task_id,title,duration_turns,on_expire,weight_bias_profile,complete_when
-task_exam,考试冲刺,2,fail,exam_default,progress.study >= 51
-task_part_time,生活补贴,2,fail,job_default,params.prosperity >= 22
-task_smuggle,码头暗线,3,fail,smuggle_default,flags.gotHarborIntel == true
+task_id,title,duration_turns,on_expire,weight_bias_profile,complete_when,accept_when
+task_meet_he,[任务·药铺] 认识何守仁,8,fail,,flags.met_he == true,flags.met_he == false
+task_meet_qin,[任务·家+市场] 认识秦素娘,8,fail,,flags.met_qin == true,flags.met_qin == false
+task_meet_zhou,[任务·练场] 认识周既明,8,fail,,flags.met_zhou == true,flags.met_zhou == false
+task_meet_cheng,[任务·道观] 认识程叔衡,8,fail,,flags.met_cheng == true,flags.met_cheng == false

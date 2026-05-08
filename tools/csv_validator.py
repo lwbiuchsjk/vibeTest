@@ -5,8 +5,8 @@ CSV 配置静态检查脚本
 功能：对事件引擎 CSV 配置（常规阶段 6 表）进行自动化静态检查，报告结构性问题。
 
 用法：
-  python tools/csv_validator.py --dir test/config/intro_flow_test
-  python tools/csv_validator.py --dir test/config/intro_flow_test --ref-dir scripts/config
+  python tools/csv_validator.py --dir scripts/config/world_event_mvp
+  python tools/csv_validator.py --dir scripts/config/world_event_mvp --ref-dir scripts/config
 """
 
 import argparse
@@ -88,6 +88,16 @@ DEMO_UNSUPPORTED_PRESENTS = {
     "adjust_relation",
     "focus_select",
     "focus_remove",
+}
+
+# option_outcomes.csv 的合法 branch 值（事件叙事反馈 MVP A，2026-05-09 新增）
+# 来源：Design/配置翻译指南.md 锚点 option_outcome_text
+# 引擎 _resolve_outcome_branch_texts fallback 链：
+#   critical_success → success → default
+#   critical_fail    → fail    → default
+#   success / fail   → default
+KNOWN_OUTCOME_BRANCHES = {
+    "default", "success", "fail", "critical_success", "critical_fail",
 }
 
 # 旧版关系 key 的正则（affinity.player_001->npc_xxx）——已废弃，仅用于识别误用
@@ -184,7 +194,13 @@ def validate(csv_dir: Path, ref_dir: Path) -> ValidationResult:
     option_rules = load_csv(csv_dir / "option_rules.csv")
     # Step 2 新增：可选表（缺失时静默跳过对应校验）。
     transition_text_pool = load_csv(csv_dir / "transition_text_pool.csv")
+    # location_graph.csv 优先在 csv_dir 找；找不到回 ref_dir 找（兼容嵌套结构：
+    # 正式路径 scripts/config/world_event_mvp/ 不含 location_graph，它在 scripts/config/ 根目录）。
     location_graph_rows = load_csv(csv_dir / "location_graph.csv")
+    if not location_graph_rows:
+        location_graph_rows = load_csv(ref_dir / "location_graph.csv")
+    # 事件叙事反馈 MVP A：option_outcomes.csv 可选表（缺失时静默跳过对应校验）。
+    option_outcomes = load_csv(csv_dir / "option_outcomes.csv")
 
     # ── 加载参考数据 ──
     attribute_keys = load_attribute_keys(ref_dir)
@@ -334,6 +350,63 @@ def validate(csv_dir: Path, ref_dir: Path) -> ValidationResult:
                     f"{row_label}: location_id '{location_id}' 不存在于 location_graph.csv"
                 )
         result.stats["过渡叙事行"] = len(transition_text_pool)
+
+    # ── 检查 6.7: option_outcomes.csv（事件叙事反馈 MVP A）──
+    # 文件可选；存在时校验：
+    #   - option_id 在 options.csv 存在（FK）
+    #   - branch 值在白名单内（KNOWN_OUTCOME_BRANCHES）
+    #   - seq 为正整数
+    #   - text 非空（含 strip）
+    #   - 同 (option_id, branch) 下 seq 连续无跳号（从 1 起递增）
+    if option_outcomes:
+        # 按 (option_id, branch) 收集 seq，最后做连续性校验。
+        seq_groups: dict[tuple[str, str], list[int]] = {}
+        for idx, row in enumerate(option_outcomes, start=1):
+            row_label = f"option_outcomes 第 {idx} 行"
+            option_id = row.get("option_id", "").strip()
+            branch = row.get("branch", "").strip()
+            seq_raw = row.get("seq", "").strip()
+            text = row.get("text", "")
+
+            if not option_id:
+                result.add_p1(f"{row_label}: option_id 为空")
+                continue
+            if option_id not in option_ids:
+                result.add_p1(
+                    f"{row_label}: option_id '{option_id}' 不存在于 options.csv"
+                )
+                continue
+            if not branch:
+                result.add_p1(f"{row_label}: branch 为空")
+                continue
+            if branch not in KNOWN_OUTCOME_BRANCHES:
+                result.add_p1(
+                    f"{row_label}: branch '{branch}' 非法"
+                    f"（合法值：{sorted(KNOWN_OUTCOME_BRANCHES)}）"
+                )
+                continue
+            if not text.strip():
+                result.add_p1(f"{row_label}: text 为空（或仅空白字符）")
+            if not seq_raw or not seq_raw.lstrip("-").isdigit() or int(seq_raw) <= 0:
+                result.add_p1(
+                    f"{row_label}: seq 必须为正整数（当前 '{seq_raw}'）"
+                )
+                continue
+
+            key = (option_id, branch)
+            seq_groups.setdefault(key, []).append(int(seq_raw))
+
+        # 同 (option_id, branch) 下 seq 必须从 1 起连续（1, 2, 3, ...），无跳号无重复。
+        for (option_id, branch), seqs in seq_groups.items():
+            seqs_sorted = sorted(seqs)
+            expected = list(range(1, len(seqs_sorted) + 1))
+            if seqs_sorted != expected:
+                result.add_p1(
+                    f"option_outcomes: ({option_id}, {branch}) 的 seq 序列 {seqs_sorted} "
+                    f"非从 1 起连续（期望 {expected}）"
+                )
+
+        result.stats["outcome 行"] = len(option_outcomes)
 
     # ── 检查 7: cost / resolution key 合法性 ──
     # 语义分工（与 world_event_config_assembler._apply_effect_or_resolution_action 对齐）：

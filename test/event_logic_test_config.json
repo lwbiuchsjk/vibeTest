@@ -1,3 +1,3 @@
 {
-  "dataset_dir": "res://test/config/intro_flow_test"
+  "_comment": "空 dataset_dir 让 main_game._load_test_config / test/event_logic_test._load_test_config 走 ConfigRuntime DEFAULT_PATHS（scripts/config/world_event_mvp）。如需切到测试数据集，把 dataset_dir 设为对应路径（如 res://test/config/pack_flow_test）。"
 }

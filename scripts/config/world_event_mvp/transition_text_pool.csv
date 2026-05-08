@@ -1,0 +1,9 @@
+pool_id,location_id,seq,text
+reflection_transition,loc_pharmacy,1,[过渡叙事·药铺·屏1] 雨后青石板，往药铺方向走（撰写期补）
+reflection_transition,loc_pharmacy,2,[过渡叙事·药铺·屏2] 推开门帘——熟悉的药香（撰写期补）
+reflection_transition,loc_qin_house,1,[过渡叙事·家+市场·屏1] 穿过市集小巷，朝家里方向（撰写期补）
+reflection_transition,loc_qin_house,2,[过渡叙事·家+市场·屏2] 远远看见母亲在灶前（撰写期补）
+reflection_transition,loc_training_ground,1,[过渡叙事·练场·屏1] 出镇朝练场方向走（撰写期补）
+reflection_transition,loc_training_ground,2,[过渡叙事·练场·屏2] 沙地上回声——人声未止（撰写期补）
+reflection_transition,loc_dao_temple,1,[过渡叙事·道观·屏1] 上山的青石阶梯（撰写期补）
+reflection_transition,loc_dao_temple,2,[过渡叙事·道观·屏2] 抬头看见道观山门（撰写期补）

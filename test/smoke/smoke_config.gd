@@ -3,8 +3,9 @@ extends RefCounted
 # 功能：冒烟测试共享配置入口。
 # 说明：冒烟测试默认使用全局 world_event_mvp 作为 csv_dir；
 #       各 smoke 若需自定义数据集，自行向 ConfigRuntime / WorldEventEngine 传入 csv_dir。
-#       本模块不再读取任何量产期测试数据（如 intro_flow_test）——
-#       量产数据集由 event_logic_test.gd 独立消费，与冒烟测试互不影响。
+#       本模块不再读取独立测试数据集副本——
+#       Phase A 占位骨架数据已迁移到 scripts/config/world_event_mvp（2026-05-09），
+#       与正式启动入口同源。冒烟测试与 main_game 共享同一份事件配置。
 #
 # 例外：以下 5 个测试因断言中硬编码了旧配置的事件/任务 ID（如 evt_market_001、task_exam），
 #       不走 SmokeConfig，而是直接使用 DEFAULT_CSV_DIR（world_event_mvp）：

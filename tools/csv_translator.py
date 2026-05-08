@@ -15,9 +15,12 @@
 不覆盖（需人工补全）：
   - event_outcomes.csv（骨架事件的 flag 设置，逐卡不同）
   - tasks.csv（骨架专用，数量少）
+  - option_outcomes.csv（事件叙事反馈 MVP A，2026-05-09 新增；选项级 outcome 叙事文本，
+    按 (option_id, branch) 分组配多屏。该字段不在事件卡 frontmatter 范围内，由 LLM 在
+    叙事撰写阶段人工填充。脚本不消费、不产出）
 
 用法：
-  python tools/csv_translator.py --cards Design/events/stage_2 --out test/config/intro_flow_test
+  python tools/csv_translator.py --cards Design/events/stage_2 --out scripts/config/world_event_mvp
 """
 
 import argparse
@@ -834,7 +837,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--out", required=True,
-        help="CSV 输出目录（如 test/config/intro_flow_test）",
+        help="CSV 输出目录（如 scripts/config/world_event_mvp）",
     )
     parser.add_argument(
         "--config-root", default="scripts/config",

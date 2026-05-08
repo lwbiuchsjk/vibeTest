@@ -37,7 +37,7 @@ const UI_ACCENT_ZHU := Color(0.698, 0.180, 0.149, 1.0)
 #   提供正式 token 池后替换。文字内容是用户领域,不应当作为引擎方设计方案的一部分。**
 # v2 演进路径(剧情上下文驱动)留待 PoC 通过后实现;接口 set_text_tokens() 不变。
 # 覆盖范围:scripts/config/location_graph.csv(town_square/market/harbor)
-#       + test/config/intro_flow_test/location_graph.csv(loc_pharmacy/loc_market/loc_training_ground/loc_outskirts)。
+#       + scripts/config/location_graph.csv(loc_pharmacy/loc_qin_house/loc_training_ground/loc_dao_temple — Phase A 4 地点)。
 # 注:GDScript const 仅允许字面量,故此处用 Array,使用处再转 PackedStringArray。
 const LOCATION_TEXT_TOKENS: Dictionary = {
 	"town_square": ["广场", "人来", "人往", "石板", "钟声", "市井"],
@@ -161,6 +161,11 @@ var _continue_handler: Callable = Callable()
 # intro 方案 B：核心区与顶部栏需独立透明度控制（不能用 root_margin 整体隐藏，否则少女层无法独立浮现）。
 @onready var left_stack: Control = $Root/RootContent/MainSplit/LeftPanel/LeftStack
 @onready var header: VBoxContainer = $Root/RootContent/Header
+
+# Phase A 调优 3：自省事件入场过场动效追踪。
+# 进入 girl_enter 背景时（reflection 类事件）触发一次 LeftStack alpha 0→1 fade-in；
+# 同一自省事件内多 presentation 切换不重复触发；切出 girl_enter 后清空状态供下次 reflection 触发。
+var _last_reflection_bg_path: String = ""
 
 
 # 功能：初始化场景。
@@ -289,6 +294,21 @@ func _on_intro_reveal_ui() -> void:
 #       Step 2：注入 sys_opening_reflection 作为开场首个事件（首个自省，含池塘开场叙事 +
 #       4 地点选择末屏）。事件不存在时引擎在 _select_next_event 报 missing_event_def fatal，
 #       配置者应确保 CSV 中存在该 event_id；老 demo 配置无此事件时直接跳过 forced 注入。
+# Phase A 调优 3：自省事件入场过场动效（轻度方案）。
+# 触发时机：_render_event_background 检测到 background path 切换到 pond_girl_enter.png。
+# 视觉效果：LeftStack alpha 0 → 1 over 0.6s，模拟"ritual 入场"渐显感。
+# 升级路径：如果用户认为效果不足以传达"涟漪循环 → girl_enter"的视觉语言，
+# 升级到中度方案（独立"自省过场"节点 + 复用 ripple 帧），开 [[文字马赛克美术背景_落地进度]] 专项。
+func _trigger_reflection_intro_fade() -> void:
+	if left_stack == null:
+		return
+	left_stack.modulate.a = 0.0
+	var tw: Tween = create_tween()
+	tw.set_trans(Tween.TRANS_SINE)
+	tw.set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(left_stack, "modulate:a", 1.0, 0.6)
+
+
 func _on_intro_completed() -> void:
 	const OPENING_REFLECTION_EVENT_ID := "sys_opening_reflection"
 	# 注入前先用 has_event 校验存在性，避免老 demo 配置（无 sys_opening_reflection）触发
@@ -346,13 +366,16 @@ func _render_current_event(turn_result: Dictionary) -> void:
 	# 叙事面板：标题 + 展示文本 + 鉴定结果摘要
 	event_title_label.text = str(turn_result.get("title", ""))
 	var narrative_parts: Array[String] = []
-	if phase == "presentation":
+	# Phase A 调优 1：选项 / 自省 / 鉴定 等 phase 都保留末屏 presentation 文字，
+	# 与选项 / 按钮同屏渲染。原仅 presentation phase 显示导致点出选项时末屏文字消失。
+	if not presentation_item.is_empty():
 		var speaker := str(presentation_item.get("speaker", "")).strip_edges()
 		var body := str(presentation_item.get("text", ""))
-		if speaker.is_empty():
-			narrative_parts.append(body)
-		else:
-			narrative_parts.append("%s: %s" % [speaker, body])
+		if not body.is_empty():
+			if speaker.is_empty():
+				narrative_parts.append(body)
+			else:
+				narrative_parts.append("%s: %s" % [speaker, body])
 	var check_summary := _build_check_result_summary(turn_result)
 	if not check_summary.is_empty():
 		narrative_parts.append(check_summary)
@@ -1961,6 +1984,15 @@ func _render_event_background(background_art_path: String) -> void:
 	# 自省事件（sys_*_reflection）通过 events.csv background_art 字段配 pond_girl_enter.png，
 	# 走引擎 fallback 链产出 girl_enter 路径，复用 IntroSequence 终态视觉（不需 Consumer 特判）。
 	var normalized_path := background_art_path.strip_edges()
+	# Phase A 调优 3：自省事件入场过场动效（轻度方案——LeftStack alpha 0→1 fade-in）。
+	# 设计基线见 [[当前版本完整主路径_MVP设计]] §二·原则 7（自省事件复用 IntroSequence 视觉）。
+	# 完整涟漪循环 → girl_enter 演出待美术阶段升级到中度方案；当前先用 fade-in 创造"过场感"。
+	var is_reflection_bg := normalized_path.ends_with("pond_girl_enter.png")
+	if is_reflection_bg and normalized_path != _last_reflection_bg_path:
+		_last_reflection_bg_path = normalized_path
+		_trigger_reflection_intro_fade()
+	elif not is_reflection_bg:
+		_last_reflection_bg_path = ""
 	if normalized_path.is_empty():
 		event_background_rect.texture = null
 		text_mosaic_bg.set_source_image(null)
@@ -2300,8 +2332,10 @@ func _load_world_event_test_config(test_config: Dictionary) -> Dictionary:
 	var csv_dir := str(test_config.get("world_event_csv_dir", "")).strip_edges()
 	if not csv_dir.is_empty():
 		override_paths["world_event_csv_dir"] = csv_dir
-	# 说明：量产测试数据集（如 intro_flow_test）自带人物/地点/关系配置，
-	# 这里按 test_config.json 里显式指定的 key 逐项 override，未指定则回退全局默认。
+	# 说明：正式启动入口走 ConfigRuntime DEFAULT_PATHS（scripts/config/world_event_mvp/）。
+	# test 场景需要切其他数据集（如 pack_flow_test / desperate_gamble_test）时，
+	# 在 test/event_logic_test_config.json 显式指定 dataset_dir，这里按 key 逐项 override。
+	# Phase A 占位骨架数据已迁移到 scripts/config/，不再需要 dataset_dir 跳板（2026-05-09）。
 	for override_key in ["roles", "location_graph", "affinity"]:
 		var override_path := str(test_config.get(override_key, "")).strip_edges()
 		if not override_path.is_empty():

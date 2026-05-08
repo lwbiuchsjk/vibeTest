@@ -132,7 +132,10 @@ static func _load_tables(base: String) -> Dictionary:
 		"task_eval_effects.csv",
 		# Step 2 自省过渡叙事文本池（设计基线见 [[当前版本完整主路径_MVP设计]] §三·节点 2）。
 		# 字段：pool_id / location_id / seq / text；缺失时引擎跳过过渡叙事段。
-		"transition_text_pool.csv"
+		"transition_text_pool.csv",
+		# 事件叙事反馈 MVP A：选项结算后追加叙事屏（设计基线见 [[事件叙事反馈_MVP设计]]）。
+		# 字段：option_id / branch / seq / text；缺失时引擎跳过 outcome 屏追加（流程兼容旧配置）。
+		"option_outcomes.csv"
 	]
 
 	var tables: Dictionary = {}
@@ -567,9 +570,15 @@ static func _validate_task_evaluation_tables(task_defs: Array, task_evaluation: 
 
 # 功能：组装 choice_points 与 options 数据。
 # 说明：新结构中不再单独维护 choice_points.csv，按 options.csv 自动归组。
+# 【CSV 契约边界】本函数除处理 options / option_rules 外，还消费 option_outcomes.csv
+# （事件叙事反馈 MVP A，设计基线见 [[事件叙事反馈_MVP设计]]）。option_outcomes 字段
+# option_id / branch / seq / text，按 (option_id, branch) 分组、seq 升序，注入
+# option["outcomes"][branch] = [text 数组] 供引擎在选项结算后追加为虚拟 presentation 屏。
 static func _assemble_choice_points(tables: Dictionary) -> Dictionary:
 	var option_rows: Array = tables.get("options.csv", [])
 	var rule_rows: Array = tables.get("option_rules.csv", [])
+	# 事件叙事反馈 MVP A：option_outcomes 为可选表（缺失时为空 [],兼容旧配置）。
+	var outcome_rows: Array = tables.get("option_outcomes.csv", [])
 
 	var cp_map: Dictionary = {}
 	var cp_order: Array = []
@@ -615,6 +624,65 @@ static func _assemble_choice_points(tables: Dictionary) -> Dictionary:
 		if option_id.is_empty() or not option_ref.has(option_id):
 			continue
 		_apply_option_rule_row(row, cp_map, option_ref)
+
+	# 事件叙事反馈 MVP A：注入 option_outcomes 数据。
+	# 中间结构：{ option_id: { branch: [{seq: int, text: String}, ...] } }
+	var outcome_staging: Dictionary = {}
+	for row_variant in outcome_rows:
+		var row: Dictionary = row_variant
+		var option_id: String = str(row.get("option_id", "")).strip_edges()
+		var branch: String = str(row.get("branch", "")).strip_edges()
+		var seq_text: String = str(row.get("seq", "")).strip_edges()
+		var text: String = str(row.get("text", ""))
+		if option_id.is_empty() or branch.is_empty() or text.strip_edges().is_empty():
+			continue
+		if not option_ref.has(option_id):
+			# 静默跳过未知 option_id 的 outcome 行，由 csv_validator 静态检查捕获 FK 错误。
+			continue
+		if seq_text.is_empty() or not seq_text.is_valid_int():
+			continue
+		var seq_value: int = int(seq_text)
+		if not outcome_staging.has(option_id):
+			outcome_staging[option_id] = {}
+		var by_branch: Dictionary = outcome_staging[option_id]
+		if not by_branch.has(branch):
+			by_branch[branch] = []
+		var entries: Array = by_branch[branch]
+		entries.append({"seq": seq_value, "text": text})
+		by_branch[branch] = entries
+		outcome_staging[option_id] = by_branch
+
+	# 排序并扁平化为 outcomes: { branch: [text, ...] }，写回对应 option dict。
+	for option_id_variant in outcome_staging.keys():
+		var option_id_key: String = str(option_id_variant)
+		var by_branch: Dictionary = outcome_staging[option_id_key]
+		var outcomes_out: Dictionary = {}
+		for branch_variant in by_branch.keys():
+			var branch_key: String = str(branch_variant)
+			var entries: Array = by_branch[branch_key]
+			entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+				return int(a.get("seq", 0)) < int(b.get("seq", 0))
+			)
+			var texts_out: Array = []
+			for entry_variant in entries:
+				var entry: Dictionary = entry_variant
+				texts_out.append(str(entry.get("text", "")))
+			outcomes_out[branch_key] = texts_out
+		# 按 option_ref 索引找到 cp_map 中对应 option dict 写回 outcomes 字段。
+		var ref: Dictionary = option_ref[option_id_key]
+		var cp_id: String = str(ref.get("cp_id", ""))
+		var idx: int = int(ref.get("index", -1))
+		if cp_id.is_empty() or idx < 0:
+			continue
+		var cp_item: Dictionary = cp_map[cp_id]
+		var options_arr: Array = cp_item.get("options", [])
+		if idx >= options_arr.size():
+			continue
+		var option_dict: Dictionary = options_arr[idx]
+		option_dict["outcomes"] = outcomes_out
+		options_arr[idx] = option_dict
+		cp_item["options"] = options_arr
+		cp_map[cp_id] = cp_item
 
 	var out_choice_points: Array = []
 	for cp_id_variant in cp_order:
@@ -1206,17 +1274,25 @@ static func _apply_chain_patch_item(patch: Dictionary, key: String, value_text: 
 		return
 
 	if key == "allowedTags":
-		var parsed_tags: Variant = JSON.parse_string(value_text)
-		if typeof(parsed_tags) == TYPE_ARRAY:
-			patch[key] = parsed_tags
-		else:
-			patch[key] = _split_text_list(value_text, ";")
+		# 仅当 value_text 形似 JSON 数组（以 [ 起始）才走 JSON.parse_string；否则直接 fallback。
+		# 直接调用 JSON.parse_string 解析非 JSON 字符串会触发 Godot 引擎层 stderr ERROR 副作用，
+		# 污染调试日志。CSV 中实际通用写法是 "chain;shi" 这种 ; 分隔字符串。
+		var stripped_tags := value_text.strip_edges()
+		if stripped_tags.begins_with("["):
+			var parsed_tags: Variant = JSON.parse_string(stripped_tags)
+			if typeof(parsed_tags) == TYPE_ARRAY:
+				patch[key] = parsed_tags
+				return
+		patch[key] = _split_text_list(value_text, ";")
 		return
 
 	if key == "weightBias":
-		var parsed_bias: Variant = JSON.parse_string(value_text)
-		if typeof(parsed_bias) == TYPE_DICTIONARY:
-			patch[key] = parsed_bias
+		# 同 allowedTags：仅当形似 JSON 字典（以 { 起始）才走 JSON.parse_string；否则跳过赋值。
+		var stripped_bias := value_text.strip_edges()
+		if stripped_bias.begins_with("{"):
+			var parsed_bias: Variant = JSON.parse_string(stripped_bias)
+			if typeof(parsed_bias) == TYPE_DICTIONARY:
+				patch[key] = parsed_bias
 		return
 
 	if key.begins_with("weightBias."):

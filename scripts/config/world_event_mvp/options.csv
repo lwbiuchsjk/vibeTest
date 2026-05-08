@@ -1,10 +1,41 @@
 option_id,choice_point_id,text,display_order
-opt_study_focus_knowledge,cp_study_plan,Focus on knowledge (cost 1 energy),1
-opt_study_take_rest,cp_study_plan,Take a short break,2
-opt_study_secret_notes,cp_study_plan,Read secret notes,3
-opt_market_buy,cp_market_trade,Buy supplies (10 gold),1
-opt_market_bargain,cp_market_trade,Bargain (cost 1 energy),2
-opt_market_black_deal,cp_market_trade,Black market deal,3
-opt_buy_info,cp_harbor_deal,Buy intel (10 gold),1
-opt_run,cp_harbor_deal,Leave now,2
-opt_bribe_guard,cp_harbor_deal,Bribe guard (50 gold),3
+evt_s2_sk_he_opt_1,cp_evt_s2_sk_he,[选项·主动靠近] 上前请教药材辨识（cost spirit 1 + check insight + 关系+2/+1）,1
+evt_s2_sk_he_opt_2,cp_evt_s2_sk_he,[选项·远观] 远远看一会就走（关系+1）,2
+evt_s2_sk_he_opt_3,cp_evt_s2_sk_he,[选项·忽略] 不打扰他（无变化）,3
+evt_s2_sk_qin_opt_1,cp_evt_s2_sk_qin,[选项·搭话] 帮母亲收拾（cost energy 1 + 关系+2）,1
+evt_s2_sk_qin_opt_2,cp_evt_s2_sk_qin,[选项·点头] 应一声便回房（关系+1）,2
+evt_s2_sk_qin_opt_3,cp_evt_s2_sk_qin,[选项·避开] 装没看见（关系+0）,3
+evt_s2_sk_zhou_opt_1,cp_evt_s2_sk_zhou,[选项·搭讪] 上前请教练拳（cost spirit 1 + check physique + 关系+2/+1）,1
+evt_s2_sk_zhou_opt_2,cp_evt_s2_sk_zhou,[选项·远观] 远远看几招（关系+1）,2
+evt_s2_sk_zhou_opt_3,cp_evt_s2_sk_zhou,[选项·避开] 不愿引人注意（关系+0）,3
+evt_s2_sk_cheng_opt_1,cp_evt_s2_sk_cheng,[选项·靠近] 上前问候（cost spirit 1 + check insight + 关系+2/+1）,1
+evt_s2_sk_cheng_opt_2,cp_evt_s2_sk_cheng,[选项·静观] 远远看一会（关系+1）,2
+evt_s2_sk_cheng_opt_3,cp_evt_s2_sk_cheng,[选项·离开] 不打扰（关系+0）,3
+evt_s2_fl_pharmacy_1_opt_1,cp_evt_s2_fl_pharmacy_1,[选项·认真] 仔细按方抓药（cost energy 1 + craft+1）,1
+evt_s2_fl_pharmacy_1_opt_2,cp_evt_s2_fl_pharmacy_1,[选项·应付] 大致抓一下（无变化）,2
+evt_s2_fl_pharmacy_2_opt_1,cp_evt_s2_fl_pharmacy_2,[选项·磨药] 静心磨药（cost energy 1 + craft+1）,1
+evt_s2_fl_pharmacy_2_opt_2,cp_evt_s2_fl_pharmacy_2,[选项·偷懒] 假装在磨（无变化）,2
+evt_s2_fl_pharmacy_3_opt_1,cp_evt_s2_fl_pharmacy_3,[选项·热情] 主动招呼客人（cost spirit 1 + insight+1）,1
+evt_s2_fl_pharmacy_3_opt_2,cp_evt_s2_fl_pharmacy_3,[选项·沉默] 等师父出来招呼（无变化）,2
+evt_s2_fl_qin_1_opt_1,cp_evt_s2_fl_qin_1,[选项·主动] 帮母亲烧火（cost energy 1 + 与秦关系+1）,1
+evt_s2_fl_qin_1_opt_2,cp_evt_s2_fl_qin_1,[选项·旁观] 站旁边发呆（无变化）,2
+evt_s2_fl_qin_2_opt_1,cp_evt_s2_fl_qin_2,[选项·砍价] 试试讲价（cost spirit 1 + insight+1）,1
+evt_s2_fl_qin_2_opt_2,cp_evt_s2_fl_qin_2,[选项·原价] 老老实实买（无变化）,2
+evt_s2_fl_qin_3_opt_1,cp_evt_s2_fl_qin_3,[选项·应承] 答应母亲（与秦关系+1）,1
+evt_s2_fl_qin_3_opt_2,cp_evt_s2_fl_qin_3,[选项·沉默] 不答话（无变化）,2
+evt_s2_fl_train_1_opt_1,cp_evt_s2_fl_train_1,[选项·走近] 凑过去看（cost spirit 1 + insight+1）,1
+evt_s2_fl_train_1_opt_2,cp_evt_s2_fl_train_1,[选项·绕开] 装没看见（无变化）,2
+evt_s2_fl_train_2_opt_1,cp_evt_s2_fl_train_2,[选项·坚持] 跑完三圈（cost energy 2 + physique+1）,1
+evt_s2_fl_train_2_opt_2,cp_evt_s2_fl_train_2,[选项·偷停] 跑两圈就停（无变化）,2
+evt_s2_fl_train_3_opt_1,cp_evt_s2_fl_train_3,[选项·尝试] 上手打几下（cost energy 1 + physique+1）,1
+evt_s2_fl_train_3_opt_2,cp_evt_s2_fl_train_3,[选项·观望] 看别人打（无变化）,2
+evt_s2_fl_dao_1_opt_1,cp_evt_s2_fl_dao_1,[选项·静听] 闭目听钟（cost spirit 1 + insight+1）,1
+evt_s2_fl_dao_1_opt_2,cp_evt_s2_fl_dao_1,[选项·路过] 听一下就走（无变化）,2
+evt_s2_fl_dao_2_opt_1,cp_evt_s2_fl_dao_2,[选项·搭话] 与老者闲聊（cost spirit 1 + insight+1）,1
+evt_s2_fl_dao_2_opt_2,cp_evt_s2_fl_dao_2,[选项·点头] 礼貌点头便走（无变化）,2
+evt_s2_fl_dao_3_opt_1,cp_evt_s2_fl_dao_3,[选项·驻足] 看那架势（cost spirit 1 + insight+1）,1
+evt_s2_fl_dao_3_opt_2,cp_evt_s2_fl_dao_3,[选项·离开] 不深究（无变化）,2
+evt_s3_chain_entry_opt_1,cp_evt_s3_chain_entry,[选项·继续] 跟母亲出门（chain stage 推进）,1
+evt_s3_chain_2_opt_1,cp_evt_s3_chain_2,[选项·继续] 等待师傅评判（chain stage 推进）,1
+evt_s3_chain_3_opt_1,cp_evt_s3_chain_3,[选项·继续] 与陆默立片刻（chain stage 推进，陆首登 unique flag 设置）,1
+evt_s3_chain_4_opt_1,cp_evt_s3_chain_4,[选项·完成] 列队训练结束（chain 退出 + forced 跳 sys_final_reflection）,1

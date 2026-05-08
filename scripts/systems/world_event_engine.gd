@@ -233,6 +233,24 @@ func preview_next_turn() -> Dictionary:
 	if not _pending_turn_context.is_empty():
 		return _build_pending_turn_response(_pending_turn_context)
 
+	# Phase A 修复：forcedNextEventId 优先级高于"包未建立 → 询问地点"默认 fallback。
+	# 当 forced 指向无地点限制事件且 packContext 为空时，用 currentLocationId 自动启动隐式包，
+	# 避免开局选择 SETTLED → IntroSequence 注入 forced=sys_opening_reflection 时被默认地点选择 UI 拦截。
+	# 设计基线：本文件首行说明"forcedNextEventId 优先级最高，链式通过 chainContext 塑形分布"。
+	var pending_forced_pre: String = str(world_state.get("forcedNextEventId", "")).strip_edges()
+	if not pending_forced_pre.is_empty() and _is_pack_awaiting_location():
+		var forced_def_pre: Dictionary = _event_map.get(pending_forced_pre, {})
+		if not forced_def_pre.is_empty():
+			var forced_eligibility_pre: Dictionary = forced_def_pre.get("eligibility", {})
+			var forced_locations_pre: Array = forced_eligibility_pre.get("requiredLocations", [])
+			if forced_locations_pre.is_empty():
+				var initial_location: String = str(world_state.get("currentLocationId", "")).strip_edges()
+				if not initial_location.is_empty():
+					_start_new_pack(initial_location)
+					print("[叙事包] 无地点 forced=%s + 包未建立，用 %s 启动隐式包绕过默认地点选择" % [
+						pending_forced_pre, initial_location
+					])
+
 	# 叙事包联动：检查是否需要进入地点选择。
 	if _is_pack_awaiting_location():
 		var loc_event: Dictionary = _build_location_select_event()
@@ -507,6 +525,25 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 			_pending_turn_context["presentation_index"] = next_index
 		else:
 			_advance_pending_phase_after_presentation(event_def)
+			# Phase A 调优 1：reflection 事件含 location_select 行时，末屏推完自动结算，
+			# 跳过 phase=confirm 多余等待玩家点击（玩家在末屏已选定地点，过渡叙事翻完后
+			# 流程应自然衔接到下一包，不该再要求玩家点"确认结算"）。
+			# sys_final_reflection 不含 location_select，保留 phase=confirm 等玩家确认结束 demo。
+			if str(event_def.get("type", "")) == "reflection":
+				var has_location_select := false
+				for it_var in presentation_items:
+					var it: Dictionary = it_var
+					if str(it.get("presents", "")) == "location_select":
+						has_location_select = true
+						break
+				if has_location_select:
+					return _resolve_pending_turn(selected_option_id)
+			# Phase A 调优 1（outcome 屏对称修复）：选项 outcome 屏推完后，选项结算已发生
+			# （_apply_option_resolution + _apply_event_effects 在追加 outcome 前已执行），
+			# outcome 屏只是世界对玩家选择的"叙事反馈"展示。末屏推完应自动结算进入下一事件，
+			# 不该再要求玩家点"确认结算"——与 reflection 末屏自动结算逻辑对称。
+			if bool(_pending_turn_context.get("_outcome_pending", false)):
+				return _resolve_pending_turn(selected_option_id)
 		return _build_pending_turn_response(_pending_turn_context)
 
 	# 说明：处理心性风险入口挂起阶段。
@@ -514,6 +551,12 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 		return _resolve_preemptive_bet_phase(selected_option_id)
 	if phase == "desperate_gamble":
 		return _resolve_desperate_gamble_phase(selected_option_id)
+
+	# 事件叙事反馈 MVP A：outcome 屏翻完后回到 phase=confirm 时，选项结算实际已发生
+	# （_apply_option_resolution + _apply_event_effects 在追加 outcome 前已执行），此处
+	# 直接走结算尾段，不重复跑选项结算流程。设计基线见 [[事件叙事反馈_MVP设计]]。
+	if phase == "confirm" and bool(_pending_turn_context.get("_outcome_pending", false)):
+		return _finalize_post_outcome_settlement(event_id, route, expected_forced, event_def)
 
 	# P0-1 修复：在任何 _apply_*（可能触发链退出清空 chainContext）之前缓存 deferred 状态，
 	# 供后续结算代码判断是否跳过 turn 推进和任务 tick。
@@ -565,6 +608,8 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 		world_state["forcedNextEventId"] = ""
 		choice_result["selected_option_id"] = str(selected.get("id", ""))
 		choice_result["resolved_by"] = "option_resolution"
+		# 事件叙事反馈 MVP A：缓存 selected option 用于结算后抽取 outcome 文本。
+		_pending_turn_context["_settled_option"] = selected.duplicate(true)
 		_apply_option_resolution(selected, event_def)
 		# 说明：如果 _apply_option_resolution 挂起到风险入口阶段，直接返回等待决策。
 		var post_phase := str(_pending_turn_context.get("phase", ""))
@@ -572,6 +617,12 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 			return _build_pending_turn_response(_pending_turn_context)
 		# 说明：正常选项路径不经过 _finalize_option_turn，需在此执行事件级 effects。
 		_apply_event_effects(event_def)
+		# 事件叙事反馈 MVP A：选项结算 + event_effects 应用完成后，尝试追加 outcome 叙事屏。
+		# 若 selected option 配了 outcomes 文本，引擎将其作为 _dynamic=true 虚拟 presentation
+		# 行追加到 event_def.presentation，切 phase=presentation 让玩家翻完后再走结算尾段。
+		# 设计基线见 [[事件叙事反馈_MVP设计]]。
+		if _try_append_option_outcomes_and_redirect(selected, event_def):
+			return _build_pending_turn_response(_pending_turn_context)
 	else:
 		# 说明：普通事件、缺失选择点或无可选项事件，都在这里统一按事件默认效果结算。
 		world_state["forcedNextEventId"] = ""
@@ -699,6 +750,16 @@ func _select_next_event() -> Dictionary:
 	if event_def.is_empty():
 		return {"ok": false, "error": "event not found: %s" % next_event_id}
 
+	# Phase A 诊断日志：打印每个事件被选中的 ID 与路径，便于跑测时还原调度序列。
+	# 普通调度（scheduler / fallback）此前无日志，导致第 2 包以后事件序列难以还原。
+	var pack_ctx_dbg: Dictionary = _dict_or_empty(world_state.get("packContext", {}))
+	var elapsed_dbg := int(pack_ctx_dbg.get("turnsElapsed", 0))
+	var capacity_dbg := int(pack_ctx_dbg.get("turnCapacity", 0))
+	var location_dbg := str(pack_ctx_dbg.get("locationId", ""))
+	print("[调度] 选事件: %s | route=%s | location=%s | turn=%d/%d" % [
+		next_event_id, route, location_dbg, elapsed_dbg + 1, capacity_dbg
+	])
+
 	return {
 		"ok": true,
 		"expected_forced": expected_forced,
@@ -760,6 +821,20 @@ func _create_pending_turn_context(
 	var has_choice := false
 	var phase := "confirm"
 
+	# 进入新一次事件前清除上次动态追加的虚拟 presentation 行（标记 _dynamic=true）：
+	# - reflection 事件：confirm_reflection_location_select 追加的过渡叙事行
+	# - 普通事件：选项结算后追加的 outcome 叙事屏（事件叙事反馈 MVP A）
+	# 避免同一 event_id 跨次触发时虚拟行累积。该清理逻辑通用化于所有事件类型。
+	var raw_pres: Array = event_def.get("presentation", [])
+	var cleaned_pres: Array = []
+	for raw_item_variant in raw_pres:
+		var raw_item: Dictionary = raw_item_variant
+		if not bool(raw_item.get("_dynamic", false)):
+			cleaned_pres.append(raw_item)
+	if cleaned_pres.size() != raw_pres.size():
+		event_def["presentation"] = cleaned_pres
+		_event_map[event_id] = event_def
+
 	# 自省事件 resolution_mode 决策（Step 2 改造）：
 	# - 老路径（reflection_state_machine）：presentation 含 adjust_relation / focus_* 时启用，
 	#   或 presentation 为空（沿用旧 EMPTY_REFLECTION 逻辑）。
@@ -769,18 +844,6 @@ func _create_pending_turn_context(
 	#   [[当前版本完整主路径_MVP设计]] §三·节点 2 "Step 2 实施落地细节"。
 	var event_type := str(event_def.get("type", "")).strip_edges()
 	if event_type == "reflection":
-		# 进入新一次 reflection 事件前清除上次 confirm_reflection_location_select 动态追加的
-		# 过渡叙事行（标记 _dynamic=true），避免同一 event_id 跨次触发时虚拟行累积。
-		var raw_pres: Array = event_def.get("presentation", [])
-		var cleaned_pres: Array = []
-		for raw_item_variant in raw_pres:
-			var raw_item: Dictionary = raw_item_variant
-			if not bool(raw_item.get("_dynamic", false)):
-				cleaned_pres.append(raw_item)
-		if cleaned_pres.size() != raw_pres.size():
-			event_def["presentation"] = cleaned_pres
-			_event_map[event_id] = event_def
-
 		var pres_items_for_check: Array = _get_event_presentation(event_def)
 		var requires_state_machine: bool = pres_items_for_check.is_empty()
 		for item_variant in pres_items_for_check:
@@ -817,6 +880,11 @@ func _create_pending_turn_context(
 	if not presentation_items.is_empty():
 		phase = "presentation"
 
+	# Phase A 诊断日志：事件初始化时打印 phase / resolution_mode / has_choice，
+	# 定位"地点选择后首个填充事件 phase=confirm 而非 phase=choice"问题根因。
+	print("[事件初始化] %s | phase=%s | resolution_mode=%s | has_choice=%s | resolved_by=%s" % [
+		event_id, phase, resolution_mode, str(has_choice), str(choice_result.get("resolved_by", ""))
+	])
 	return {
 		"event_id": event_id,
 		"route": route,
@@ -835,13 +903,22 @@ func _create_pending_turn_context(
 func _advance_pending_phase_after_presentation(event_def: Dictionary) -> void:
 	var rm := str(_pending_turn_context.get("resolution_mode", "event_effects"))
 	var next_phase := "confirm"
-	if rm == "reflection":
+	# 事件叙事反馈 MVP A：outcome 屏翻完后 phase 必须切到 confirm（让 _outcome_pending 路由
+	# 收口），即便 resolution_mode=choice_resolution（选项已结算）。无此守门会回到 phase=choice
+	# 让 UI 重新显示选项。
+	if bool(_pending_turn_context.get("_outcome_pending", false)):
+		next_phase = "confirm"
+	elif rm == "reflection":
 		next_phase = "reflection"
 	elif rm == "choice_resolution":
 		next_phase = "choice"
 		var choice_result: Dictionary = _dict_or_empty(_pending_turn_context.get("choice", {}))
 		if choice_result.is_empty():
 			next_phase = "confirm"
+	# Phase A 诊断日志：phase 推进决策细节。
+	print("[末屏推进] event=%s | resolution_mode=%s | next_phase=%s" % [
+		str(event_def.get("id", "")), rm, next_phase
+	])
 	_pending_turn_context["phase"] = next_phase
 	_pending_turn_context["presentation_index"] = 0
 
@@ -865,10 +942,18 @@ func _build_presentation_state(event_def: Dictionary, phase: String) -> Dictiona
 		"total": presentation_items.size(),
 		"current_item": {}
 	}
-	if phase != "presentation" or presentation_items.is_empty():
+	if presentation_items.is_empty():
 		return state
-	var current_index := clampi(int(_pending_turn_context.get("presentation_index", 0)), 0, presentation_items.size() - 1)
-	state["active"] = true
+	# Phase A 调优 1：phase=choice / reflection / 等阶段也暴露末屏 presentation 作 current_item，
+	# 让 UI 在选项 / 自省按钮组等同屏渲染时仍能显示末屏叙事文本。
+	# active 字段仅在 phase=presentation 时为 true（保留原"是否需要继续翻页"语义）。
+	var current_index: int
+	if phase == "presentation":
+		current_index = clampi(int(_pending_turn_context.get("presentation_index", 0)), 0, presentation_items.size() - 1)
+		state["active"] = true
+	else:
+		current_index = presentation_items.size() - 1
+		state["active"] = false
 	state["index"] = current_index
 	state["current_item"] = presentation_items[current_index]
 	return state
@@ -1227,10 +1312,32 @@ func _sort_grade_overrides_by_priority_desc(grade_overrides: Array) -> void:
 
 # 功能：生成候选事件集合。
 # 说明：这里只做可用性与权重计算，不做最终抽签。
+#       Phase A 增加 3 项调度可见性守门（仅作用于普通调度路径，forced / final_pool 路径不受影响）：
+#         1) reflection 事件仅 forced/包结束自动注入路径触发，普通调度排除
+#         2) 末位池骨架（tag 含 final_event_pool_tag）仅末位池路径触发
+#         3) ChainContinue 策略事件（chain 入口与 chain 内屏）仅 chainContext 已激活时可见；
+#            chain 入口本就靠 final_event_pool_exhausted_forced_id 走 forced 路径，
+#            chain 内屏由 chainContext.allowedTags 过滤继续工作。
+#       设计基线见 [[当前版本完整主路径_MVP设计]] §三·节点 3 末尾位骨架抽取规则 + §四·改造清单。
 func _build_candidates() -> Array:
 	var out: Array = []
+	var pool_tag: String = str(_pack_config.get("final_event_pool_tag", "")).strip_edges()
+	var chain_active: bool = (world_state.get("chainContext", null) != null)
 	for event_variant in events:
 		var event_def: Dictionary = event_variant
+		# 守门 1：reflection 类型事件普通调度排除。
+		var event_type := str(event_def.get("type", "")).strip_edges()
+		if event_type == "reflection":
+			continue
+		# 守门 2：末位池骨架普通调度排除（仅 final_pool 路径走）。
+		if not pool_tag.is_empty():
+			var event_tags_pool: Array = event_def.get("tags", [])
+			if pool_tag in event_tags_pool:
+				continue
+		# 守门 3：ChainContinue 策略事件需 chainContext 激活才可见。
+		var policy := str(event_def.get("continuationPolicy", "")).strip_edges()
+		if (policy == "ChainContinue" or policy == "ChainContinueWithForcedNext") and not chain_active:
+			continue
 		if _is_event_eligible(event_def):
 			var weight := _compute_weight(event_def)
 			out.append({"id": str(event_def.get("id", "")), "weight": weight})
@@ -2331,17 +2438,42 @@ func _finalize_option_turn(event_def: Dictionary) -> Dictionary:
 	var event_id := str(_pending_turn_context.get("event_id", ""))
 	var route := str(_pending_turn_context.get("route", "scheduler"))
 	var expected_forced := str(_pending_turn_context.get("expected_forced", ""))
-	var pending_has_choice := bool(_pending_turn_context.get("has_choice", false))
+
+	# 事件叙事反馈 MVP A：风险路径（preemptive_bet / desperate_gamble）结算完毕后同样
+	# 尝试追加 outcome 叙事屏；追加成功 → 切 phase=presentation + 标 _outcome_pending=true，
+	# 玩家翻完 outcome 后下次 _resolve_pending_turn(confirm) 走 _finalize_post_outcome_settlement
+	# 直接收口（避免 _apply_event_effects 重复跑两次）。
+	var settled_option: Dictionary = _dict_or_empty(_pending_turn_context.get("_settled_option", {}))
+	if not settled_option.is_empty():
+		if _try_append_option_outcomes_and_redirect(settled_option, event_def):
+			return _build_pending_turn_response(_pending_turn_context)
+
+	return _finalize_post_outcome_settlement(event_id, route, expected_forced, event_def)
+
+
+# 功能：选项结算尾段（含 history / 任务 tick / turn 推进 / pack 推进 / pending 清空）。
+# 说明：事件叙事反馈 MVP A 抽出共享尾段，被两类入口复用：
+#         1. _finalize_option_turn 风险路径无 outcome 时直接调用
+#         2. _resolve_pending_turn confirm 分支下 _outcome_pending=true 时（玩家翻完
+#            outcome 屏后回到 confirm）调用，跳过选项结算重跑。
+# 注意：本函数假设 _apply_event_effects 已在调用方执行。
+func _finalize_post_outcome_settlement(
+	event_id: String,
+	route: String,
+	expected_forced: String,
+	event_def: Dictionary
+) -> Dictionary:
+	var pending_has_choice: bool = bool(_pending_turn_context.get("has_choice", false))
 	var pending_choice: Dictionary = _dict_or_empty(_pending_turn_context.get("choice", {}))
-	var choice_result := pending_choice.duplicate(true)
+	var choice_result: Dictionary = pending_choice.duplicate(true)
 
 	_eval_complete_when_after_settlement()
 	_record_history(event_id)
 	# 叙事包联动：使用缓存的 deferred 状态，避免链退出后 chainContext 被清空导致误判。
-	var was_deferred := bool(_pending_turn_context.get("_was_in_deferred_chain", false))
+	var was_deferred: bool = bool(_pending_turn_context.get("_was_in_deferred_chain", false))
 	if not was_deferred:
 		_tick_tasks_after_turn()
-	var ended_this_turn := false
+	var ended_this_turn: bool = false
 	if bool(event_def.get("isEndingEvent", false)):
 		_finalize_world(event_id)
 		ended_this_turn = true
@@ -2361,6 +2493,92 @@ func _finalize_option_turn(event_def: Dictionary) -> Dictionary:
 		pending_has_choice,
 		choice_result
 	)
+
+
+# 功能：尝试为已结算的 selected option 追加 outcome 叙事屏（事件叙事反馈 MVP A）。
+# 说明：从 selected_option["outcomes"] 字典按 branch 抽取文本组（branch fallback 链：
+#         critical_success → success → default
+#         critical_fail    → fail    → default
+#       success / fail 自身找不到时 fallback 到 default）。
+#       命中即追加 _dynamic=true 虚拟 presentation 行，切 phase=presentation +
+#       presentation_index 指向第一条 outcome 屏 + 标 _outcome_pending=true，返回 true。
+#       未命中（无 outcomes 字段 / 对应分支无文本）返回 false，调用方走默认结算尾段。
+# 设计基线见 [[事件叙事反馈_MVP设计]]。
+func _try_append_option_outcomes_and_redirect(selected_option: Dictionary, event_def: Dictionary) -> bool:
+	var outcomes_dict: Dictionary = _dict_or_empty(selected_option.get("outcomes", {}))
+	if outcomes_dict.is_empty():
+		return false
+
+	# 决议 branch：有 check 走 _last_check_result.result_type；无 check 走 default。
+	var branch: String = "default"
+	if not _last_check_result.is_empty():
+		var rt: String = str(_last_check_result.get("result_type", "")).strip_edges()
+		if not rt.is_empty():
+			branch = rt
+
+	# branch 抽取 + fallback 链。
+	var texts: Array = _resolve_outcome_branch_texts(outcomes_dict, branch)
+	if texts.is_empty():
+		return false
+
+	var event_id: String = str(event_def.get("id", ""))
+	var presentation_items: Array = _get_event_presentation(event_def)
+	var max_seq: int = 0
+	for it_var in presentation_items:
+		var it: Dictionary = it_var
+		max_seq = max(max_seq, int(it.get("order", 0)))
+	var first_outcome_index: int = presentation_items.size()
+	var option_id: String = str(selected_option.get("id", ""))
+	for i in range(texts.size()):
+		presentation_items.append({
+			"id": "%s_outcome_%s_%d" % [option_id, branch, i + 1],
+			"order": max_seq + i + 1,
+			"type": "text",
+			"speaker": "",
+			"text": str(texts[i]),
+			"presents": "text",
+			"_dynamic": true
+		})
+	event_def["presentation"] = presentation_items
+	_event_map[event_id] = event_def
+
+	# 切 phase=presentation 让玩家翻 outcome 屏；同时记 _outcome_pending=true，
+	# 翻完后回到 confirm 时直接走 _finalize_post_outcome_settlement。
+	_pending_turn_context["phase"] = "presentation"
+	_pending_turn_context["presentation_index"] = first_outcome_index
+	_pending_turn_context["_outcome_pending"] = true
+	print("[outcome] 选项 %s 追加 outcome 屏 %d 条 | branch=%s" % [option_id, texts.size(), branch])
+	return true
+
+
+# 功能：按 branch fallback 链解析 outcome 文本组。
+# 说明：选项 outcomes 字典结构 { branch: [text1, text2, ...] }；本函数实现 branch 抽取链：
+#         critical_success → success → default
+#         critical_fail    → fail    → default
+#         fail             → default
+#         success          → default
+#         其他自定义 branch → 直接查（无 fallback）
+#       全部 fallback 失败返回 [] 空数组。
+func _resolve_outcome_branch_texts(outcomes_dict: Dictionary, branch: String) -> Array:
+	var fallback_chain: Array = []
+	match branch:
+		"critical_success":
+			fallback_chain = ["critical_success", "success", "default"]
+		"critical_fail":
+			fallback_chain = ["critical_fail", "fail", "default"]
+		"success":
+			fallback_chain = ["success", "default"]
+		"fail":
+			fallback_chain = ["fail", "default"]
+		_:
+			fallback_chain = [branch]
+	for b in fallback_chain:
+		var key: String = str(b)
+		if outcomes_dict.has(key):
+			var texts: Array = outcomes_dict[key]
+			if not texts.is_empty():
+				return texts
+	return []
 
 # 功能：打印 assessment 骰池鉴定调试信息。
 # 说明：在 _is_check_pass 委托 RuleEngine 计算后，输出骰面、命中数等骰池详情。

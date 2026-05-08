@@ -15,8 +15,8 @@ const TEST_CONFIG_PATH := "res://test/event_logic_test_config.json"
 # **占位:以下词组为代码默认值以避免空运行,等用户从游戏内容(event_presentations / 角色状态等)
 #   提供正式 token 池后替换。文字内容是用户领域,不应当作为引擎方设计方案的一部分。**
 # v2 演进路径(剧情上下文驱动)留待 PoC 通过后实现;接口 set_text_tokens() 不变。
-# 覆盖范围:scripts/config/location_graph.csv(town_square/market/harbor)
-#       + test/config/intro_flow_test/location_graph.csv(loc_pharmacy/loc_market/loc_training_ground/loc_outskirts)。
+# 覆盖范围:scripts/config/location_graph.csv（Phase A 落地后含 loc_pharmacy/loc_qin_house/loc_training_ground/loc_dao_temple）。
+# 旧版本曾在 test/config/intro_flow_test/ 维护独立副本；2026-05-09 起统一走正式路径。
 # 注:GDScript const 仅允许字面量,故此处用 Array,使用处再转 PackedStringArray。
 const LOCATION_TEXT_TOKENS: Dictionary = {
 	"town_square": ["广场", "人来", "人往", "石板", "钟声", "市井"],

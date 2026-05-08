@@ -19,6 +19,10 @@ _kb_sync/
 # Local environment config (path varies per machine, see tools/local_env.example.json)
 tools/local_env.json
 
+# Godot 跑测临时日志（手动 / PowerShell 启动 Godot 时生成）
+godot_*.log
+godot_*.err
+
 # Python virtual environment for tools (openai SDK, etc.)
 tools/.venv/
 

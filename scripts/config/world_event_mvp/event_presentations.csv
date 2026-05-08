@@ -1,14 +1,27 @@
-event_id,presentation_id,display_order,item_type,speaker,text
-evt_study_001,pre_study_001,1,text,旁白,你摊开今天的学习计划，决定先把注意力收回来。
-evt_study_001,pre_study_002,2,text,旁白,窗外传来零散的人声，但你还是把视线落回了笔记。
-evt_market_001,pre_market_001,1,text,旁白,市场里充满了叫卖声，来往行人几乎把道路堵满。
-evt_market_001,pre_market_002,2,text,商贩,要不要看看今天的新货？
-evt_harbor_hint_001,pre_harbor_hint_001,1,text,旁白,有人悄悄把一张纸条塞进了你的手里。
-evt_harbor_hint_001,pre_harbor_hint_002,2,text,纸条,今晚去码头，会有人告诉你下一步该怎么做。
-evt_harbor_deal_001,pre_harbor_deal_001,1,text,旁白,你来到码头，潮湿的海风裹着咸味扑面而来。
-evt_harbor_deal_001,pre_harbor_deal_002,2,text,走私者,你终于来了，我还以为你不敢赴约。
-evt_harbor_deal_001,pre_harbor_deal_003,3,text,旁白,对方压低了帽檐，示意你靠近。
-evt_guard_chase_001,pre_guard_chase_001,1,text,旁白,沉重的脚步声从身后逼近，守卫已经发现了你的动静。
-evt_smuggle_escape_001,pre_escape_001,1,text,旁白,你终于甩开了追兵，夜色暂时替你遮住了身形。
-evt_smuggle_end_001,pre_smuggle_end_001,1,text,旁白,你看着重新安静下来的街道，忽然意识到自己并不想再继续追逐下去了。
-evt_smuggle_end_001,pre_smuggle_end_002,2,text,旁白,这一次，你决定亲手结束这场冒险。
+event_id,presentation_id,display_order,item_type,speaker,text,presents
+sys_opening_reflection,sys_opening_reflection_p1,1,text,旁白,[首个自省·屏1·林叙事] 池塘开场——林秋禾叙述沈眼中世界（撰写期补）,text
+sys_opening_reflection,sys_opening_reflection_p2,2,text,旁白,[首个自省·屏2·末段+地点选择] 林叙事末段，引导你选一处去（撰写期补）,location_select
+sys_reflection,sys_reflection_p1,1,text,旁白,[中段自省·屏1·林叙事] 林对刚发生的骨架做承担位回应（差分逻辑待补，撰写期分 4 版按 last_consumed_skeleton_event_id）,text
+sys_reflection,sys_reflection_p2,2,text,旁白,[中段自省·屏2·末段+地点选择] 林叙事末段，引导你再选一处（撰写期补）,location_select
+sys_final_reflection,sys_final_reflection_p1,1,text,旁白,[最终自省·屏1·林叙事] 拜师后的收口——林叙述新阶段的开始（撰写期补）,text
+sys_final_reflection,sys_final_reflection_p2,2,text,旁白,[最终自省·屏2·林叙事] 收口末段——demo 流程结束提示（撰写期补）,text
+evt_s2_sk_he,evt_s2_sk_he_p1,1,text,旁白,[骨架·药铺·屏1] 少女在药铺角落看到何守仁辨识药材，他注意到目光，点头致意,text
+evt_s2_sk_qin,evt_s2_sk_qin_p1,1,text,旁白,[骨架·家+市场·屏1] 母亲秦素娘在灶前忙碌，回头看见你，眼神里有交代有期许,text
+evt_s2_sk_zhou,evt_s2_sk_zhou_p1,1,text,旁白,[骨架·练场·屏1] 练场上周既明带几个少年练拳，他擦汗时瞥见你站在场边,text
+evt_s2_sk_cheng,evt_s2_sk_cheng_p1,1,text,旁白,[骨架·道观·屏1] 道观侧院程叔衡盘坐石上，眼皮微抬看了你一眼，没说话,text
+evt_s2_fl_pharmacy_1,evt_s2_fl_pharmacy_1_p1,1,text,旁白,[填充·药铺·1·屏1] 师父让你按方抓药——挑战准确度（撰写期补）,text
+evt_s2_fl_pharmacy_2,evt_s2_fl_pharmacy_2_p1,1,text,旁白,[填充·药铺·2·屏1] 雨天柜台清闲，磨药打发时间（撰写期补）,text
+evt_s2_fl_pharmacy_3,evt_s2_fl_pharmacy_3_p1,1,text,旁白,[填充·药铺·3·屏1] 客人来抓药，你需要应对（撰写期补）,text
+evt_s2_fl_qin_1,evt_s2_fl_qin_1_p1,1,text,旁白,[填充·家+市场·1·屏1] 母亲灶前忙活，让你帮把手（撰写期补）,text
+evt_s2_fl_qin_2,evt_s2_fl_qin_2_p1,1,text,旁白,[填充·家+市场·2·屏1] 集市买菜——讨价还价或被坑（撰写期补）,text
+evt_s2_fl_qin_3,evt_s2_fl_qin_3_p1,1,text,旁白,[填充·家+市场·3·屏1] 母亲晚饭桌上叮嘱你做人本分（撰写期补）,text
+evt_s2_fl_train_1,evt_s2_fl_train_1_p1,1,text,旁白,[填充·练场·1·屏1] 远远看练场队列出操（撰写期补）,text
+evt_s2_fl_train_2,evt_s2_fl_train_2_p1,1,text,旁白,[填充·练场·2·屏1] 跟着晨练跑了几圈，喘得不行（撰写期补）,text
+evt_s2_fl_train_3,evt_s2_fl_train_3_p1,1,text,旁白,[填充·练场·3·屏1] 角落的沙袋——空击试一试（撰写期补）,text
+evt_s2_fl_dao_1,evt_s2_fl_dao_1_p1,1,text,旁白,[填充·道观·1·屏1] 殿前听老钟回响（撰写期补）,text
+evt_s2_fl_dao_2,evt_s2_fl_dao_2_p1,1,text,旁白,[填充·道观·2·屏1] 扫地时遇见一位老者搭话（撰写期补）,text
+evt_s2_fl_dao_3,evt_s2_fl_dao_3_p1,1,text,旁白,[填充·道观·3·屏1] 殿内观人练拳——架势奇特（撰写期补）,text
+evt_s3_chain_entry,evt_s3_chain_entry_p1,1,text,旁白,[拜师·屏1·母亲准备] 母亲早早起身为你打理出门——这是拜师的日子（撰写期补）,text
+evt_s3_chain_2,evt_s3_chain_2_p1,1,text,旁白,[拜师·屏2·集体面试] 几位少年候在堂前，师傅一个个看过去（撰写期补）,text
+evt_s3_chain_3,evt_s3_chain_3_p1,1,text,旁白,[拜师·屏3·私密愣住·陆首登] 师傅独留你一会——而陆承岳在角落沉默看你（陆首登承担位）,text
+evt_s3_chain_4,evt_s3_chain_4_p1,1,text,旁白,[拜师·屏4·第一次训练] 拜师次日，第一次列队训练（撰写期补）,text
