@@ -489,32 +489,58 @@ func _select_next_event() -> Dictionary:
 	var next_event_id := ""
 	var route := "scheduler"
 
+	# 第 1 段：消费外部 forcedNextEventId（如有）。
+	# missing_event_def 视为配置错误，立即显式失败（避免事件被普通调度静默吞掉，参见行
+	# 441/453 的"事件结算时清空 forcedNextEventId"逻辑）；location_mismatch 保留原行为
+	# （forcedNextEventId 字段不动，落入下方普通调度——这条延迟语义在 demo 期由外部 forced
+	# 的配置者自我约束）。
 	if not expected_forced.is_empty():
-		# 叙事包联动：检查 forcedNext 事件的地点约束是否与当前地点匹配。
-		var forced_def: Dictionary = _event_map.get(expected_forced, {})
-		var forced_eligible := true
-		if not forced_def.is_empty():
-			var forced_eligibility: Dictionary = forced_def.get("eligibility", {})
-			var forced_locations: Array = forced_eligibility.get("requiredLocations", [])
-			var current_loc := str(world_state.get("currentLocationId", ""))
-			if not forced_locations.is_empty() and not (current_loc in forced_locations):
-				# 地点不匹配：保留 forcedNextEventId，走正常调度流程。
-				forced_eligible = false
-				print("[叙事包] forcedNext %s 地点不匹配（需要 %s，当前 %s），延迟触发" % [
-					expected_forced, str(forced_locations), current_loc
-				])
-		if forced_eligible:
-			next_event_id = expected_forced
+		var resolved: Dictionary = _try_resolve_forced(expected_forced)
+		if bool(resolved.get("eligible", false)):
+			next_event_id = str(resolved.get("event_id", ""))
 			route = "forced"
-			# 叙事包联动：无地点约束的 forcedNext 事件插入时，包回合容量 +1。
-			if not forced_def.is_empty():
-				var fl: Array = forced_def.get("eligibility", {}).get("requiredLocations", [])
-				if fl.is_empty():
-					var pack_ctx: Dictionary = _dict_or_empty(world_state.get("packContext", {}))
-					if not str(pack_ctx.get("locationId", "")).is_empty():
-						pack_ctx["turnCapacity"] = int(pack_ctx.get("turnCapacity", 0)) + 1
-						world_state["packContext"] = pack_ctx
-						print("[叙事包] 无地点约束 forcedNext，包容量 +1")
+		elif str(resolved.get("reason", "")) == "missing_event_def":
+			return {
+				"ok": false,
+				"error": "forcedNextEventId points to missing event: %s" % expected_forced
+			}
+
+	# 第 2 段：末尾位池抽取（设计基线见 [[当前版本完整主路径_MVP设计]] §三·节点 3）。
+	# 触发条件：无外部 forced（不论延迟与否）+ 处于包末位 + packConfig 配置了池 tag。
+	# 外部 forced 已存在（即便地点不匹配延迟）时不进入末位池，避免覆盖外部 forced 安排。
+	# 池空时通过统一 forced 路径处理（地点校验 / 无地点容量 +1 复用）。
+	# 收口事件命名建议：使用无 requiredLocations 的事件（如 chain 入口），避免落入"配地点
+	# 但玩家不在该地点 → forced 字段无法保留"的脆弱路径。
+	if next_event_id.is_empty() and expected_forced.is_empty():
+		var pool_tag: String = str(_pack_config.get("final_event_pool_tag", "")).strip_edges()
+		if not pool_tag.is_empty() and _is_at_pack_final_turn():
+			if _is_final_pool_exhausted(pool_tag):
+				var exhausted_id: String = str(_pack_config.get("final_event_pool_exhausted_forced_id", "")).strip_edges()
+				if not exhausted_id.is_empty():
+					# 先校验 eligibility 再 commit forcedNextEventId，避免无意义写入随后被
+					# 普通事件结算清空（行 441/453）。
+					var resolved_exhaust: Dictionary = _try_resolve_forced(exhausted_id)
+					if bool(resolved_exhaust.get("eligible", false)):
+						world_state["forcedNextEventId"] = exhausted_id
+						next_event_id = str(resolved_exhaust.get("event_id", ""))
+						route = "final_pool_exhausted_forced"
+						print("[叙事包] 末尾位池 %s 已耗尽，切换 forced=%s" % [pool_tag, exhausted_id])
+					elif str(resolved_exhaust.get("reason", "")) == "missing_event_def":
+						return {
+							"ok": false,
+							"error": "final_event_pool_exhausted_forced_id points to missing event: %s" % exhausted_id
+						}
+					# location_mismatch：本回合让出走普通调度，下次进入末位再尝试匹配
+			else:
+				var location_boost: int = int(_pack_config.get("final_event_location_boost", 0))
+				var pool_candidates: Array = _build_final_pool_candidates(pool_tag, location_boost)
+				if not pool_candidates.is_empty():
+					next_event_id = _weighted_pick(pool_candidates)
+					route = "final_pool"
+					print("[叙事包] 末尾位池 %s 抽取: %s（候选 %d 个）" % [
+						pool_tag, next_event_id, pool_candidates.size()
+					])
+
 	if next_event_id.is_empty():
 		var candidates := _build_candidates()
 		if candidates.is_empty():
@@ -536,6 +562,40 @@ func _select_next_event() -> Dictionary:
 		"route": route,
 		"event_def": event_def
 	}
+
+
+# 功能：尝试消费指定 forced 事件 ID，复用地点校验与无地点 forced 包容量 +1 联动。
+# 说明：抽出原 _select_next_event 顶部的 forced 处理逻辑，供"外部 forcedNextEventId"
+#       与"末尾位池空收口"两个入口共享。返回结构：
+#         { eligible: bool, event_id: String, reason: String? }
+#       eligible=false 时调用方应保留 forcedNextEventId 字段等待下回合再尝试，
+#       不会触发包容量 +1（仅在事件实际进入处理时才推进容量）。
+func _try_resolve_forced(forced_id: String) -> Dictionary:
+	if forced_id.is_empty():
+		return {"eligible": false, "reason": "empty_id"}
+	var forced_def: Dictionary = _event_map.get(forced_id, {})
+	if forced_def.is_empty():
+		# 事件定义缺失：保留 forced 字段，由上层决定是否清空（避免静默丢失）。
+		return {"eligible": false, "reason": "missing_event_def"}
+
+	var forced_eligibility: Dictionary = forced_def.get("eligibility", {})
+	var forced_locations: Array = forced_eligibility.get("requiredLocations", [])
+	var current_loc: String = str(world_state.get("currentLocationId", ""))
+	if not forced_locations.is_empty() and not (current_loc in forced_locations):
+		print("[叙事包] forcedNext %s 地点不匹配（需要 %s，当前 %s），延迟触发" % [
+			forced_id, str(forced_locations), current_loc
+		])
+		return {"eligible": false, "reason": "location_mismatch"}
+
+	# 无地点约束的 forcedNext 事件插入时，包回合容量 +1（保留原有联动行为）。
+	if forced_locations.is_empty():
+		var pack_ctx: Dictionary = _dict_or_empty(world_state.get("packContext", {}))
+		if not str(pack_ctx.get("locationId", "")).is_empty():
+			pack_ctx["turnCapacity"] = int(pack_ctx.get("turnCapacity", 0)) + 1
+			world_state["packContext"] = pack_ctx
+			print("[叙事包] 无地点约束 forcedNext，包容量 +1")
+
+	return {"eligible": true, "event_id": forced_id}
 
 
 # 功能：创建事件待处理上下文。
@@ -1004,6 +1064,103 @@ func _build_candidates() -> Array:
 	return out
 
 
+# 功能：判断当前是否处于包末位回合（即将处理的事件是包内最后一回合）。
+# 说明：在 _select_next_event 中用于决定是否走末尾位池抽取分支。
+#       条件：处于活动包（locationId 非空）+ turnsElapsed + 1 == turnCapacity。
+#       _advance_pack_turn 在事件结算后才递增 turnsElapsed，因此调度阶段读到的值
+#       表示"已处理回合数"，下一回合 = elapsed + 1。
+func _is_at_pack_final_turn() -> bool:
+	var pack_ctx: Dictionary = _dict_or_empty(world_state.get("packContext", {}))
+	if str(pack_ctx.get("locationId", "")).is_empty():
+		return false
+	var elapsed := int(pack_ctx.get("turnsElapsed", 0))
+	var capacity := int(pack_ctx.get("turnCapacity", 0))
+	return capacity > 0 and elapsed + 1 == capacity
+
+
+# 功能：读取指定末尾位池 tag 的已消耗事件列表。
+# 说明：world_state.finalEventPoolConsumed 结构 { tag → [event_id, ...] }；不存在或非数组返回空列表。
+func _get_final_pool_consumed_list(pool_tag: String) -> Array:
+	if pool_tag.is_empty():
+		return []
+	var all_consumed: Dictionary = _dict_or_empty(world_state.get("finalEventPoolConsumed", {}))
+	var raw: Variant = all_consumed.get(pool_tag, [])
+	if typeof(raw) == TYPE_ARRAY and raw != null:
+		return raw
+	return []
+
+
+# 功能：构建末尾位池候选事件列表。
+# 说明：从 events 中筛选 tags 含 pool_tag 的事件，排除已消耗 + 不通过 eligibility 的。
+#       权重在 _compute_weight 基础上叠加 location_boost（事件 requiredLocations 含当前地点时）。
+#       注意 boost 的实际生效面：_is_event_eligible 已对配置了 requiredLocations 但不匹配当前地点
+#       的事件做硬过滤，因此 boost 不会出现在"地点不匹配候选"上。boost 仅在以下情形真正起效：
+#         1) 事件 requiredLocations 含多个地点且当前地点是其中之一 —— 优先于"全场可触发"事件；
+#         2) 事件未配置 requiredLocations（全场可触发）—— 不获 boost，权重不变。
+#       当前 4 地点-4 骨架 1:1 映射下，每个末位回合候选退化为唯一可触发的当地骨架，效果等价"必触当地"。
+func _build_final_pool_candidates(pool_tag: String, location_boost: int) -> Array:
+	var consumed: Array = _get_final_pool_consumed_list(pool_tag)
+	var current_location := str(world_state.get("currentLocationId", ""))
+	var out: Array = []
+	for event_variant in events:
+		var event_def: Dictionary = event_variant
+		var event_id := str(event_def.get("id", ""))
+		if event_id.is_empty():
+			continue
+		var event_tags: Array = event_def.get("tags", [])
+		if not (pool_tag in event_tags):
+			continue
+		if event_id in consumed:
+			continue
+		if not _is_event_eligible(event_def):
+			continue
+		var weight := _compute_weight(event_def)
+		var eligibility: Dictionary = event_def.get("eligibility", {})
+		var required_locations: Array = eligibility.get("requiredLocations", [])
+		if not required_locations.is_empty() and current_location in required_locations:
+			weight += location_boost
+		out.append({"id": event_id, "weight": weight})
+	return out
+
+
+# 功能：检查指定末尾位池 tag 是否已被全部消耗。
+# 说明：用于"池空降级"判定。返回 true 表示该 tag 下所有事件均已记入消耗集合（无剩余可抽）。
+#       仅按 tag 匹配判定，不考虑 eligibility（永远不满足条件的事件不应进池）。
+func _is_final_pool_exhausted(pool_tag: String) -> bool:
+	if pool_tag.is_empty():
+		return false
+	var consumed: Array = _get_final_pool_consumed_list(pool_tag)
+	for event_variant in events:
+		var event_def: Dictionary = event_variant
+		var event_id := str(event_def.get("id", ""))
+		if event_id.is_empty():
+			continue
+		var event_tags: Array = event_def.get("tags", [])
+		if not (pool_tag in event_tags):
+			continue
+		if not (event_id in consumed):
+			return false
+	return true
+
+
+# 功能：将事件 ID 标记到指定末尾位池 tag 的消耗集合中。
+# 说明：写入 world_state.finalEventPoolConsumed[pool_tag]，去重；空参数直接返回。
+func _mark_final_pool_consumed(pool_tag: String, event_id: String) -> void:
+	if pool_tag.is_empty() or event_id.is_empty():
+		return
+	var all_consumed: Dictionary = _dict_or_empty(world_state.get("finalEventPoolConsumed", {}))
+	var raw: Variant = all_consumed.get(pool_tag, [])
+	var list: Array = []
+	if typeof(raw) == TYPE_ARRAY and raw != null:
+		list = raw
+	if event_id in list:
+		return
+	list.append(event_id)
+	all_consumed[pool_tag] = list
+	world_state["finalEventPoolConsumed"] = all_consumed
+	print("[叙事包] 末尾位池 %s 标记消耗: %s（累计 %d）" % [pool_tag, event_id, list.size()])
+
+
 # 功能：导出当前候选事件权重快照。
 # 说明：仅用于调试/测试，不改变世界状态。
 func debug_get_candidate_weights() -> Dictionary:
@@ -1336,6 +1493,22 @@ func _apply_event_effects(event_def: Dictionary) -> void:
 
 	var task_actions := _array_or_empty(effects.get("taskActions", []))
 	_apply_task_actions(task_actions)
+
+	# 末尾位池消耗记录：若事件 tags 含已配置的池 tag，自动写入消耗集合。
+	# 设计基线见 [[当前版本完整主路径_MVP设计]] §三·节点 3 末尾位骨架抽取规则。
+	# 任何路径触发的事件（forced / scheduler / final_pool）都覆盖，避免遗漏。
+	# mark 后立即检查池是否变空：是则马上安排收口 forced，确保 MVP 设计要求的
+	# "消耗完最后一个 → 立即触发收口事件"语义；同回合不覆盖外部已存在的 forced 安排。
+	var final_pool_tag: String = str(_pack_config.get("final_event_pool_tag", "")).strip_edges()
+	if not final_pool_tag.is_empty():
+		var event_tags: Array = event_def.get("tags", [])
+		if final_pool_tag in event_tags:
+			_mark_final_pool_consumed(final_pool_tag, str(event_def.get("id", "")))
+			if _is_final_pool_exhausted(final_pool_tag):
+				var exhausted_id: String = str(_pack_config.get("final_event_pool_exhausted_forced_id", "")).strip_edges()
+				if not exhausted_id.is_empty() and str(world_state.get("forcedNextEventId", "")).is_empty():
+					world_state["forcedNextEventId"] = exhausted_id
+					print("[叙事包] 末尾位池 %s 消费后耗尽，安排收口 forced=%s" % [final_pool_tag, exhausted_id])
 
 # 功能：按 continuationPolicy 推进链上下文。
 # 说明：forcedNextEventId 由 effects 或 resolution 驱动，不在这里判定。
@@ -3022,12 +3195,23 @@ func _ensure_pack_context() -> void:
 
 
 # 功能：初始化叙事包系统配置，从 world_state.packConfig 加载。
-# 说明：缺省时使用默认值（defaultCapacity=3），保证系统在无配置时也能正常运行。
+# 说明：缺省时使用默认值，保证系统在无配置时也能正常运行。
+#       末尾位池抽取相关字段（final_event_pool_tag / final_event_location_boost /
+#       final_event_pool_exhausted_forced_id）支持包末位回合从 tag 池抽取骨架事件，
+#       具体逻辑见 _select_next_event 中的"末尾位池分支"。
+#       配置层留空即不启用末尾位池。设计基线见 [[当前版本完整主路径_MVP设计]] §三·节点 3。
 func _init_pack_config() -> void:
 	var raw: Dictionary = _dict_or_empty(world_state.get("packConfig", {}))
 	_pack_config = {
 		"defaultCapacity": int(raw.get("defaultCapacity", 3)),
+		"final_event_pool_tag": str(raw.get("final_event_pool_tag", "")).strip_edges(),
+		"final_event_location_boost": int(raw.get("final_event_location_boost", 0)),
+		"final_event_pool_exhausted_forced_id": str(raw.get("final_event_pool_exhausted_forced_id", "")).strip_edges(),
 	}
+	# 末尾位池消耗记录（按 tag 分组持久化，支持多池共存与未来阶段切换）。
+	# 结构：{ tag → [event_id, ...] }；首次加载时初始化空字典。
+	if not world_state.has("finalEventPoolConsumed") or typeof(world_state.get("finalEventPoolConsumed", null)) != TYPE_DICTIONARY:
+		world_state["finalEventPoolConsumed"] = {}
 	print("[叙事包] packConfig 已加载: %s" % str(_pack_config))
 
 

@@ -211,9 +211,15 @@ static func _assemble_world_state(tables: Dictionary) -> Dictionary:
 				affinity_config[key] = _to_int(value_text, 0)
 				world_state["affinityConfig"] = affinity_config
 			"pack_config":
-				# 说明：叙事包系统配置（默认回合容量），写入 packConfig 字典。
+				# 说明：叙事包系统配置，写入 packConfig 字典。
+				#       int 字段：defaultCapacity / final_event_location_boost。
+				#       string 字段：final_event_pool_tag / final_event_pool_exhausted_forced_id（末尾位池抽取）。
 				var pack_config: Dictionary = world_state.get("packConfig", {})
-				pack_config[key] = _to_int(value_text, 0)
+				match key:
+					"final_event_pool_tag", "final_event_pool_exhausted_forced_id":
+						pack_config[key] = value_text.strip_edges()
+					_:
+						pack_config[key] = _to_int(value_text, 0)
 				world_state["packConfig"] = pack_config
 			"reflection_config":
 				# 说明：自省系统配置（操作限额、调整刻度、推荐数量、关注上限、初始关注列表），写入 reflectionConfig 字典。
