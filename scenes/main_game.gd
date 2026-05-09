@@ -878,6 +878,12 @@ func _get_full_option_defs_for_current_event() -> Array:
 # 功能：判断某个选项是否满足主动押注触发条件。
 # 说明：条件与引擎 _apply_option_resolution 中一致：心性允许、选项含鉴定、未被 disabled。
 func _can_option_trigger_bet(option_def: Dictionary, risk_profile: Dictionary) -> bool:
+	# demo_mode: disable_preemptive_bet_path —— demo 期心性完全不暴露，
+	#   UI 层不渲染主动押注切换按钮（防止玩家选了被引擎层拦下产生困惑）。
+	#   引擎层守门见 world_event_engine.gd:_resolve_pending_turn 选项分支。
+	#   重构期审视入口：[[代码重构_预启动]] §4.3。
+	if _engine != null and _engine.is_demo_mode_enabled("disable_preemptive_bet_path"):
+		return false
 	if not bool(risk_profile.get("allow_preemptive_bet", false)):
 		return false
 	var check_raw: Variant = option_def.get("check", null)

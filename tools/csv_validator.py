@@ -201,6 +201,13 @@ def validate(csv_dir: Path, ref_dir: Path) -> ValidationResult:
         location_graph_rows = load_csv(ref_dir / "location_graph.csv")
     # 事件叙事反馈 MVP A：option_outcomes.csv 可选表（缺失时静默跳过对应校验）。
     option_outcomes = load_csv(csv_dir / "option_outcomes.csv")
+    # 任务评价系统：tasks.csv 与 task_eval_*.csv 的 FK 一致性（2026-05-09 新增；
+    # Phase A 后期暴露的"task_eval 引用 tasks 已删 task_id"事故触发的硬化校验）。
+    tasks_rows = load_csv(csv_dir / "tasks.csv")
+    task_eval_grades = load_csv(csv_dir / "task_eval_grades.csv")
+    task_eval_indicators = load_csv(csv_dir / "task_eval_indicators.csv")
+    task_eval_grade_overrides = load_csv(csv_dir / "task_eval_grade_overrides.csv")
+    task_eval_effects = load_csv(csv_dir / "task_eval_effects.csv")
 
     # ── 加载参考数据 ──
     attribute_keys = load_attribute_keys(ref_dir)
@@ -407,6 +414,39 @@ def validate(csv_dir: Path, ref_dir: Path) -> ValidationResult:
                 )
 
         result.stats["outcome 行"] = len(option_outcomes)
+
+    # ── 检查 6.8: task_eval_*.csv 与 tasks.csv 的 FK 一致性 ──
+    # 文件可选；存在时校验 task_eval_grades / task_eval_indicators /
+    #   task_eval_grade_overrides / task_eval_effects 中的 task_id 必须在 tasks.csv 内。
+    # 历史教训（2026-05-09）：Phase A 落地时 tasks.csv 改为 4 个新 task，但 task_eval_*.csv
+    #   仍引用早期 milestone 1 的 task_exam，dataset_dir 设空后两表同源导致 assembler
+    #   FK 校验失败、main_game 提前 return 出现 UI 空白。csv_validator 当时未覆盖此层。
+    task_id_set: set[str] = {
+        r.get("task_id", "").strip() for r in tasks_rows
+        if r.get("task_id", "").strip()
+    }
+
+    def _check_task_eval_fk(rows: list[dict[str, str]], file_label: str) -> None:
+        """通用 task_id FK 校验：每行 task_id 必须在 tasks.csv 中。"""
+        for idx, row in enumerate(rows, start=1):
+            task_id = row.get("task_id", "").strip()
+            if not task_id:
+                continue  # 空 task_id 由各表自身的更严格校验处理
+            if task_id not in task_id_set:
+                result.add_p1(
+                    f"{file_label} 第 {idx} 行: task_id '{task_id}' 不存在于 tasks.csv"
+                )
+
+    if tasks_rows:
+        _check_task_eval_fk(task_eval_grades, "task_eval_grades")
+        _check_task_eval_fk(task_eval_indicators, "task_eval_indicators")
+        _check_task_eval_fk(task_eval_grade_overrides, "task_eval_grade_overrides")
+        _check_task_eval_fk(task_eval_effects, "task_eval_effects")
+        result.stats["task 数"] = len(task_id_set)
+    else:
+        # tasks.csv 缺失时仅警告（兼容历史 / 测试数据集）。
+        if any([task_eval_grades, task_eval_indicators, task_eval_grade_overrides, task_eval_effects]):
+            result.add_p2("task_eval_*.csv 存在数据但 tasks.csv 缺失，跳过 FK 校验")
 
     # ── 检查 7: cost / resolution key 合法性 ──
     # 语义分工（与 world_event_config_assembler._apply_effect_or_resolution_action 对齐）：
