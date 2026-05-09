@@ -45,6 +45,9 @@ var _cycle_affinity_changes: Array = []
 var _pack_config: Dictionary = {}
 # 自省系统配置（操作限额、调整刻度、推荐数量），从 world_seed reflectionConfig 加载。
 var _reflection_config: Dictionary = {}
+# demo 期临时收紧的开关（心性 UI 隐藏 / 心性接入路径禁用等），从 world_seed demoModeConfig 加载。
+# 重构期审视清单见 [[代码重构_预启动]] §4.3 demo_mode_config 开关清单；规约见 [[鉴定 demo 期表现规约]]。
+var _demo_mode_config: Dictionary = {}
 # 自省操作已使用次数，自省开始时重置为0。
 var _reflection_ops_used: int = 0
 # 自省状态机实例，管理自省事件的完整交互流程。
@@ -162,6 +165,7 @@ func load_from_json_text(
 	# 说明：JSON 路径也需要加载这些配置，否则自省事件的 reflectionConfig 不会被读取。
 	_init_affinity_system()
 	_init_reflection_config()
+	_init_demo_mode_config()
 	return {"ok": true}
 
 # 功能：从内存对象加载数据。
@@ -213,6 +217,8 @@ func load_from_data(data: Dictionary, location_graph: Variant = null, role_state
 	_init_reflection_config()
 	# 初始化叙事包系统配置。
 	_init_pack_config()
+	# 初始化 demo 期临时收紧开关（心性 UI 隐藏 / 心性接入路径禁用等）。
+	_init_demo_mode_config()
 	# 确保 packContext 存在（首次加载时初始化为空包状态）。
 	_ensure_pack_context()
 	return {"ok": true}
@@ -2098,11 +2104,14 @@ func _apply_option_resolution(selected_option: Dictionary, event_def: Dictionary
 
 	# 3. 主动押注检查：心性允许且选项含鉴定且未被 disabled。
 	#    全局化后不再要求选项显式配置 preemptiveBet，含鉴定的选项默认走全局默认。
+	# demo_mode: disable_preemptive_bet_path —— demo 期禁用押注前置 phase（避免心性接入泄露）。
+	#   重构期审视入口：[[代码重构_预启动]] §4.3。
 	var check_for_bet := _dict_or_empty(selected_option.get("check", {}))
 	var option_bet_cfg: Variant = selected_option.get("preemptiveBet", null)
 	var bet_disabled: bool = (typeof(option_bet_cfg) == TYPE_DICTIONARY and bool(option_bet_cfg.get("disabled", false)))
 	var has_check := not check_for_bet.is_empty()
-	if bool(risk_profile.get("allow_preemptive_bet", false)) and has_check and not bet_disabled:
+	var demo_disable_bet := is_demo_mode_enabled("disable_preemptive_bet_path")
+	if bool(risk_profile.get("allow_preemptive_bet", false)) and has_check and not bet_disabled and not demo_disable_bet:
 		# 挂起到 preemptive_bet phase，等待玩家决策
 		_pending_turn_context["phase"] = "preemptive_bet"
 		_pending_turn_context["selected_option"] = selected_option.duplicate(true)
@@ -2124,7 +2133,11 @@ func _apply_option_resolution(selected_option: Dictionary, event_def: Dictionary
 	print("[鉴定结果] result_type: %s | pass: %s" % [str(check_result.get("result_type", "")), str(check_result.get("pass", true))])
 
 	# 6. 孤注一掷检查：主结果 fail 且心性允许
-	if not check_result.get("pass", true) and bool(risk_profile.get("allow_desperate_gamble", false)):
+	# demo_mode: disable_desperate_gamble_path —— demo 期禁用 fail 后的孤注一掷重掷路径
+	#   （fail 直接走 fail，避免"为什么有时鉴定多了一次重试"的隐式机制泄露）。
+	#   重构期审视入口：[[代码重构_预启动]] §4.3。
+	var demo_disable_gamble := is_demo_mode_enabled("disable_desperate_gamble_path")
+	if not check_result.get("pass", true) and bool(risk_profile.get("allow_desperate_gamble", false)) and not demo_disable_gamble:
 		_pending_turn_context["phase"] = "desperate_gamble"
 		_pending_turn_context["selected_option"] = selected_option.duplicate(true)
 		_pending_turn_context["check_result"] = check_result.duplicate(true)
@@ -3631,6 +3644,24 @@ func _init_pack_config() -> void:
 	if not world_state.has("last_consumed_skeleton_event_id"):
 		world_state["last_consumed_skeleton_event_id"] = ""
 	print("[叙事包] packConfig 已加载: %s" % str(_pack_config))
+
+
+# 功能：初始化 demo 期临时收紧开关（demo_mode_config）。
+# 说明：从 world_state.demoModeConfig 加载所有 bool 开关，缺省时默认 false（即不收紧）。
+#       重构期审视清单见 [[代码重构_预启动]] §4.3 demo_mode_config 开关清单。
+#       规约依赖见 [[鉴定 demo 期表现规约]]（鉴定降配 + 心性完全隐藏决议）。
+#       命名规范："行为描述"风格：hide_X_panel_X / disable_X_path / simplify_X_ui。
+func _init_demo_mode_config() -> void:
+	var raw: Dictionary = _dict_or_empty(world_state.get("demoModeConfig", {}))
+	_demo_mode_config = raw
+	print("[demo_mode] demoModeConfig 已加载: %s" % str(_demo_mode_config))
+
+
+# 功能：查询 demo_mode 开关是否启用。
+# 说明：UI / 引擎消费位统一通过本 API 查询，便于重构期 grep `is_demo_mode_enabled` 一次性找全所有消费位。
+#       缺省 false（未配置时默认不收紧），保证向后兼容。
+func is_demo_mode_enabled(key: String) -> bool:
+	return bool(_demo_mode_config.get(key, false))
 
 
 # 功能：判断当前是否处于 deferred 模式的 chain 中。

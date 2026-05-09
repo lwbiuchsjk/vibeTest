@@ -34,3 +34,7 @@ reflection_config,,,trust_delta_negative,-5
 reflection_config,,,recommend_count,3
 reflection_config,,,focus_limit,3
 reflection_config,,,initial_focus_npcs,
+demo_mode_config,,,hide_xinxing_panel_values,true
+demo_mode_config,,,hide_check_result_xinxing_summary,true
+demo_mode_config,,,disable_desperate_gamble_path,true
+demo_mode_config,,,disable_preemptive_bet_path,true

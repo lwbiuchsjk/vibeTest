@@ -1139,8 +1139,10 @@ func _build_check_result_summary(turn_result: Dictionary) -> String:
 		lines.append("关系修正: %s (%s, %s) bias=%+d" % [npc_id, npc_tier, direction, bias])
 
 	# 心性转移摘要
+	# demo_mode: hide_check_result_xinxing_summary —— demo 期心性完全不暴露，
+	#   隐藏鉴定结果中的"心性转移"行。重构期审视入口：[[代码重构_预启动]] §4.3。
 	var transition: Dictionary = turn_result.get("xinxing_transition", {})
-	if not transition.is_empty():
+	if not transition.is_empty() and not _engine.is_demo_mode_enabled("hide_check_result_xinxing_summary"):
 		lines.append("心性转移: %d → %d" % [
 			int(transition.get("old_value", 0)),
 			int(transition.get("new_value", 0))
@@ -1366,9 +1368,16 @@ func _update_character_panel(player: Dictionary, xinxing_tracker: Dictionary) ->
 	var energy := int(player.get("energy", 0))
 	var gold := int(player.get("gold", 0))
 
-	var line1 := "生命 %d    精力 %d    金币 %d    ┃    心性 %d（稳健%d / 孤注%d）" % [
-		hp, energy, gold, xinxing, steady, gamble
-	]
+	# demo_mode: hide_xinxing_panel_values —— demo 期心性完全不暴露，
+	#   character_panel 隐藏 xinxing/steady/gamble 三项数值显示。
+	#   重构期审视入口：[[代码重构_预启动]] §4.3。
+	var line1: String
+	if _engine.is_demo_mode_enabled("hide_xinxing_panel_values"):
+		line1 = "生命 %d    精力 %d    金币 %d" % [hp, energy, gold]
+	else:
+		line1 = "生命 %d    精力 %d    金币 %d    ┃    心性 %d（稳健%d / 孤注%d）" % [
+			hp, energy, gold, xinxing, steady, gamble
+		]
 	var line2 := _build_ability_display_text()
 	character_label.text = "%s\n%s" % [line1, line2]
 

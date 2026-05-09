@@ -19,6 +19,16 @@
     按 (option_id, branch) 分组配多屏。该字段不在事件卡 frontmatter 范围内，由 LLM 在
     叙事撰写阶段人工填充。脚本不消费、不产出）
 
+demo 期约束（2026-05-09 [[鉴定 demo 期表现规约]] 决议，软约束不在脚本硬化）：
+  - 鉴定相关字段：DC（hitThreshold）demo 期单一 6；鉴定只在骨架事件出现；
+    单事件最多 1 个 check 选项；保留 cost spirit 1
+  - option_outcomes.csv：demo 期只写 success/fail 两 branch；**不写 critical_success
+    / critical_fail**（引擎自动 fallback 到 success/fail）
+  - 心性相关：option_rules.csv / event_outcomes.csv 不写 xinxing 字段（心性是行为
+    驱动属性，引擎自动累积；demo 期完全不暴露给玩家，详见 [[代码重构_预启动]] §4.1）
+  - 重构期约束变更入口：[[鉴定 demo 期表现规约]] §六 维护说明 + [[代码重构_预启动]]
+    §4.2 / §4.3
+
 用法：
   python tools/csv_translator.py --cards Design/events/stage_2 --out scripts/config/world_event_mvp
 """

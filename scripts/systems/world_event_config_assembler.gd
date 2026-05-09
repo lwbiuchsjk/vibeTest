@@ -282,6 +282,13 @@ static func _assemble_world_state(tables: Dictionary) -> Dictionary:
 					_:
 						pack_config[key] = _to_int(value_text, 0)
 				world_state["packConfig"] = pack_config
+			"demo_mode_config":
+				# 说明：demo 期临时收紧的开关（心性 UI 隐藏、心性接入路径禁用等），写入 demoModeConfig 字典。
+				#       值类型：bool（true/false 字符串）。重构期审视清单见 [[代码重构_预启动]] §4.3。
+				#       命名规范："行为描述"风格：hide_X_panel_X / disable_X_path / simplify_X_ui，不用"模块归属"命名。
+				var demo_mode_config: Dictionary = world_state.get("demoModeConfig", {})
+				demo_mode_config[key] = _parse_literal(value_text)
+				world_state["demoModeConfig"] = demo_mode_config
 			"reflection_config":
 				# 说明：自省系统配置（操作限额、调整刻度、推荐数量、关注上限、初始关注列表），写入 reflectionConfig 字典。
 				var reflection_config: Dictionary = world_state.get("reflectionConfig", {})

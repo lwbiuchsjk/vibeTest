@@ -13,6 +13,10 @@ evt_s2_sk_qin_opt_2,default,1,[outcome·家+市场·首遇·点头·屏1] 你应
 evt_s2_sk_qin_opt_2,default,2,[outcome·家+市场·首遇·点头·屏2] 屋里灯还亮着，你听见母亲在外间又坐了好一会
 evt_s2_sk_qin_opt_3,default,1,[outcome·家+市场·首遇·避开·屏1] 你装没看见从旁边过去，秦素娘叹了口气（关系+0）
 evt_s2_sk_qin_opt_3,default,2,[outcome·家+市场·首遇·避开·屏2] 你回屋后听见她在外间洗碗，水声比平日重些
+evt_s2_sk_qin_opt_4,success,1,[outcome·家+市场·首遇·用心·成功·屏1·TODO属性] 你用心准备了一道菜，秦素娘尝了一口手停了一下（关系+2）
+evt_s2_sk_qin_opt_4,success,2,[outcome·家+市场·首遇·用心·成功·屏2·TODO属性] 她没夸你，但晚饭桌上多放了一双筷子的位置——这是她平日里不会做的小事
+evt_s2_sk_qin_opt_4,fail,1,[outcome·家+市场·首遇·用心·失败·屏1·TODO属性] 你想做得更好却出了岔子，秦素娘没说什么默默接过来（关系+1，难为情）
+evt_s2_sk_qin_opt_4,fail,2,[outcome·家+市场·首遇·用心·失败·屏2·TODO属性] 你坐回桌边，看母亲手里那道菜——你想她大概比你更懂这个家的温度
 evt_s2_sk_zhou_opt_1,success,1,[outcome·练场·首遇·成功·屏1] 周既明扫你一眼，问你练过几年（关系+2）
 evt_s2_sk_zhou_opt_1,success,2,[outcome·练场·首遇·成功·屏2] 你含糊答了几句他便没追问——但他记下了你站姿里的那点东西
 evt_s2_sk_zhou_opt_1,fail,1,[outcome·练场·首遇·失败·屏1] 你架势露怯，周既明只笑了一下没接话（关系+1，尴尬）

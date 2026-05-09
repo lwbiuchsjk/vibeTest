@@ -181,6 +181,7 @@ Design hook 中处理含中文的 junction 路径（`$ROOT` 解析到 `D:\坚果
 - [UI风格快速翻调_demo期进度](Design/进度/UI风格快速翻调_demo期进度.md) — **进行中**：议题 B 第一阶段收口（聚合面板 + OptionCard + 信笺描边），下一步议题 E 选项效果精调（cost/check/hover/disabled）
 - [文字马赛克_hover鱼眼_预启动](Design/进度/文字马赛克_hover鱼眼_预启动.md) — **预启动**：cursor 邻域字符放大 + 邻居挤开（Apple Dock 鱼眼），单 Godot 路径方案待 MVP 设计
 - [Web首屏加载性能_诊断与部署方案](Design/进度/Web首屏加载性能_诊断与部署方案.md) — MVP 落地：nginx 自签 HTTPS 70s 首屏；COS/nip.io 路径已验证排除；CDN 等深度优化待备案解锁
+- [代码重构_预启动](Design/进度/代码重构_预启动.md) — **预启动**：项目内容期收口后的代码重构总入口；含 Phase A 实施期 10 条工程洞察 + 5 项宏观观察 + demo 期临时收紧清单（心性完全隐藏 / 鉴定降配 / demo_mode_config 开关）；启动时机为 Phase B + 阶段 3 + 阶段 4 全部收口后
 
 ## 已归档
 

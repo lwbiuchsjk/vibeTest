@@ -5,6 +5,7 @@ evt_s2_sk_he_opt_3,cp_evt_s2_sk_he,[选项·忽略] 不打扰他（无变化）,
 evt_s2_sk_qin_opt_1,cp_evt_s2_sk_qin,[选项·搭话] 帮母亲收拾（cost energy 1 + 关系+2）,1
 evt_s2_sk_qin_opt_2,cp_evt_s2_sk_qin,[选项·点头] 应一声便回房（关系+1）,2
 evt_s2_sk_qin_opt_3,cp_evt_s2_sk_qin,[选项·避开] 装没看见（关系+0）,3
+evt_s2_sk_qin_opt_4,cp_evt_s2_sk_qin,[选项·用心做事] 用心帮母亲准备饭食（cost spirit 1 + check insight TODO属性 + 关系+2/+1）,4
 evt_s2_sk_zhou_opt_1,cp_evt_s2_sk_zhou,[选项·搭讪] 上前请教练拳（cost spirit 1 + check physique + 关系+2/+1）,1
 evt_s2_sk_zhou_opt_2,cp_evt_s2_sk_zhou,[选项·远观] 远远看几招（关系+1）,2
 evt_s2_sk_zhou_opt_3,cp_evt_s2_sk_zhou,[选项·避开] 不愿引人注意（关系+0）,3
