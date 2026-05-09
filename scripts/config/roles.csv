@@ -1,5 +1,5 @@
 role_id,role_type,display_name,location_id,portrait_file,aptitude,physique,craft,insight,xinxing,hp,energy,spirit,gold
-player_001,player,沈砚,loc_pharmacy,icon.svg,3,999,2,1,-2,100,999,3,30
+player_001,player,沈砚,loc_pharmacy,icon.svg,3,999,2,1,0,100,999,3,30
 npc_he,npc,何守仁,loc_pharmacy,icon.svg,1,1,3,2,0,50,3,2,20
 npc_qin,npc,秦素娘,loc_qin_house,icon.svg,1,1,2,1,0,40,3,2,5
 npc_zhou,npc,周既明,loc_training_ground,icon.svg,2,2,2,2,0,50,4,3,10

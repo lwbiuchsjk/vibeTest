@@ -38,3 +38,4 @@ demo_mode_config,,,hide_xinxing_panel_values,true
 demo_mode_config,,,hide_check_result_xinxing_summary,true
 demo_mode_config,,,disable_desperate_gamble_path,true
 demo_mode_config,,,disable_preemptive_bet_path,true
+demo_mode_config,,,disable_xinxing_stability_bias,true

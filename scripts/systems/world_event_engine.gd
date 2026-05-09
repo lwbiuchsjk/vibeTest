@@ -1344,6 +1344,13 @@ func _build_candidates() -> Array:
 		var policy := str(event_def.get("continuationPolicy", "")).strip_edges()
 		if (policy == "ChainContinue" or policy == "ChainContinueWithForcedNext") and not chain_active:
 			continue
+		# 守门 4：REQ-001 包内硬去重（2026-05-09）—— 当前包内已 played 的事件硬排除，
+		#   避免同包内同一 event_id 重复触发。跨包仍可重复（体现叙事日常性）。
+		#   仅作用普通调度路径；forced / final_pool 路径不受影响（不经过本函数）。
+		var pack_ctx_dedup: Dictionary = _dict_or_empty(world_state.get("packContext", {}))
+		var played_in_pack: Array = pack_ctx_dedup.get("played_events", [])
+		if str(event_def.get("id", "")) in played_in_pack:
+			continue
 		if _is_event_eligible(event_def):
 			var weight := _compute_weight(event_def)
 			out.append({"id": str(event_def.get("id", "")), "weight": weight})
@@ -1883,6 +1890,17 @@ func _record_history(event_id: String) -> void:
 	while history.size() > 12:
 		history.pop_front()
 	world_state["history"] = history
+	# REQ-001 包内硬去重（2026-05-09）：同步追加到 packContext.played_events，
+	#   仅当包激活时（locationId 非空）。_build_candidates 守门 4 消费。
+	#   forced / final_pool 路径也会经过本函数追加，但那些路径不走 _build_candidates，
+	#   所以追加是无害的（仅占内存几 byte）。
+	var pack_ctx: Dictionary = _dict_or_empty(world_state.get("packContext", {}))
+	if not str(pack_ctx.get("locationId", "")).is_empty():
+		var played: Array = pack_ctx.get("played_events", [])
+		if not (event_id in played):
+			played.append(event_id)
+			pack_ctx["played_events"] = played
+			world_state["packContext"] = pack_ctx
 
 # 功能：判断两个数组是否存在任意交集。
 # 说明：用于 tag 匹配。
@@ -2175,7 +2193,14 @@ func _is_check_pass(check: Dictionary, risk_modifiers: Dictionary = {}) -> Dicti
 	var risk_profile := RuleEngine.get_xinxing_risk_profile(current_xinxing)
 	merged_risk_modifiers["xinxing"] = current_xinxing
 	merged_risk_modifiers["risk_profile"] = risk_profile
-	merged_risk_modifiers["stability_bias"] = int(risk_profile.get("stability_bias", 0))
+	# demo_mode: disable_xinxing_stability_bias —— demo 期心性完全不暴露，强制 stability_bias=0
+	#   防止 xinxing > 0 时给鉴定 dice 池加骰造成"鉴定突然变好"的隐式机制泄露。
+	#   tracker 累积保留（数据完整供阶段 3 启用），仅在本鉴定计算位强制为 0。
+	#   重构期审视入口：[[代码重构_预启动]] §4.3。
+	var stability_bias_value: int = int(risk_profile.get("stability_bias", 0))
+	if is_demo_mode_enabled("disable_xinxing_stability_bias"):
+		stability_bias_value = 0
+	merged_risk_modifiers["stability_bias"] = stability_bias_value
 
 	# 关系修正判定：遍历 relationshipNpcs，汇总 relationship_bias 注入骰池。
 	var relationship_npcs: Array = check.get("relationshipNpcs", [])
@@ -3723,11 +3748,15 @@ func _advance_pack_turn() -> bool:
 # 功能：清空叙事包状态，准备进入地点选择。
 # 说明：清空 packContext 使 preview_next_turn 检测到空包并进入地点选择流程。
 func _clear_pack_context() -> void:
+	# played_events：包内硬去重（REQ-001，2026-05-09）—— 单包内同一 event_id 不重复触发，
+	#   跨包仍可重复（叙事日常性）。普通调度路径在 _build_candidates 守门 4 消费，
+	#   forced / final_pool 路径不受影响。详见 [[代码重构_预启动]] §五·REQ-001。
 	world_state["packContext"] = {
 		"locationId": "",
 		"turnCapacity": 0,
 		"turnsElapsed": 0,
-		"interrupted": false
+		"interrupted": false,
+		"played_events": []
 	}
 
 
@@ -3739,7 +3768,8 @@ func _start_new_pack(location_id: String) -> void:
 		"locationId": location_id,
 		"turnCapacity": capacity,
 		"turnsElapsed": 0,
-		"interrupted": false
+		"interrupted": false,
+		"played_events": []
 	}
 	world_state["currentLocationId"] = location_id
 	print("[叙事包] 新包开始: location=%s, capacity=%d" % [location_id, capacity])
