@@ -12,6 +12,10 @@
 class_name IntroSequence
 extends Control
 
+# 开始按钮字体（2026-05-10）：思源宋体 Bold——宋骨厚重 + 仪式感对路；
+# 与 main_game 叙事标题同字体，形成"重要时刻"语言一致性。
+const FONT_START_BUTTON: Font = preload("res://font/SourceHanSerifCN-Bold.otf")
+
 # ============================================================
 # 资产路径常量
 # ============================================================
@@ -179,6 +183,10 @@ func _ready() -> void:
 	# 脸部 mask 注入推迟到 _on_start_fade_out（即将装载 girl_enter 时），
 	# 涟漪期 A/B 套 IntroFaceMask 都不挂 mask——涟漪 cross-fade 切帧时
 	# B 套 alpha 0→1 不会带出米色块污染涟漪画面。
+
+	# 开始按钮字体注入（2026-05-10）：思源宋体 Bold 替换全局默认霞鹜文楷，强化"开始游戏"仪式感
+	if start_button != null:
+		start_button.add_theme_font_override("font", FONT_START_BUTTON)
 
 
 # ============================================================
