@@ -3909,9 +3909,9 @@ func get_reflection_location_options() -> Array:
 			and (loc_id in forced_locations)
 		)
 		var is_current: bool = (loc_id == current_location)
+		# 议题 E 子项 5（2026-05-10）：取消"（当前所在）"后缀标记——
+		# 自省末屏候选展示纯地点名即可；is_current 字段保留供其他逻辑使用（如未来高亮 / 排序）。
 		var option_text: String = display_name
-		if is_current:
-			option_text = "%s（当前所在）" % display_name
 		out.append({
 			"id": "loc_select_%s" % loc_id,
 			"location_id": loc_id,

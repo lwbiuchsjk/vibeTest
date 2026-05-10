@@ -1,5 +1,5 @@
 location_id,display_name,neighbors,art_file
 loc_pharmacy,药铺,loc_qin_house;loc_dao_temple,pond_still.png
-loc_qin_house,家+市场,loc_pharmacy;loc_training_ground;loc_dao_temple,pond_ripple_1.png
+loc_qin_house,家,loc_pharmacy;loc_training_ground;loc_dao_temple,pond_ripple_1.png
 loc_training_ground,练场,loc_qin_house;loc_dao_temple,pond_ripple_2.png
 loc_dao_temple,道观,loc_pharmacy;loc_qin_house;loc_training_ground,pond_ripple_3.png

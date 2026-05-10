@@ -895,15 +895,37 @@ func _render_reflection_location_buttons(_turn_result: Dictionary) -> void:
 			status_label.text = "[BUG] reflection 末屏候选为空 visited=%s mode=%s" % [str(visited), mode]
 		push_warning("[main_game] reflection 末屏候选为空：visited=%s mode=%s" % [str(visited), mode])
 		return
+	# 议题 E 子项 5（2026-05-10）：地点选择按钮迁移到 OptionCard 形态体系
+	# 形态决策：候选 a 统一 OptionCard 形态（地点名作主文本，无 cost/check 副字）
+	#       + 候选 b 地点专属阴影 tokens（LOCATION_TEXT_TOKENS，让每张地点卡的斑驳词汇贴该地点语义）。
+	# 与 _render_choice_options 共享 OptionCard，"伸手"语义在自省末屏退化为"位置切换"——
+	# 视觉一致优先于语义细分（统一卡片形态降低玩家学习成本）。
+	var visible_count := 0
 	for opt_variant in options:
 		var opt: Dictionary = opt_variant
 		var location_id := str(opt.get("location_id", ""))
 		var option_text := str(opt.get("text", location_id))
-		var btn := Button.new()
-		btn.text = option_text
-		btn.pressed.connect(_on_reflection_location_select_pressed.bind(location_id))
-		ButtonTheme.apply(btn)
-		option_list.add_child(btn)
+		visible_count += 1
+		var card: OptionCard = OptionCard.new()
+		option_list.add_child(card)
+		# 阴影 tokens 优先取地点专属词库（如药铺 ["药铺","苦汤","草药",...]），
+		# 未配置地点 fallback 到通用诗意词库。各卡 seed 不同保证斑驳模式各异。
+		var loc_tokens_raw: Variant = LOCATION_TEXT_TOKENS.get(location_id, COMMON_MOSAIC_TOKENS)
+		var shadow_tokens: PackedStringArray = PackedStringArray(loc_tokens_raw)
+		var seed_val: int = visible_count * 137 + abs(hash(location_id)) % 100
+		card.set_option(
+			option_text,
+			location_id,
+			null,    # font=null:OptionCard 内部 fallback 到主题字体（霞鹜文楷）
+			17,
+			true,    # 自省末屏地点候选总是可选
+			seed_val,
+			shadow_tokens,
+			[],      # 地点选择无 cost/check 副字印章
+			FONT_QINGNIAO_MEIHEI,
+			FONT_SERIF_MEDIUM
+		)
+		card.pressed.connect(_on_reflection_location_select_pressed.bind(location_id))
 
 
 # 功能：处理自省末屏地点选择按钮点击（Step 2 新增）。
