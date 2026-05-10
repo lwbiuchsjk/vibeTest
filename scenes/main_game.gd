@@ -16,6 +16,10 @@ const FONT_SERIF_BOLD: Font = preload("res://font/SourceHanSerifCN-Bold.otf")
 const FONT_SERIF_MEDIUM: Font = preload("res://font/SourceHanSerifCN-Medium.otf")
 # 青鸟华光简美黑:笔画粗壮、毛笔/书法感强,印章主字与装饰位用
 const FONT_QINGNIAO_MEIHEI: Font = preload("res://font/QingNiaoHuaGuangJianMeiHei-2.ttf")
+# Zhi Mang Xing（志莽行）：行草风格字体（Google Fonts，SIL OFL 1.1）
+# 议题 E 子项 6.2：鉴定结果中央大印"成功 / 失败"专用字体——草书体的"飞舞"语义
+# 与"鉴定结果 = 命运一掷"的"伸手"语境契合。注入位见 _render_choice_options。
+const FONT_ZHIMANGXING: Font = preload("res://font/ZhiMangXing-Regular.ttf")
 const TextMosaicBackground := preload("res://scripts/ui/text_mosaic_background.gd")
 const TextMosaicParticles := preload("res://scripts/ui/text_mosaic_particles.gd")
 const TextMosaicAccentMarked := preload("res://scripts/ui/text_mosaic_accent_marked.gd")
@@ -31,6 +35,32 @@ const UI_PANEL_PAPER := Color(0.957, 0.925, 0.847, 0.75)
 const UI_TEXT_PRIMARY := Color(0.180, 0.161, 0.141, 1.0)
 const UI_TEXT_SECONDARY := Color(0.353, 0.310, 0.271, 1.0)
 const UI_ACCENT_ZHU := Color(0.698, 0.180, 0.149, 1.0)
+
+# 选项卡 cost 资源 key → 印章主字汉字映射（议题 E 组 1，2026-05-10）。
+# demo 期 option_rules.csv 实际使用 spirit / energy 两枚；新增资源时同步追加映射。
+# 选字策略：单字承载资源核心义；与状态栏印章选字（命/力/金/心/回）尽量错开，
+#   避免 OptionCard 副字印章与状态栏印章主字撞字（spirit 不用"心"避开心性印章；
+#   energy 不用"力"避开未来体力相关印章——待后续状态栏定字后再回看一次）。
+# 暂用对照：spirit→"精"、energy→"力"；未在表内的 key 兜底取首字符大写。
+const OPTION_COST_KEY_TO_SEAL_MAIN: Dictionary = {
+	"spirit": "精",
+	"energy": "力",
+	"hp": "命",
+	"gold": "金",
+	"qi": "气",
+}
+
+# 选项卡 check 属性 key → 朱印主字汉字映射（议题 E 组 1 二轮调整，2026-05-10）。
+# 来源：scripts/config/attribute_names.csv（physique/craft/insight 是 4 NPC 鉴定主属性，
+#   aptitude 备用——4 NPC 4 属性 Phase B 决议）。鉴定 demo 期暴露属性维度（按用户调整决议），
+#   但仍不暴露 DC 数值（[[鉴定 demo 期表现规约]] §一·5）。
+# 未在表内的 attr key 兜底为 "鉴"（防御性）。
+const OPTION_CHECK_ATTR_TO_SEAL_MAIN: Dictionary = {
+	"physique": "武",
+	"craft": "艺",
+	"insight": "识",
+	"aptitude": "资",
+}
 
 # 地点 → 文字马赛克 token 数组(v1 固定映射,详见 Design/文字马赛克美术背景_MVP设计.md §7.1)。
 # **占位:以下词组为代码默认值以避免空运行,等用户从游戏内容(event_presentations / 角色状态等)
@@ -77,6 +107,26 @@ var _current_turn_result: Dictionary = {}
 var _resizing := false              # 防止窗口尺寸调整时递归触发
 # 主动押注切换状态：按选项 ID 记录各选项的押注模式（true=押注，false=默认）。
 var _bet_mode_options: Dictionary = {}
+# 议题 E 子项 6.2（2026-05-10）：鉴定结果反馈窗口需要追溯刚被点击的 option_id，
+# 用于在 _handle_resolved_turn_result 时定位对应 OptionCard 触发大印 + 灰化其他卡。
+# _on_option_pressed 进入时设置，_handle_resolved_turn_result 消费后由下次点击覆盖。
+var _last_pending_option_id: String = ""
+# 当前事件渲染期填充：option_id → 是否含 check（鉴定）。
+# 用于 _on_option_pressed 时判断是否触发反馈窗口——不依赖 turn_result.check_result（引擎 _last_check_result
+# 在 confirm_pending_turn 多 phase 推进时可能残留上次鉴定数据，UI 层不能用它做触发判断）。
+var _current_event_check_options: Dictionary = {}
+# 本次点击是否触发了鉴定（在 _on_option_pressed 时根据 _current_event_check_options 计算）
+var _last_pending_is_check: bool = false
+# 反馈窗口期间锁输入：防止玩家在等待期重复点击触发竞态
+var _is_check_feedback_active: bool = false
+
+# 鉴定反馈窗口时长（议题 E 子项 6.2，2026-05-10）。调长 / 调短改这里。
+# reveal 动画 ≈ 0.2s 在窗口内执行，CHECK_FEEDBACK_DURATION_SEC 是包含动画的总等待时长。
+const CHECK_FEEDBACK_DURATION_SEC: float = 1.2
+const CHECK_FEEDBACK_REVEAL_SEC: float = 0.20  # 大印从右向左 reveal 动画时长
+
+# 调试按键 F5/F6 重复触发时的 race 防护：每次触发自增，await 后比对决定是否清除。
+var _debug_feedback_token: int = 0
 # 议题 B 聚合面板的"继续"页脚回调路由：不同 phase（普通事件 / 开局选择 narrating / 开局选择 outcome）
 # 共享同一个 ContinueButton 节点,通过 _show_continue_footer 切换 _continue_handler 实现行为分流。
 # 默认指向普通事件的 _on_continue_button_pressed,phase 切换时由 _show_continue_footer 重设。
@@ -407,6 +457,9 @@ func _render_current_event(turn_result: Dictionary) -> void:
 	# 自动放弃押注并继续结算，避免 UI 卡死。
 	if phase == "preemptive_bet":
 		push_warning("preemptive_bet phase 未被链式调用消费，自动放弃押注。")
+		# 议题 E 子项 6.2：兜底路径不触发鉴定反馈窗口（防御性清空状态）
+		_last_pending_option_id = ""
+		_last_pending_is_check = false
 		var fallback_result := _engine.confirm_pending_turn("reject")
 		_handle_resolved_turn_result(fallback_result, "自动放弃押注（兜底）")
 		return
@@ -954,12 +1007,47 @@ func _build_bet_info_for_option(option_def: Dictionary) -> Dictionary:
 	return {"can_afford": can_afford, "cost_text": cost_text, "bias_text": bias_text}
 
 
+# 功能：从 option_def 提取 cost / check 信息，构造 OptionCard 副字印章列表。
+# 说明：议题 E 组 1（2026-05-10）—— cost 多印分立（墨印 ink）+ check 单印按属性区分主字（朱印 zhu）+ 排序 cost→check。
+#       二轮调整：check 暴露属性维度（武/艺/识/资），仍不暴露 DC（[[鉴定 demo 期表现规约]] §一·5 单一 DC=6 不显示）。
+#       未在 OPTION_COST_KEY_TO_SEAL_MAIN / OPTION_CHECK_ATTR_TO_SEAL_MAIN 映射的 key 走兜底，避免渲染崩溃。
+func _build_option_seals(option_def: Dictionary) -> Array:
+	var result: Array = []
+	# cost 印章群（多印分立，按 cost dict 顺序，墨印 ink）
+	var cost_raw: Variant = option_def.get("cost", null)
+	if typeof(cost_raw) == TYPE_DICTIONARY:
+		var cost_dict: Dictionary = cost_raw
+		for key_variant in cost_dict.keys():
+			var key: String = str(key_variant)
+			var amount: int = int(cost_dict[key_variant])
+			if amount <= 0:
+				continue
+			var main_char: String = str(OPTION_COST_KEY_TO_SEAL_MAIN.get(key, key.substr(0, 1)))
+			result.append({"main": main_char, "value": str(amount), "tone": "ink"})
+	# check 印章（朱印 zhu，主字按属性 key 映射；多 item 取第 1 个——demo 期 ≤1 鉴定）
+	var check_raw: Variant = option_def.get("check", null)
+	if typeof(check_raw) == TYPE_DICTIONARY and not (check_raw as Dictionary).is_empty():
+		var check_dict: Dictionary = check_raw
+		var attr_main: String = "鉴"  # 兜底
+		var items_raw: Variant = check_dict.get("items", null)
+		if typeof(items_raw) == TYPE_ARRAY and (items_raw as Array).size() > 0:
+			var first_item: Dictionary = (items_raw as Array)[0]
+			var attr_key: String = str(first_item.get("key", ""))
+			if attr_key != "" and OPTION_CHECK_ATTR_TO_SEAL_MAIN.has(attr_key):
+				attr_main = str(OPTION_CHECK_ATTR_TO_SEAL_MAIN[attr_key])
+		result.append({"main": attr_main, "value": "", "tone": "zhu"})
+	return result
+
+
 # 功能：渲染选择阶段的选项列表，含鉴定选项支持默认/押注模式切换。
 # 说明：遍历完整选项定义，对满足押注条件的选项渲染切换组件，其余渲染普通按钮。
 func _render_choice_options(full_options: Array, risk_profile: Dictionary) -> void:
 	var visible_count := 0
 	# OptionCard 阴影 mosaic 词库:议题 B 用通用诗意词,与背景 mosaic 同源风格
 	var shadow_tokens: PackedStringArray = PackedStringArray(COMMON_MOSAIC_TOKENS)
+	# 议题 E 子项 6.2（2026-05-10）：渲染期填充 _current_event_check_options，
+	# 供 _on_option_pressed 时判断"本次点击是否触发鉴定"，与 turn_result.check_result 残留解耦。
+	_current_event_check_options.clear()
 	for option_variant in full_options:
 		var option_def: Dictionary = option_variant
 		var state := str(option_def.get("state", "disabled"))
@@ -968,6 +1056,10 @@ func _render_choice_options(full_options: Array, risk_profile: Dictionary) -> vo
 
 		visible_count += 1
 		var option_id := str(option_def.get("id", ""))
+		# 记录该选项是否含 check 字段（鉴定）
+		var check_field: Variant = option_def.get("check", null)
+		var has_check: bool = typeof(check_field) == TYPE_DICTIONARY and not (check_field as Dictionary).is_empty()
+		_current_event_check_options[option_id] = has_check
 		var can_bet := _can_option_trigger_bet(option_def, risk_profile)
 
 		if can_bet:
@@ -979,6 +1071,8 @@ func _render_choice_options(full_options: Array, risk_profile: Dictionary) -> vo
 			var card: OptionCard = OptionCard.new()
 			option_list.add_child(card)
 			var seed_val: int = visible_count * 137 + abs(hash(option_id)) % 100
+			# 议题 E 组 1：构造副字印章列表（cost 在前 check 在后，与 _build_option_seals 约定一致）
+			var seal_list: Array = _build_option_seals(option_def)
 			card.set_option(
 				str(option_def.get("text", "")),
 				option_id,
@@ -986,8 +1080,13 @@ func _render_choice_options(full_options: Array, risk_profile: Dictionary) -> vo
 				17,
 				state == "selectable",
 				seed_val,
-				shadow_tokens
+				shadow_tokens,
+				seal_list,
+				FONT_QINGNIAO_MEIHEI,  # 印章主字字体（粗壮书法感）
+				FONT_SERIF_MEDIUM       # 印章副字字体（规整数字）
 			)
+			# 议题 E 子项 6.2：鉴定结果大印"成功/失败"用 Zhi Mang Xing 草书体
+			card.center_seal_text_font = FONT_ZHIMANGXING
 			card.pressed.connect(_on_option_pressed.bind(option_id))
 
 	if visible_count == 0:
@@ -1172,6 +1271,12 @@ func _on_option_pressed(option_id: String) -> void:
 	if _current_turn_result.is_empty():
 		status_label.text = "当前没有待处理的事件选择。"
 		return
+	# 议题 E 子项 6.2：反馈窗口期间锁输入，防止重复点击
+	if _is_check_feedback_active:
+		return
+	# 保存 option_id + 是否含 check 供 _handle_resolved_turn_result 决策反馈窗口
+	_last_pending_option_id = option_id
+	_last_pending_is_check = bool(_current_event_check_options.get(option_id, false))
 
 	var turn_result := _engine.confirm_pending_turn(option_id)
 	if not turn_result.get("ok", false):
@@ -1191,6 +1296,9 @@ func _on_option_pressed(option_id: String) -> void:
 # 功能：处理继续指令。
 # 说明：展示阶段点击继续只推进到下一条展示文本；确认阶段点击继续才会真正结算当前事件。
 func _on_continue_button_pressed() -> void:
+	# 议题 E 子项 6.2：继续按钮触发的 turn_result 不应触发鉴定反馈窗口（仅选项点击触发）
+	_last_pending_option_id = ""
+	_last_pending_is_check = false
 	if _current_turn_result.is_empty():
 		_preview_next_event()
 		return
@@ -1227,6 +1335,16 @@ func _handle_resolved_turn_result(turn_result: Dictionary, resolved_log: String)
 	_append_xinxing_transition_log(turn_result)
 
 	_current_turn_result = (turn_result as Dictionary).duplicate(true)
+
+	# 议题 E 子项 6.2（2026-05-10）：鉴定结果反馈窗口
+	# 仅当本次点击的选项**真的是鉴定选项**（_last_pending_is_check=true）才触发。
+	# 不能用 turn_result.check_result 是否非空判断——引擎 _last_check_result 在 confirm_pending_turn
+	# 多 phase 推进时可能残留上次鉴定数据（preview_next_turn 才清空），UI 触发判断必须独立。
+	# preemptive_bet 兜底 / continue 推进等路径在各自入口已清空 _last_pending_is_check，自然不触发。
+	var check_result_dict: Dictionary = turn_result.get("check_result", {})
+	if _last_pending_is_check and not _last_pending_option_id.is_empty():
+		await _show_check_result_feedback(check_result_dict)
+
 	if _is_world_ended_result(turn_result):
 		_append_end_log(turn_result)
 		_render_current_event(turn_result)
@@ -1235,6 +1353,41 @@ func _handle_resolved_turn_result(turn_result: Dictionary, resolved_log: String)
 
 	_update_side_panels()
 	_preview_next_event()
+
+
+# 功能：鉴定结果反馈窗口（议题 E 子项 6.2，2026-05-10）。
+# 流程：定位被点击的 OptionCard → 中央大印 + 其他卡灰化 + 锁输入 → 等 0.8s → 释放
+# 说明：本函数不负责清空 OptionCard 列表（_render_current_event / _preview_next_event 流程接手清理）。
+#       朱印 check 在大印渲染时仍在 OptionCard 右侧（_draw Layer 5 早于 Layer 6 中央大印），始终保留。
+func _show_check_result_feedback(check_result_dict: Dictionary) -> void:
+	_is_check_feedback_active = true
+	var is_pass: bool = bool(check_result_dict.get("pass", true))
+	var result_str: String = "success" if is_pass else "fail"
+	var target_card: OptionCard = null
+
+	# 找到当前被点击的 OptionCard（按 _last_pending_option_id 匹配），其他卡片灰化
+	for child in option_list.get_children():
+		if not (child is OptionCard):
+			continue
+		var card: OptionCard = child as OptionCard
+		if card.option_id == _last_pending_option_id:
+			target_card = card
+		else:
+			# 未选中的卡片：灰化（半透 + 灰度），但不隐藏（保留"我做了选择"的视觉对比）
+			card.modulate = Color(0.55, 0.55, 0.55, 0.45)
+		# 反馈窗口期间，所有 OptionCard 都不响应点击
+		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	if target_card != null:
+		target_card.set_check_result(result_str)
+
+	# 强制等待（窗口含 reveal 动画 + 完整停留；总时长 = CHECK_FEEDBACK_DURATION_SEC）
+	await get_tree().create_timer(CHECK_FEEDBACK_DURATION_SEC).timeout
+
+	# 反馈窗口结束。OptionCard 实例由 _render_current_event 推进时统一清理；
+	# 此处不主动 clear / reset state，避免与下游 _preview_next_event 时序冲突。
+	_is_check_feedback_active = false
+	_last_pending_is_check = false  # 防御性清空，避免下次点击非 check 选项被误判
 
 
 # 功能：构建当前事件的调试元数据文本，用于右侧面板展示。
@@ -2284,6 +2437,58 @@ func _unhandled_input(event: InputEvent) -> void:
 				event_background_rect.visible = not show_mosaic
 			KEY_F8:
 				_force_render_zhou_training_ground()
+			# 议题 E 子项 6.2 调试热键（2026-05-10）：仅在当前事件含 check 选项时响应。
+			# 用于反复观察完整反馈节奏（reveal + 停留 + 自动清除），不触发引擎结算（无副作用）。
+			# F5 = 触发完整成功展示 / F6 = 触发完整失败展示
+			# 反复触发会重置定时器（新触发覆盖旧的清除流程）
+			KEY_F5:
+				_debug_show_check_result_feedback("success")
+			KEY_F6:
+				_debug_show_check_result_feedback("fail")
+
+
+# 功能：议题 E 子项 6.2 调试展示——模拟完整鉴定反馈节奏（含自动清除）（2026-05-10）。
+# 说明：仅修改 OptionCard 视觉（大印 + 灰化其他卡），不触发引擎结算 / outcome 推进；可反复触发。
+#       完整流程：reveal 大印 + 灰化 → 停留 CHECK_FEEDBACK_DURATION_SEC → 自动清除恢复。
+#       重复按键时新触发会覆盖旧的清除流程（_debug_feedback_token 防 race）。
+func _debug_show_check_result_feedback(state: String) -> void:
+	_debug_feedback_token += 1
+	var current_token: int = _debug_feedback_token
+
+	var first_check_opt_id: String = ""
+	for opt_id_variant in _current_event_check_options.keys():
+		if bool(_current_event_check_options[opt_id_variant]):
+			first_check_opt_id = str(opt_id_variant)
+			break
+	if first_check_opt_id.is_empty():
+		print("[调试] 当前事件无 check 选项，F5/F6 不响应")
+		return
+	# 触发反馈展示（reveal 大印 + 灰化其他卡）
+	for child in option_list.get_children():
+		if not (child is OptionCard):
+			continue
+		var card: OptionCard = child as OptionCard
+		if card.option_id == first_check_opt_id:
+			card.set_check_result(state)
+		else:
+			card.modulate = Color(0.55, 0.55, 0.55, 0.45)
+	print("[调试] 鉴定反馈展示: %s on %s（%.1fs 后自动清除）" % [state, first_check_opt_id, CHECK_FEEDBACK_DURATION_SEC])
+
+	# 等待完整时长（与实际反馈窗口同步长度，方便用户调整 CHECK_FEEDBACK_DURATION_SEC 后立刻在调试中验证）
+	await get_tree().create_timer(CHECK_FEEDBACK_DURATION_SEC).timeout
+
+	# 期间被新的 F5/F6 覆盖了 token → 让新触发负责清除，本次跳过
+	if current_token != _debug_feedback_token:
+		return
+
+	# 自动清除恢复
+	for child in option_list.get_children():
+		if not (child is OptionCard):
+			continue
+		var card: OptionCard = child as OptionCard
+		card.set_check_result("")
+		card.modulate = Color.WHITE
+	print("[调试] 鉴定反馈自动清除")
 
 
 # 功能：F8 调试键——强制把 EventBackground 切到周既明练武场背景，token 池切到周既明专池。
