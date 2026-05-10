@@ -6,7 +6,10 @@ sys_reflection,sys_reflection_p1,1,text,,[中段自省·屏1·林叙事] 林对�
 sys_reflection,sys_reflection_p2,2,text,,[中段自省·屏2·末段+地点选择] 林叙事末段，引导你再选一处（撰写期补）,location_select
 sys_final_reflection,sys_final_reflection_p1,1,text,,[最终自省·屏1·林叙事] 拜师后的收口——林叙述新阶段的开始（撰写期补）,text
 sys_final_reflection,sys_final_reflection_p2,2,text,,[最终自省·屏2·林叙事] 收口末段——demo 流程结束提示（撰写期补）,text
-evt_s2_sk_he,evt_s2_sk_he_p1,1,text,,[骨架·药铺·屏1] 少女在药铺角落看到何守仁辨识药材，他注意到目光，点头致意,text
+evt_s2_sk_he,evt_s2_sk_he_p1,1,text,,你来药铺已经几日，跟着别的伙计跑腿。今早进门，旁边那个老伙计把你拉到一边。,text
+evt_s2_sk_he,evt_s2_sk_he_p2,2,text,,"""何掌柜回来了。今儿你算正式上工——你过去见见他。""",text
+evt_s2_sk_he,evt_s2_sk_he_p3,3,text,,你掀开门帘进店。柜台后那人正低头看一味药材，慢慢翻动。听到你进来，他抬眼看你一下，又低下头继续看，没出声。,text
+evt_s2_sk_he,evt_s2_sk_he_p4,4,text,,你认得那株药材的样子，但说不上来名字。柜后人慢慢摆弄药材的样子，让你想起几样自己一直没记牢的事。,text
 evt_s2_sk_qin,evt_s2_sk_qin_p1,1,text,,[骨架·家+市场·屏1] 母亲秦素娘在灶前忙碌，回头看见你，眼神里有交代有期许,text
 evt_s2_sk_zhou,evt_s2_sk_zhou_p1,1,text,,[骨架·练场·屏1] 练场上周既明带几个少年练拳，他擦汗时瞥见你站在场边,text
 evt_s2_sk_cheng,evt_s2_sk_cheng_p1,1,text,,[骨架·道观·屏1] 道观侧院程叔衡盘坐石上，眼皮微抬看了你一眼，没说话,text

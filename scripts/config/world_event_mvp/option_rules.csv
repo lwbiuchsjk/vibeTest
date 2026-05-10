@@ -1,12 +1,14 @@
 option_id,rule_type,branch,target,left,op,right,key,value
 evt_s2_sk_he_opt_1,cost,default,,,,,spirit,1
 evt_s2_sk_he_opt_1,check,default,check,,,,type,assessment
-evt_s2_sk_he_opt_1,check,default,check,,,,items,insight:positive
+evt_s2_sk_he_opt_1,check,default,check,,,,items,craft:positive
 evt_s2_sk_he_opt_1,check,default,check,,,,hitThreshold,6
 evt_s2_sk_he_opt_1,check,default,check,,,,requiredHits,1
 evt_s2_sk_he_opt_1,resolution,default,affinity,,,,affinityDeltas,player_001->npc_he:+10
+evt_s2_sk_he_opt_1,resolution,default,player,,add,,craft,1
 evt_s2_sk_he_opt_1,resolution,fail,affinity,,,,affinityDeltas,player_001->npc_he:+5
 evt_s2_sk_he_opt_2,resolution,default,affinity,,,,affinityDeltas,player_001->npc_he:+5
+evt_s2_sk_he_opt_2,resolution,default,player,,add,,craft,1
 evt_s2_sk_he_opt_3,resolution,default,affinity,,,,affinityDeltas,player_001->npc_he:+0
 evt_s2_sk_qin_opt_1,cost,default,,,,,energy,1
 evt_s2_sk_qin_opt_1,resolution,default,affinity,,,,affinityDeltas,player_001->npc_qin:+10

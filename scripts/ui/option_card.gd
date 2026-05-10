@@ -42,12 +42,24 @@ var border_color: Color = Color(0.353, 0.310, 0.271, 0.45)     # 淡墨边框（
 var shadow_ink_color: Color = Color(0.180, 0.161, 0.141, 1.0)  # 深褐墨阴影字符 / 阴影底
 var disabled_text_color: Color = Color(0.353, 0.310, 0.271, 0.5)
 
+# === 交互状态 modulate（议题 E 子项 3+4，2026-05-10）===
+# 设计决策：性能纪律（不重绘 _draw）+ 朱色克制（不破例）双约束 → 仅靠 modulate 实现交互反馈。
+# 颜色策略（2026-05-10 调整）：RGB 均匀放大会让米白底红通道被 clamp 到 1.0，导致相对绿蓝突出 → 偏青冷。
+# 改为 RGB 不均匀（红 > 绿 > 蓝），保留暖色感同时提供"光照感"；幅度从 12% 降到 5-8% 更温和。
+var hover_modulate: Color = Color(1.08, 1.05, 1.02, 1.0)        # hover：温和偏暖提亮（轻微"上浮被光照"）
+var pressed_modulate: Color = Color(0.92, 0.90, 0.87, 1.0)      # pressed：温和偏暖变暗（轻微"按下"）
+var disabled_modulate: Color = Color(1.0, 1.0, 1.0, 0.5)        # disabled：整张半透（与字色淡化双管齐下）
+
 # === 几何（不对称布局,阴影只在右下）===
 var shadow_extent: int = 9     # 阴影向右下扩张像素（仅右、下两个方向）
 var label_padding_h: int = 16  # 卡片实体内左右 padding
 var label_padding_v: int = 12  # 卡片实体内上下 padding
 var border_width: int = 1
 var corner_radius: int = 2
+# 卡片统一最小高度（议题 E 子项 4，2026-05-10）：让含印章 / 无印章卡视觉对齐高度一致。
+# 默认值 64 = 印章高度（main 18 + padding 8 + 余量 = 30）+ 上下 padding (12*2) + shadow_extent (9) ≈ 63。
+# 若 Label autowrap 多行触发，卡片自动加高（min 仅是下限）。调整字号 / padding 时需同步评估此值。
+var min_card_height: int = 64
 
 # === 阴影实色底参数 ===
 var shadow_base_alpha: float = 0.22  # 贴卡片边缘处的阴影底色 alpha（向外渐变到 0）
@@ -222,6 +234,9 @@ func set_option(
 		_label.add_theme_color_override("font_color", text_color)
 	else:
 		_label.add_theme_color_override("font_color", disabled_text_color)
+	# 议题 E 子项 4（2026-05-10）：disabled 状态整张半透（与字色淡化双管齐下）。
+	# selectable 状态 modulate 保持 Color.WHITE（hover/pressed 期间临时覆盖，由 reset_modulate_to_default 恢复）。
+	reset_modulate_to_default()
 	# 印章群存在时调整 PanelContainer 右侧 content_margin，给印章群让出空间
 	_refresh_seal_layout()
 	queue_redraw()
@@ -275,10 +290,10 @@ func _refresh_seal_layout() -> void:
 	transparent.content_margin_bottom = float(label_padding_v + shadow_extent)
 	add_theme_stylebox_override("panel", transparent)
 
-	# 印章高度若大于单行 Label 高度，需保证卡片不会被印章溢出（custom_minimum_size.y 兜底）
-	if seals.size() > 0:
-		var min_h: float = seal_h + float(label_padding_v) * 2.0 + float(shadow_extent)
-		custom_minimum_size = Vector2(custom_minimum_size.x, max(custom_minimum_size.y, min_h))
+	# 议题 E 子项 4 调整（2026-05-10）：所有 OptionCard 强制统一 min_card_height，
+	# 让含印章 / 无印章卡视觉对齐——避免印章引入额外几像素差异破坏列表整齐感。
+	# 印章 _draw 时按 inner 中心垂直居中（小于卡高自然居中）。
+	custom_minimum_size = Vector2(custom_minimum_size.x, float(min_card_height))
 	update_minimum_size()
 
 
@@ -333,12 +348,12 @@ func _gui_input(event: InputEvent) -> void:
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			if mb.pressed:
 				_is_pressing = true
-				modulate = Color(1.0, 1.0, 1.0, 0.85)
+				modulate = pressed_modulate
 				accept_event()  # press 也 accept,避免事件冒泡到 NarrativePanel
 			else:
 				if _is_pressing:
 					_is_pressing = false
-					modulate = Color.WHITE
+					reset_modulate_to_default()
 					pressed.emit()
 					accept_event()
 
@@ -349,10 +364,21 @@ func _on_hover_changed(is_entered: bool) -> void:
 	if not selectable:
 		return
 	if is_entered:
-		modulate = Color(1.06, 1.06, 1.06, 1.0)
+		modulate = hover_modulate
 	else:
 		_is_pressing = false
+		reset_modulate_to_default()
+
+
+# 功能：把 modulate 恢复到该卡当前 selectable 状态对应的默认值（议题 E 子项 4，2026-05-10）。
+# 说明：selectable=true 卡恢复到 Color.WHITE；selectable=false 卡恢复到 disabled_modulate（半透）。
+#       供 hover 离开 / pressed 释放 / 鉴定反馈窗口结束等"恢复默认状态"场景统一调用，
+#       避免直接 set Color.WHITE 覆盖 disabled 半透状态。
+func reset_modulate_to_default() -> void:
+	if selectable:
 		modulate = Color.WHITE
+	else:
+		modulate = disabled_modulate
 
 
 # === 渲染 ===

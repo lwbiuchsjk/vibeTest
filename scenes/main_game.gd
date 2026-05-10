@@ -2503,13 +2503,13 @@ func _debug_show_check_result_feedback(state: String) -> void:
 	if current_token != _debug_feedback_token:
 		return
 
-	# 自动清除恢复
+	# 自动清除恢复（议题 E 子项 4 联动：reset_modulate_to_default 兼容 disabled 半透状态）
 	for child in option_list.get_children():
 		if not (child is OptionCard):
 			continue
 		var card: OptionCard = child as OptionCard
 		card.set_check_result("")
-		card.modulate = Color.WHITE
+		card.reset_modulate_to_default()
 	print("[调试] 鉴定反馈自动清除")
 
 
