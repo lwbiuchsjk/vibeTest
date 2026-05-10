@@ -32,18 +32,31 @@ evt_s2_sk_cheng_opt_2,default,1,[outcome·道观·首遇·静观·屏1] 你远�
 evt_s2_sk_cheng_opt_2,default,2,[outcome·道观·首遇·静观·屏2] 山道上松风不止，你才发觉自己屏息了大半个时辰
 evt_s2_sk_cheng_opt_3,default,1,[outcome·道观·首遇·离开·屏1] 你不打扰转身离去，殿内静默如常（关系+0）
 evt_s2_sk_cheng_opt_3,default,2,[outcome·道观·首遇·离开·屏2] 你下山一路无人——也许该再来一次，也许不必
-evt_s2_fl_pharmacy_1_opt_1,default,1,[outcome·药铺·1·认真·屏1] 你按方仔细抓药，何守仁路过时点了下头（百艺+1）
-evt_s2_fl_pharmacy_1_opt_1,default,2,[outcome·药铺·1·认真·屏2] 收柜时你检查了一遍，确认重量分毫不差——比上次多耗了半盏茶
-evt_s2_fl_pharmacy_1_opt_2,default,1,[outcome·药铺·1·应付·屏1] 你大致抓了一下便交差（无变化）
-evt_s2_fl_pharmacy_1_opt_2,default,2,[outcome·药铺·1·应付·屏2] 半个时辰后客人来取，你心里一沉——还好分量没出错
-evt_s2_fl_pharmacy_2_opt_1,default,1,[outcome·药铺·2·磨药·屏1] 雨声里你静心磨药，腕力比昨日稳了些（百艺+1）
-evt_s2_fl_pharmacy_2_opt_1,default,2,[outcome·药铺·2·磨药·屏2] 一臼磨完你停手揉腕——窗外雨已小了，铺子里药香漫得更浓
-evt_s2_fl_pharmacy_2_opt_2,default,1,[outcome·药铺·2·偷懒·屏1] 你在木臼前假装磨药，等雨停（无变化）
-evt_s2_fl_pharmacy_2_opt_2,default,2,[outcome·药铺·2·偷懒·屏2] 雨停后你才动手补磨——半盏茶就糊弄完了，反正没人验
-evt_s2_fl_pharmacy_3_opt_1,default,1,[outcome·药铺·3·热情·屏1] 你主动招呼客人，听他们说东说西（学识+1）
-evt_s2_fl_pharmacy_3_opt_1,default,2,[outcome·药铺·3·热情·屏2] 客人走后你回想几句——东街的旱情、码头的脚价，都是新听说
-evt_s2_fl_pharmacy_3_opt_2,default,1,[outcome·药铺·3·沉默·屏1] 你站在柜后等师父出来招呼（无变化）
-evt_s2_fl_pharmacy_3_opt_2,default,2,[outcome·药铺·3·沉默·屏2] 师父出来招呼时瞥了你一眼——没说什么，但你知道他记下了
+evt_s2_fl_pharmacy_1_opt_1,default,1,你一味一味把药挑出来，秤了又秤，包成一包递过去。客人接过药，付了钱，转身出门。
+evt_s2_fl_pharmacy_1_opt_1,default,2,你把方子放回到柜后，手心里还带着方才几味药的气味——有几个药名你这次记住了。
+evt_s2_fl_pharmacy_1_opt_2,default,1,老伙计抽空过来瞄了眼方子，几味你不认得的药他直接帮你挑了出来。剩下的你抓完，递给客人。
+evt_s2_fl_pharmacy_1_opt_3,default,1,你按方子上几味自己认得的药抓了一份，凑齐递过去。客人接过药就走，没多说什么。
+evt_s2_fl_pharmacy_2_opt_1,default,1,你放慢了力道，一下一下地碾过去，细粉一点点积在臼底。药材的气味随着碾压漫出来，你辨得出其中两三味。
+evt_s2_fl_pharmacy_2_opt_1,default,2,磨完抬头，雨还在落，老伙计的眼皮也没动。今日的工就这些了。
+evt_s2_fl_pharmacy_2_opt_2,default,1,老伙计被你的声音惊了一下，随即应了几声，提到今年的雨比往年来得早。两人断断续续说了些没营养的话，倒也不觉得时间长了。
+evt_s2_fl_pharmacy_2_opt_3,default,1,背靠着柜子坐下去，雨声里不知过了多久，你动了一下腿才发现醒了。老伙计那头也没动静——不知他是不是也睡了一觉。
+evt_s2_fl_pharmacy_3_opt_1,default,1,你取了几味药包起来，报了价。客人接过去，数钱放在柜台上，转身出门。
+evt_s2_fl_pharmacy_3_opt_1,default,2,老伙计从后面出来，瞥了眼柜台，没说什么，转身去搬下一批货。
+evt_s2_fl_pharmacy_3_opt_2,default,1,你问了几句，客人一一答了，说起来比最初说的要多一些。你听完，重新在药架上取了两味。
+evt_s2_fl_pharmacy_3_opt_2,default,2,客人接过药，掂了掂，道了声谢，走慢了些出去。
+evt_s2_fl_pharmacy_3_opt_3,default,1,老伙计过来，听了几句，回身从药架上取了几味，替你把药包递过去。客人付完钱走了。
+evt_s2_fl_pharmacy_4_opt_1,default,1,你把书拿起来，又翻了几页。有几个字眼你不认得，有几个认得但不晓得放在一起是什么意思。看了一阵，还是没看懂。
+evt_s2_fl_pharmacy_4_opt_1,default,2,你把书塞回原来的缝隙里。往后手里做着别的，脑子里还挂着那几个字——就是说不出它们在讲什么。
+evt_s2_fl_pharmacy_4_opt_2,default,1,你把书推回缝隙里，没多看。手上继续整理药材，日光往西挪了一截。
+evt_s2_fl_pharmacy_4_opt_3,default,1,你把书搁在一边，转回去整理药材。一筐一筐理完，码好，做完了该做的事，拿到了这一日的工钱。
+evt_s2_fl_pharmacy_5_opt_1,default,1,你挨着账册上的顺序拣，不认得的名目多比对几次，总算把这批货一包包归到位。
+evt_s2_fl_pharmacy_5_opt_1,default,2,几个之前没见过的名目，经这一趟，你在包皮上认出来了。
+evt_s2_fl_pharmacy_5_opt_2,default,1,老伙计在前头分，你跟着节奏拣，不认识的包他顺手归了位，你留意了名目。
+evt_s2_fl_pharmacy_5_opt_3,default,1,你按大致的位置把药材包搬进去，摞齐。老伙计扫了一眼，没说什么，低头继续对账。
+evt_s2_fl_pharmacy_6_opt_1,default,1,你把几件零碎一项一项收好。老伙计锁完最后几个格子，瞄了你一眼，把备用的那盏灯推到你这边来。
+evt_s2_fl_pharmacy_6_opt_1,default,2,等你出门时，街上只剩几盏灯笼。药铺的门从里面锁上，钥匙重了一把。
+evt_s2_fl_pharmacy_6_opt_2,default,1,你收拾完自己那摊子，拎上外套走出铺子。外边天色还没全黑，街上还有几个行人。
+evt_s2_fl_pharmacy_6_opt_3,default,1,老伙计收格子，你在柜台另一头顺口说了几句，他也接着说了几句，说的都是些不紧要的事。说完了各自走。
 evt_s2_fl_qin_1_opt_1,default,1,[outcome·家+市场·1·主动·屏1] 你帮秦素娘烧火，灶前热得脸红（与秦关系+1）
 evt_s2_fl_qin_1_opt_1,default,2,[outcome·家+市场·1·主动·屏2] 饭桌上她多盛了你一勺——没说什么，碗推得近些
 evt_s2_fl_qin_1_opt_2,default,1,[outcome·家+市场·1·旁观·屏1] 你站在灶旁发呆，没去搭手（无变化）

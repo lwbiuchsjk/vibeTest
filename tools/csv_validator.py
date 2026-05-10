@@ -58,7 +58,17 @@ from pathlib import Path
 # ============================================================
 
 # 资源 key（引擎硬编码，不在 attribute_names.csv 中）
-RESOURCE_KEYS = {"energy", "spirit"}
+# 议题 A 收口（2026-05-10）：hp / energy 设计层移除，cost / resolution 不应再使用这两 key。
+# 状态栏 5 印章 = 气(spirit) / 银(gold) / 武(physique) / 艺(craft) / 识(insight)；
+#   spirit / gold 是 RESOURCE_KEYS 范围，physique/craft/insight 在 attribute_names 范围。
+# 保留 gold 防御性（未来如有 cost gold 选项可自动通过校验）。
+RESOURCE_KEYS = {"spirit", "gold"}
+
+# cost 黑名单（议题 A 收口，2026-05-10）：检查 7 cost 分支补丁。
+# attribute_names.csv 仍保留 hp/energy 行作为 schema reference（roles.csv 列对齐），
+# 但 cost 行不应再使用——单独黑名单拦截。
+# 修复 csv_validator 漏检 BUG：之前仅缩 RESOURCE_KEYS 不够，cost energy 仍通过 attribute_names 路径合法。
+DISALLOWED_COST_KEYS = {"hp", "energy"}
 
 # option_rules 的合法 rule_type
 KNOWN_RULE_TYPES = {
@@ -464,7 +474,13 @@ def validate(csv_dir: Path, ref_dir: Path) -> ValidationResult:
                 continue
 
             if rt == "cost":
-                if not is_player_attr_key(key, attribute_keys):
+                # 黑名单优先：议题 A 收口后 hp/energy 作 cost 不合法（即便 attribute_names 仍含这两行）
+                if key in DISALLOWED_COST_KEYS:
+                    result.add_p1(
+                        f"option_rules: '{oid}' cost key '{key}' 已被议题 A 决议移除，"
+                        f"请改为 cost spirit 或删除 cost 行（[[UI风格快速翻调_demo期进度]] §议题 A）"
+                    )
+                elif not is_player_attr_key(key, attribute_keys):
                     result.add_p1(
                         f"option_rules: '{oid}' cost key '{key}' 不是玩家属性/资源"
                     )

@@ -36,6 +36,10 @@ var corner_radius: int = 2
 var padding: Vector2 = Vector2(10.0, 6.0)
 var noise_cell_size: int = 4
 var noise_seed: int = 0
+# 副字保留宽度（议题 A 抖动修复，2026-05-10）：
+# > 0 时强制副字最小宽度，避免 sub_text 变化（如 "1"→"2"）宽度差异引起印章 size 抖动。
+# 状态栏调用方按 "999" 等最大数值预算后传入。0 表示按实际 sub_text 宽度算（旧行为）。
+var sub_reserve_width: float = 0.0
 var ink_pool: PackedStringArray = PackedStringArray([
 	"命", "力", "金", "心", "回", "岁", "年", "气",
 	"神", "魂", "天", "人", "土", "水", "火", "木"
@@ -76,6 +80,7 @@ func set_seal(
 # 功能:根据主字 + 副字 size 计算 minimum size。
 # 说明:高度按主字 ascent+descent + 上下 padding;
 #       宽度按主字宽 + 副字宽 + 6px 间隔 + 左右 padding。
+#       sub_reserve_width > 0 时副字宽度兜底（避免数字变化引起印章宽度抖动）。
 func _get_minimum_size() -> Vector2:
 	if main_font == null or main_text == "":
 		return Vector2(60.0, 32.0)
@@ -87,6 +92,9 @@ func _get_minimum_size() -> Vector2:
 		sub_w = sub_font.get_string_size(
 			sub_text, HORIZONTAL_ALIGNMENT_LEFT, -1, sub_font_size
 		).x
+	# 副字保留宽度兜底：sub_reserve_width 大于实际宽时用保留值，避免抖动
+	if sub_reserve_width > 0.0:
+		sub_w = max(sub_w, sub_reserve_width)
 	var total_w: float = main_size.x + sub_w + 6.0
 	return Vector2(total_w, main_size.y) + padding * 2.0
 

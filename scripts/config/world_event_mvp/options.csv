@@ -12,12 +12,24 @@ evt_s2_sk_zhou_opt_3,cp_evt_s2_sk_zhou,[选项·避开] 不愿引人注意,3
 evt_s2_sk_cheng_opt_1,cp_evt_s2_sk_cheng,[选项·靠近] 上前问候,1
 evt_s2_sk_cheng_opt_2,cp_evt_s2_sk_cheng,[选项·静观] 远远看一会,2
 evt_s2_sk_cheng_opt_3,cp_evt_s2_sk_cheng,[选项·离开] 不打扰,3
-evt_s2_fl_pharmacy_1_opt_1,cp_evt_s2_fl_pharmacy_1,[选项·认真] 仔细按方抓药,1
-evt_s2_fl_pharmacy_1_opt_2,cp_evt_s2_fl_pharmacy_1,[选项·应付] 大致抓一下,2
-evt_s2_fl_pharmacy_2_opt_1,cp_evt_s2_fl_pharmacy_2,[选项·磨药] 静心磨药,1
-evt_s2_fl_pharmacy_2_opt_2,cp_evt_s2_fl_pharmacy_2,[选项·偷懒] 假装在磨,2
-evt_s2_fl_pharmacy_3_opt_1,cp_evt_s2_fl_pharmacy_3,[选项·热情] 主动招呼客人,1
-evt_s2_fl_pharmacy_3_opt_2,cp_evt_s2_fl_pharmacy_3,[选项·沉默] 等师父出来招呼,2
+evt_s2_fl_pharmacy_1_opt_1,cp_evt_s2_fl_pharmacy_1,仔细按方抓药,1
+evt_s2_fl_pharmacy_1_opt_2,cp_evt_s2_fl_pharmacy_1,叫住老伙计问几句,2
+evt_s2_fl_pharmacy_1_opt_3,cp_evt_s2_fl_pharmacy_1,大致抓一下,3
+evt_s2_fl_pharmacy_2_opt_1,cp_evt_s2_fl_pharmacy_2,守着石磨慢慢碾,1
+evt_s2_fl_pharmacy_2_opt_2,cp_evt_s2_fl_pharmacy_2,跟老伙计搭几句话,2
+evt_s2_fl_pharmacy_2_opt_3,cp_evt_s2_fl_pharmacy_2,靠着药柜打个盹,3
+evt_s2_fl_pharmacy_3_opt_1,cp_evt_s2_fl_pharmacy_3,照单抓了几味,1
+evt_s2_fl_pharmacy_3_opt_2,cp_evt_s2_fl_pharmacy_3,多问了几句病情,2
+evt_s2_fl_pharmacy_3_opt_3,cp_evt_s2_fl_pharmacy_3,叫来老伙计帮看,3
+evt_s2_fl_pharmacy_4_opt_1,cp_evt_s2_fl_pharmacy_4,顺手多翻了几页,1
+evt_s2_fl_pharmacy_4_opt_2,cp_evt_s2_fl_pharmacy_4,搁回原位，没多看,2
+evt_s2_fl_pharmacy_4_opt_3,cp_evt_s2_fl_pharmacy_4,书放下，做手头活,3
+evt_s2_fl_pharmacy_5_opt_1,cp_evt_s2_fl_pharmacy_5,逐包仔细对名目,1
+evt_s2_fl_pharmacy_5_opt_2,cp_evt_s2_fl_pharmacy_5,跟着老伙计的顺序分,2
+evt_s2_fl_pharmacy_5_opt_3,cp_evt_s2_fl_pharmacy_5,凑数搬进去算了,3
+evt_s2_fl_pharmacy_6_opt_1,cp_evt_s2_fl_pharmacy_6,留下把零碎收完,1
+evt_s2_fl_pharmacy_6_opt_2,cp_evt_s2_fl_pharmacy_6,收拾一下就走,2
+evt_s2_fl_pharmacy_6_opt_3,cp_evt_s2_fl_pharmacy_6,跟老伙计说几句,3
 evt_s2_fl_qin_1_opt_1,cp_evt_s2_fl_qin_1,[选项·主动] 帮母亲烧火,1
 evt_s2_fl_qin_1_opt_2,cp_evt_s2_fl_qin_1,[选项·旁观] 站旁边发呆,2
 evt_s2_fl_qin_2_opt_1,cp_evt_s2_fl_qin_2,[选项·砍价] 试试讲价,1

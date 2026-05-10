@@ -36,19 +36,28 @@ const UI_TEXT_PRIMARY := Color(0.180, 0.161, 0.141, 1.0)
 const UI_TEXT_SECONDARY := Color(0.353, 0.310, 0.271, 1.0)
 const UI_ACCENT_ZHU := Color(0.698, 0.180, 0.149, 1.0)
 
-# 选项卡 cost 资源 key → 印章主字汉字映射（议题 E 组 1，2026-05-10）。
-# demo 期 option_rules.csv 实际使用 spirit / energy 两枚；新增资源时同步追加映射。
-# 选字策略：单字承载资源核心义；与状态栏印章选字（命/力/金/心/回）尽量错开，
-#   避免 OptionCard 副字印章与状态栏印章主字撞字（spirit 不用"心"避开心性印章；
-#   energy 不用"力"避开未来体力相关印章——待后续状态栏定字后再回看一次）。
-# 暂用对照：spirit→"精"、energy→"力"；未在表内的 key 兜底取首字符大写。
+# 选项卡 cost 资源 key → 印章主字汉字映射。
+# 议题 A 决议（2026-05-10）：hp / energy 设计层移除，状态栏 5 印章 = 气/银/武/艺/识；
+# spirit 汉字与状态栏统一为 "气"（与 attribute_names "心气" 一致），双源不再分裂。
+# 当前 demo 期 option_rules.csv 仅 cost spirit；映射保留 gold→银 防御性兜底（未来如 cost gold 自动生效）。
+# 未在表内的 key 兜底取首字符（参见 _build_option_seals）。
 const OPTION_COST_KEY_TO_SEAL_MAIN: Dictionary = {
-	"spirit": "精",
-	"energy": "力",
-	"hp": "命",
-	"gold": "金",
-	"qi": "气",
+	"spirit": "气",
+	"gold": "银",
 }
+
+# 状态栏 5 印章定义（议题 A 收口，2026-05-10）：mock 转正式实装。
+# 主字汉字与 OptionCard cost 印章映射保持单源（spirit→气 / gold→银 与 OPTION_COST_KEY_TO_SEAL_MAIN 一致）。
+# 字段对应 roles.csv player_001 的 spirit / gold / physique / craft / insight 5 列。
+# 不显示项：hp/energy（设计层移除）/ aptitude（被 武艺识 取代）/ xinxing（demo_mode 隐藏）/
+#          turn / currentLocationId / packContext / flags（其他维度承担：叙事 / mosaic 渲染层数等）。
+const STATE_SEAL_DEFINITIONS: Array = [
+	{"key": "qi", "main": "气", "field": "spirit"},
+	{"key": "yin", "main": "银", "field": "gold"},
+	{"key": "wu", "main": "武", "field": "physique"},
+	{"key": "yi", "main": "艺", "field": "craft"},
+	{"key": "shi", "main": "识", "field": "insight"},
+]
 
 # 选项卡 check 属性 key → 朱印主字汉字映射（议题 E 组 1 二轮调整，2026-05-10）。
 # 来源：scripts/config/attribute_names.csv（physique/craft/insight 是 4 NPC 鉴定主属性，
@@ -107,6 +116,19 @@ var _current_turn_result: Dictionary = {}
 var _resizing := false              # 防止窗口尺寸调整时递归触发
 # 主动押注切换状态：按选项 ID 记录各选项的押注模式（true=押注，false=默认）。
 var _bet_mode_options: Dictionary = {}
+# 状态栏 5 印章 SealPanel 节点引用缓存（议题 A 收口，2026-05-10）。
+# 由 _setup_state_seal_row 创建 + 缓存，_update_state_seal_row 每 turn 刷新数值。
+# 按 STATE_SEAL_DEFINITIONS 中 "key" 字段索引（"qi"/"yin"/"wu"/"yi"/"shi"）。
+var _state_seals: Dictionary = {}
+# 状态栏容器引用 + 首次显示标记（2026-05-10 修复）。
+# _setup 时创建 seal_row 用 modulate.a=0 隐藏（避免 intro 期暴露 "?" 占位）；
+# _update 首次填真值后触发 0.3s fade-in，与 intro 结束后的"渐显"节奏自然契合。
+var _state_seal_row: HBoxContainer = null
+var _state_seal_revealed: bool = false
+# 数值变化动效（2026-05-10）：增长 / 降低时整张印章 modulate 闪烁（增长偏暖 / 降低偏冷）。
+# _last_state_values 缓存上次值用于 diff；_state_seal_tweens 缓存 per-seal tween 引用用于 kill 旧动画。
+var _last_state_values: Dictionary = {}
+var _state_seal_tweens: Dictionary = {}
 # 议题 E 子项 6.2（2026-05-10）：鉴定结果反馈窗口需要追溯刚被点击的 option_id，
 # 用于在 _handle_resolved_turn_result 时定位对应 OptionCard 触发大印 + 灰化其他卡。
 # _on_option_pressed 进入时设置，_handle_resolved_turn_result 消费后由下次点击覆盖。
@@ -230,7 +252,7 @@ func _ready() -> void:
 	narrative_panel.gui_input.connect(_on_narrative_panel_gui_input)
 	end_root.action_requested.connect(_on_end_action_requested)
 	_setup_overlay_styles()
-	_setup_seal_row_mock()  # Phase 1.5 mock:验证印章式状态条形态后整体重构
+	_setup_state_seal_row()  # 议题 A 收口（2026-05-10）：5 印章正式实装（动态绑定 player_state）
 	_setup_screen_background()
 	_setup_platform_default_layers()
 	# 响应式布局初始化：注册 viewport 监听并触发首次布局。
@@ -1495,6 +1517,8 @@ func _update_side_panels() -> void:
 	_update_character_panel(player, xinxing_tracker)
 	# ── 左侧：世界面板 ──
 	_update_world_panel(world_state, params)
+	# ── 顶部：状态栏 5 印章（议题 A 收口，2026-05-10）──
+	_update_state_seal_row()
 
 	# ── 右侧：调试/参考信息 ──
 	var lines: Array[String] = []
@@ -2081,60 +2105,174 @@ func _setup_overlay_styles() -> void:
 	continue_button.add_theme_font_size_override("font_size", 14)
 
 
-# 功能：Phase 1.5 印章式状态条 mock(参见 [[UI风格快速翻调_demo期进度]] § 印章方向讨论)。
-# 说明：暂时隐藏 CharacterPanel/WorldPanel,在 LeftContent 顶部插入 5 枚朱印 PanelContainer
-#       占位,看"小尖锐朱印 vs 大叙事面板"的视觉权重对比是否对路。
-#       内容用现有标签+数值占位(不做 icon 字 / 定性化,那是用户领域,确认形态后单独议题)。
-#       哲学锚点:朱印是国画的内置语言(鉴藏印 / 钤印 / 题款印),与"修行者凝视画里世界 +
-#       留下行动痕迹"哲学契合;朱色语义从"玩家伸手"扩展为"看画人 / 修行者的痕迹"。
-#       回退方法:注释掉 _ready() 中本函数调用 + 删除/隐藏 SealRow_Mock 节点即可恢复原状态条。
-#       后续:形态确认后由大模型美术出图(朱印 PNG 资产)优化精致度。
-func _setup_seal_row_mock() -> void:
-	# 隐藏现有状态面板(原 CharacterPanel / WorldPanel 数值仍由后续逻辑更新但不显示)
+# 功能：状态栏 5 印章正式实装（议题 A 收口，2026-05-10；从 Phase 1.5 mock 升级）。
+# 说明：在 LeftContent 顶部插入 5 枚 SealPanel（气/银/武/艺/识），动态绑定 player_state。
+#       hp/energy 设计层移除；aptitude/xinxing demo 期不暴露；turn/location/pack/flags 由其他维度承担。
+# 哲学锚点：状态印章 = 修行者内观自己 → 墨色（与 mosaic 字符同源）；
+#       朱色严格保留给"伸手"位（OptionCard 鉴定 + 继续页脚 + 鉴定结果失败大印）。
+# 节点引用缓存到 _state_seals，由 _update_state_seal_row 每 turn 刷新数值。
+func _setup_state_seal_row() -> void:
+	# 隐藏旧 character_panel / world_panel（保留节点供其他逻辑数据访问，仅 visible=false）
 	character_panel.visible = false
 	world_panel.visible = false
 
-	# 朱印占位内容:5 枚,主字 + 副字独立配置(主字大、青鸟美黑;副字小、宋体 Medium)。
-	# icon 字取核心义("命/力/金/心/回"是 Claude 占位选字,最终由用户裁断);
-	# 数值 2 位处理:>99 capped / 1 位前导 0 / 负号占位 → 各印章宽度相近便于排版观察。
-	var seal_items: Array = [
-		{"main": "命", "value": "99"},
-		{"main": "力", "value": "99"},
-		{"main": "金", "value": "30"},
-		{"main": "心", "value": "-2"},
-		{"main": "回", "value": "01"},
-	]
-
-	# 墨印阴刻 SealPanel(自定义 Control,三层叠加渲染:实色墨底 + 斑驳墨层 + 反白主字)
-	# 哲学锚点(2026-05-06 用户设计修订):
-	#   状态 = 修行者内观自己 → 墨色(与画面 mosaic 字符同源,含蓄内向)
-	#   选项 = 修行者伸手介入 → 朱色(独一份,关键时刻用在刀刃上)
-	#   斑驳墨层用 sin(x,y,seed) noise 驱动字符密度,模拟印泥不均;各印章 seed 不同
-	#   产生各异斑驳模式 —— 与 text_mosaic_background.gd 同源算法的简化版,
-	#   把"印章质感"做到美术资源 80% 效果(余 20% 等出图后替换 SealPanel 实现)。
-	# 朱印容器:HBoxContainer + 右对齐 + separation 10(用户反馈紧凑些)
+	# 墨印阴刻 SealPanel 容器：HBoxContainer + 右对齐 + separation 10
+	# modulate.a 初始 0 隐藏（占位但透明），避免 intro 期暴露 "?" 占位副字；
+	# _update_state_seal_row 首次填真值后触发 fade-in 显示。
 	var seal_row := HBoxContainer.new()
-	seal_row.name = "SealRow_Mock"
+	seal_row.name = "StateSealRow"
 	seal_row.add_theme_constant_override("separation", 10)
-	seal_row.alignment = BoxContainer.ALIGNMENT_END
+	seal_row.alignment = BoxContainer.ALIGNMENT_CENTER  # 议题 A 二轮调整：底部位置改为水平居中
 	seal_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	seal_row.modulate.a = 0.0
+	_state_seal_row = seal_row
+	_state_seal_revealed = false
 
-	for i in range(seal_items.size()):
-		var item: Dictionary = seal_items[i]
+	# 副字保留宽度（议题 A 抖动修复，2026-05-10）：按 "999" 最大数值估算副字宽度，
+	# 让 SealPanel _get_minimum_size 用此值兜底，避免数字变化（如 "1"→"2"）引起印章宽度抖动。
+	# demo 期数值范围 1-3 / 银两 30-100，3 位数足够覆盖；如未来出现 4 位数需提至 "9999"。
+	var sub_reserve_w: float = FONT_SERIF_MEDIUM.get_string_size(
+		"999", HORIZONTAL_ALIGNMENT_LEFT, -1, 15
+	).x
+
+	# 创建 5 印章节点骨架 + 缓存引用（初始 value="?"，待 _update_state_seal_row 填真值）
+	# 主字青鸟美黑 22 + 副字宋体 Medium 15（与状态栏 mock 同字号，保持视觉一致）
+	# 各印章 seed 不同产生各异斑驳模式
+	_state_seals.clear()
+	for i in range(STATE_SEAL_DEFINITIONS.size()):
+		var def: Dictionary = STATE_SEAL_DEFINITIONS[i]
 		var seal: SealPanel = SealPanel.new()
-		# 主字青鸟美黑 22(粗壮书法感) + 副字宋体 Medium 11(规整数字);各印章 seed 不同
+		# 先设保留宽度，再 set_seal（set_seal 内部 update_minimum_size 时即生效）
+		seal.sub_reserve_width = sub_reserve_w
 		seal.set_seal(
-			item["main"], item["value"],
+			str(def["main"]), "?",  # 占位副字（隐藏期间不可见），_update_state_seal_row 立即覆盖
 			FONT_QINGNIAO_MEIHEI, 22,
 			FONT_SERIF_MEDIUM, 15,
 			i
 		)
 		seal_row.add_child(seal)
+		_state_seals[str(def["key"])] = seal
 
-	# 插入到 LeftContent 顶部(原 character_panel 位置)
+	# 插入到 LeftContent 底部（议题 A 二轮调整，2026-05-10）：
+	# 从顶部移到底部——视觉焦点统一（叙事 + 选项 + 状态变化在同一视野）；
+	# 墨印实心黑色"重者沉下"符合国画构图；与 OptionCard cost/check 印章在同一视觉区形成"印章语言群"；
+	# 顶部空出让 mosaic 背景 + 事件背景图获得"凝视空间"，符合修行者哲学。
 	var left_content: Node = character_panel.get_parent()
-	left_content.add_child(seal_row)
-	left_content.move_child(seal_row, 0)
+	left_content.add_child(seal_row)  # add_child 默认追加末尾，无需再 move_child
+
+
+# 功能：刷新状态栏 5 印章数值（议题 A 收口，2026-05-10）。
+# 说明：从 _engine.world_state.player 读取 spirit/gold/physique/craft/insight 5 字段，
+#       更新对应 SealPanel 副字。每次 turn_result 处理后由 _update_side_panels 调用。
+#       _engine 未就绪时静默跳过（_setup_state_seal_row 在 _engine 之前执行，初始保留 "?" 占位）。
+func _update_state_seal_row() -> void:
+	if _engine == null or _state_seals.is_empty():
+		return
+	var player: Dictionary = _engine.world_state.get("player", {})
+	for i in range(STATE_SEAL_DEFINITIONS.size()):
+		var def: Dictionary = STATE_SEAL_DEFINITIONS[i]
+		var key: String = str(def["key"])
+		var seal: SealPanel = _state_seals.get(key, null)
+		if seal == null:
+			continue
+		var value: int = int(player.get(str(def["field"]), 0))
+		# diff 检测：首次显示前不触发动效（首次填真值时 _state_seal_revealed=false）
+		var prev: int = int(_last_state_values.get(key, value))
+		var changed: bool = (prev != value) and _state_seal_revealed
+		seal.set_seal(
+			str(def["main"]), str(value),
+			FONT_QINGNIAO_MEIHEI, 22,
+			FONT_SERIF_MEDIUM, 15,
+			i
+		)
+		_last_state_values[key] = value
+		if changed:
+			_trigger_state_seal_change_animation(key, seal, value > prev)
+
+	# 首次有真值时触发 fade-in 显示（modulate.a 0 → 1，0.3s）
+	if not _state_seal_revealed and _state_seal_row != null:
+		_state_seal_revealed = true
+		var tw: Tween = create_tween()
+		tw.tween_property(_state_seal_row, "modulate:a", 1.0, 0.3)
+
+
+# 状态栏数值变化浮动汉字反馈参数（议题 A 收口附加三轮重设，2026-05-10）。
+# 设计：状态栏在屏顶 + 玩家注意力在叙事面板，modulate+scale 闪烁观感弱；改用浮动汉字
+#       "增"/"减" + 上移/下移 + 颜色 + 草书字体四维度，醒目度显著提升。
+# 颜色调性：低饱和绿 / 朱系暗红，符合当前米白墨色 + 朱色的国画调性，不破朱色"伸手"专属。
+const STATE_SEAL_FLOAT_FONT_SIZE: int = 28
+const STATE_SEAL_FLOAT_INCREASE_COLOR: Color = Color(0.30, 0.50, 0.20, 1.0)   # 竹叶绿 #4D8033
+const STATE_SEAL_FLOAT_DECREASE_COLOR: Color = Color(0.65, 0.25, 0.22, 1.0)   # 朱系暗红 #A64038
+const STATE_SEAL_FLOAT_DISTANCE: float = 20.0     # 上移 / 下移距离 px
+const STATE_SEAL_FLOAT_OFFSET: float = -8.0        # 起点与印章边缘的错开距离 px（避免遮挡墨印）
+const STATE_SEAL_FLOAT_DURATION: float = 0.75     # 总时长（含 fade-in / hold / fade-out）
+const STATE_SEAL_FLOAT_FADE_IN_SEC: float = 0.15
+const STATE_SEAL_FLOAT_FADE_OUT_SEC: float = 0.60  # 取消 hold，fade-out 贯穿剩余时间，全程渐隐
+
+
+# 功能：状态栏印章数值变化动效（议题 A 收口附加，2026-05-10；三轮重设：浮动汉字反馈）。
+# 说明：印章下方浮现"增"（增长，竹叶绿，向上飘）/"减"（降低，朱系暗红，向下沉）草书汉字；
+#       0.75s alpha fade-in→hold→fade-out + 同步位置移动；动效完成自动 queue_free。
+#       Label 用 top_level=true 脱离父布局（HBoxContainer 不接管），用 global_position 绝对定位。
+#       保留 _state_seal_tweens 缓存避免快速连续触发时位置 tween 叠加。
+func _trigger_state_seal_change_animation(key: String, seal: SealPanel, is_growth: bool) -> void:
+	# kill 旧 tween + 重置 SealPanel modulate/scale（清理上轮 modulate+scale 方案残留）
+	var old_tween: Variant = _state_seal_tweens.get(key, null)
+	if old_tween != null and (old_tween as Tween).is_valid():
+		(old_tween as Tween).kill()
+	seal.modulate = Color.WHITE
+	seal.scale = Vector2.ONE
+
+	# 创建浮动 Label
+	var floating_label: Label = Label.new()
+	floating_label.add_theme_font_override("font", FONT_ZHIMANGXING)
+	floating_label.add_theme_font_size_override("font_size", STATE_SEAL_FLOAT_FONT_SIZE)
+	floating_label.text = "增" if is_growth else "减"
+	var color: Color = STATE_SEAL_FLOAT_INCREASE_COLOR if is_growth else STATE_SEAL_FLOAT_DECREASE_COLOR
+	floating_label.add_theme_color_override("font_color", color)
+	floating_label.modulate.a = 0.0
+	floating_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# 父节点选状态栏父容器（LeftContent），加 child 后开 top_level 脱离布局
+	var floating_parent: Node = (
+		_state_seal_row.get_parent() if _state_seal_row != null else seal.get_parent()
+	)
+	floating_parent.add_child(floating_label)
+	floating_label.top_level = true
+
+	# 起始位置：增从印章上方错开 OFFSET 起步（贴顶但不遮挡） / 减从印章下方错开 OFFSET 起步（贴底但不遮挡）。
+	# 错开距离让 Label 与印章保持视觉间距，不互相遮挡；同时仍贴近印章表达"从印章生出"的动势。
+	# 汉字宽度 / 高度按字号近似（单字汉字方块 ≈ 字号 × 字号）。
+	var text_width: float = float(STATE_SEAL_FLOAT_FONT_SIZE)
+	var text_height: float = float(STATE_SEAL_FLOAT_FONT_SIZE)
+	var start_y: float = (
+		seal.global_position.y - text_height - STATE_SEAL_FLOAT_OFFSET   # 增：印章上方错开
+		if is_growth else
+		seal.global_position.y + seal.size.y + STATE_SEAL_FLOAT_OFFSET    # 减：印章下方错开
+	)
+	var start_pos: Vector2 = Vector2(
+		seal.global_position.x + seal.size.x * 0.5 - text_width * 0.5,
+		start_y
+	)
+	floating_label.global_position = start_pos
+
+	# 终点位置：增继续向上飘升 / 减继续向下沉降
+	var direction: float = -1.0 if is_growth else 1.0
+	var end_pos: Vector2 = start_pos + Vector2(0, direction * STATE_SEAL_FLOAT_DISTANCE)
+
+	# Tween 1：position 全程线性移动
+	var pos_tw: Tween = create_tween()
+	pos_tw.tween_property(floating_label, "global_position", end_pos, STATE_SEAL_FLOAT_DURATION)
+	_state_seal_tweens[key] = pos_tw
+
+	# Tween 2：alpha fade-in → hold → fade-out + 末尾 queue_free
+	var hold_sec: float = STATE_SEAL_FLOAT_DURATION - STATE_SEAL_FLOAT_FADE_IN_SEC - STATE_SEAL_FLOAT_FADE_OUT_SEC
+	var alpha_tw: Tween = create_tween()
+	alpha_tw.tween_property(floating_label, "modulate:a", 1.0, STATE_SEAL_FLOAT_FADE_IN_SEC)
+	if hold_sec > 0.0:
+		alpha_tw.tween_interval(hold_sec)
+	alpha_tw.tween_property(floating_label, "modulate:a", 0.0, STATE_SEAL_FLOAT_FADE_OUT_SEC)
+	alpha_tw.tween_callback(floating_label.queue_free)
 
 
 # 功能：初始化全屏装饰衬底。
@@ -2463,10 +2601,30 @@ func _unhandled_input(event: InputEvent) -> void:
 			# 用于反复观察完整反馈节奏（reveal + 停留 + 自动清除），不触发引擎结算（无副作用）。
 			# F5 = 触发完整成功展示 / F6 = 触发完整失败展示
 			# 反复触发会重置定时器（新触发覆盖旧的清除流程）
+			# 议题 A 调试热键（2026-05-10）：F1/F2 触发全 5 印章 增/减 浮动汉字动效，方便调参观察。
+			KEY_F1:
+				_debug_trigger_state_seal_change_all(true)
+			KEY_F2:
+				_debug_trigger_state_seal_change_all(false)
 			KEY_F5:
 				_debug_show_check_result_feedback("success")
 			KEY_F6:
 				_debug_show_check_result_feedback("fail")
+
+
+# 功能：议题 A 调试展示——触发全 5 印章浮动汉字动效（2026-05-10）。
+# 说明：方便调整 STATE_SEAL_FLOAT_* 参数（颜色 / 距离 / 时长 / 字号）后立即观察效果，
+#       不依赖实际 player_state 变动；可反复触发（旧 tween 会被 _trigger 内 kill）。
+func _debug_trigger_state_seal_change_all(is_growth: bool) -> void:
+	if _state_seals.is_empty():
+		print("[调试] 状态栏 5 印章尚未就绪，F1/F2 不响应")
+		return
+	for key_variant in _state_seals.keys():
+		var key: String = str(key_variant)
+		var seal: SealPanel = _state_seals[key]
+		if seal != null:
+			_trigger_state_seal_change_animation(key, seal, is_growth)
+	print("[调试] 触发状态栏 5 印章 %s 动效" % ("增" if is_growth else "减"))
 
 
 # 功能：议题 E 子项 6.2 调试展示——模拟完整鉴定反馈节奏（含自动清除）（2026-05-10）。

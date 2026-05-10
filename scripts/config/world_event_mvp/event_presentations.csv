@@ -13,9 +13,18 @@ evt_s2_sk_he,evt_s2_sk_he_p4,4,text,,你认得那株药材的样子，但说不�
 evt_s2_sk_qin,evt_s2_sk_qin_p1,1,text,,[骨架·家+市场·屏1] 母亲秦素娘在灶前忙碌，回头看见你，眼神里有交代有期许,text
 evt_s2_sk_zhou,evt_s2_sk_zhou_p1,1,text,,[骨架·练场·屏1] 练场上周既明带几个少年练拳，他擦汗时瞥见你站在场边,text
 evt_s2_sk_cheng,evt_s2_sk_cheng_p1,1,text,,[骨架·道观·屏1] 道观侧院程叔衡盘坐石上，眼皮微抬看了你一眼，没说话,text
-evt_s2_fl_pharmacy_1,evt_s2_fl_pharmacy_1_p1,1,text,,[填充·药铺·1·屏1] 师父让你按方抓药——挑战准确度（撰写期补）,text
-evt_s2_fl_pharmacy_2,evt_s2_fl_pharmacy_2_p1,1,text,,[填充·药铺·2·屏1] 雨天柜台清闲，磨药打发时间（撰写期补）,text
-evt_s2_fl_pharmacy_3,evt_s2_fl_pharmacy_3_p1,1,text,,[填充·药铺·3·屏1] 客人来抓药，你需要应对（撰写期补）,text
+evt_s2_fl_pharmacy_1,evt_s2_fl_pharmacy_1_p1,1,text,,中午前药铺忙起来。柜台后只剩你和一个老伙计——他把一张方子塞到你手里，又转身去应付门口的客人。,text
+evt_s2_fl_pharmacy_1,evt_s2_fl_pharmacy_1_p2,2,text,,你低头看方子上的几味药——有几个名字你认得，有几个还得想一想。柜台另一头的客人正等着。,text
+evt_s2_fl_pharmacy_2,evt_s2_fl_pharmacy_2_p1,1,text,,雨从半上午就没停过，柜台前几乎没来客人。老伙计在角落里坐着，眼皮半垂，不知睡着还是清醒。,text
+evt_s2_fl_pharmacy_2,evt_s2_fl_pharmacy_2_p2,2,text,,你面前还有半臼药没磨完——也不急，今天的事大概就这些了。雨声从门缝里漏进来，软绵绵的。,text
+evt_s2_fl_pharmacy_3,evt_s2_fl_pharmacy_3_p1,1,text,,上午铺子里没什么人，老伙计在后面整药架，只剩你守着柜台。一个客人推门进来，径直走到你这边。,text
+evt_s2_fl_pharmacy_3,evt_s2_fl_pharmacy_3_p2,2,text,,客人说家里老人咳了好几日了，问你有什么药。你手搭在柜台上，扫了一眼身后的药架。,text
+evt_s2_fl_pharmacy_4,evt_s2_fl_pharmacy_4_p1,1,text,,铺子里清闲。你整理货架的时候，有样东西从两罐药材之间滑出来，落在柜台边沿——不是药材，是一本书。,text
+evt_s2_fl_pharmacy_4,evt_s2_fl_pharmacy_4_p2,2,text,,你顺手翻开几页。字认得，但排在一起读不通——不像记药方用的格式，也不像账目。你不知道该怎么放回去。,text
+evt_s2_fl_pharmacy_5,evt_s2_fl_pharmacy_5_p1,1,text,,上午铺子刚开，一车货箱已经搬到门口。老伙计提着账册清点，一包一包翻开。,text
+evt_s2_fl_pharmacy_5,evt_s2_fl_pharmacy_5_p2,2,text,,轮到你上手时，几个包上的名目你还认不全——但数量不少，搬进去之前得一一对上。,text
+evt_s2_fl_pharmacy_6,evt_s2_fl_pharmacy_6_p1,1,text,,天色沉下来时，老伙计已经开始推柜台前的木格抽屉，一行一行推进去，一行一行锁好。,text
+evt_s2_fl_pharmacy_6,evt_s2_fl_pharmacy_6_p2,2,text,,窗外日头已经落下去，铺子里亮起一盏灯。你这边手头还有几件没交代完的零碎活——走也成，不走也成。,text
 evt_s2_fl_qin_1,evt_s2_fl_qin_1_p1,1,text,,[填充·家+市场·1·屏1] 母亲灶前忙活，让你帮把手（撰写期补）,text
 evt_s2_fl_qin_2,evt_s2_fl_qin_2_p1,1,text,,[填充·家+市场·2·屏1] 集市买菜——讨价还价或被坑（撰写期补）,text
 evt_s2_fl_qin_3,evt_s2_fl_qin_3_p1,1,text,,[填充·家+市场·3·屏1] 母亲晚饭桌上叮嘱你做人本分（撰写期补）,text
