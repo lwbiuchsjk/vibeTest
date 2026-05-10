@@ -38,6 +38,7 @@ evt_s2_sk_cheng_opt_1,resolution,default,affinity,,,,affinityDeltas,player_001->
 evt_s2_sk_cheng_opt_1,resolution,fail,affinity,,,,affinityDeltas,player_001->npc_cheng:+5
 evt_s2_sk_cheng_opt_2,resolution,default,affinity,,,,affinityDeltas,player_001->npc_cheng:+5
 evt_s2_sk_cheng_opt_3,resolution,default,affinity,,,,affinityDeltas,player_001->npc_cheng:+0
+evt_s2_fl_pharmacy_1_opt_1,cost,default,,,,,spirit,1
 evt_s2_fl_pharmacy_1_opt_1,resolution,default,player,,add,,craft,1
 evt_s2_fl_pharmacy_1_opt_1,resolution,default,player,,add,,gold,10
 evt_s2_fl_pharmacy_1_opt_2,resolution,default,player,,add,,craft,1
