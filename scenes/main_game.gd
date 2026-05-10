@@ -831,7 +831,16 @@ func _on_location_select_pressed(location_id: String) -> void:
 func _render_reflection_location_buttons(_turn_result: Dictionary) -> void:
 	var options: Array = _engine.get_reflection_location_options()
 	if options.is_empty():
-		_add_option_hint("无可选地点（visited_locations 已覆盖全图或邻居为空）。")
+		# Step 11 异常分支 1·解读 C 兜底：intro 模式下 visited_locations 已覆盖全图，
+		# 或 regular 模式下当前地点无邻居。demo 期正常路径（4 包 4 地点 + 末位池收口）
+		# 不应触发——若发生说明上游某处状态机错位（如末位池消耗未触发 forced 收口
+		# 让 reflection 多次循环）。此处显式 BUG 警示而非默默 fallback，让跑测能暴露。
+		var visited: Array = _engine.world_state.get("visited_locations", []) if _engine != null else []
+		var mode: String = str(_engine.world_state.get("reflection_mode", "")) if _engine != null else ""
+		_add_option_hint("[BUG] 自省末屏无可选地点（visited 已覆盖全图或邻居为空）—— 这是设计预期外的边界，请截图反馈。")
+		if status_label != null:
+			status_label.text = "[BUG] reflection 末屏候选为空 visited=%s mode=%s" % [str(visited), mode]
+		push_warning("[main_game] reflection 末屏候选为空：visited=%s mode=%s" % [str(visited), mode])
 		return
 	for opt_variant in options:
 		var opt: Dictionary = opt_variant
@@ -1776,7 +1785,13 @@ func _show_continue_footer(label_text: String, callback: Callable = Callable()) 
 # 功能：ContinueButton.pressed 信号的统一路由器。
 # 说明：根据当前 phase 的 _continue_handler 分流到对应回调（普通事件 / 创建 narrating / 创建 outcome）;
 #       _continue_handler 未设置时兜底走普通事件路径,避免开局阶段误触导致 null 调用。
+#       Step 11 异常分支防御：入口检查 disabled 状态做防抖。chain / outcome 多屏推进时
+#       button 在结算期被 _clear_option_list 临时 disable；本守门兜底以下两个边界——
+#         1. _on_narrative_panel_gui_input 转发路径未检查 disabled（只查 visible）；
+#         2. 未来 callback 内部引入 await 等异步路径时仍能拦住嵌套点击。
 func _on_continue_footer_pressed_router() -> void:
+	if continue_button != null and continue_button.disabled:
+		return
 	if _continue_handler.is_valid():
 		_continue_handler.call()
 	else:
