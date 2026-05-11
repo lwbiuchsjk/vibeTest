@@ -105,18 +105,6 @@ evt_s2_fl_zhou_5_opt_3,default,1,你往门内挪了一两步靠在门框边。�
 evt_s2_fl_zhou_6_opt_1,default,1,你低头喝完那碗茶。几个小子也喝完了散开，各自往街那头走了。摊主从摊后头出来收碗，你把铜板放在桌上，抬脚走了。
 evt_s2_fl_zhou_6_opt_2,default,1,你抬头朝那边问了一句。几个小子转过头，其中一个挠挠头说周家那几代都有家底，又说陆师傅那门是镇上少有几个能进的。说完几个人也散开各自走了。
 evt_s2_fl_zhou_6_opt_3,default,1,你抬手把铜板放在桌上，端起碗一口喝完，转身往街那头走了。身后那几个小子的话头很快被另一阵市声盖了过去。
-evt_s2_fl_train_1_opt_1,default,1,[outcome·练场·1·走近·屏1] 你凑过去看队列变换，记住几个手势（学识+1）
-evt_s2_fl_train_1_opt_1,default,2,[outcome·练场·1·走近·屏2] 走开时教头并未喝止——你想是因为你看得太专心
-evt_s2_fl_train_1_opt_2,default,1,[outcome·练场·1·绕开·屏1] 你装没看见从场边走过（无变化）
-evt_s2_fl_train_1_opt_2,default,2,[outcome·练场·1·绕开·屏2] 拐过墙角你才回头看了一眼——队列还在变换
-evt_s2_fl_train_2_opt_1,default,1,[outcome·练场·2·坚持·屏1] 你跑完三圈，腿肚子发紧但脚下稳了（体魄+1）
-evt_s2_fl_train_2_opt_1,default,2,[outcome·练场·2·坚持·屏2] 你扶着场边的木桩喘气——比第一圈想放弃时好得多
-evt_s2_fl_train_2_opt_2,default,1,[outcome·练场·2·偷停·屏1] 你跑两圈就借故停了下来（无变化）
-evt_s2_fl_train_2_opt_2,default,2,[outcome·练场·2·偷停·屏2] 你坐在场边看别人继续跑——胸口的闷气没散
-evt_s2_fl_train_3_opt_1,default,1,[outcome·练场·3·尝试·屏1] 你上手打了几下沙袋，掌心发麻（体魄+1）
-evt_s2_fl_train_3_opt_1,default,2,[outcome·练场·3·尝试·屏2] 收手后你看着自己的拳——红了一片，但比上次有数得多
-evt_s2_fl_train_3_opt_2,default,1,[outcome·练场·3·观望·屏1] 你站在边上看别人打（无变化）
-evt_s2_fl_train_3_opt_2,default,2,[outcome·练场·3·观望·屏2] 你看了一会便走——回去的路上手心还在出汗
 evt_s2_fl_cheng_1_opt_1,default,1,你坐在那儿没动。镇上提起这位程先生的，多半是这个口气——不夸张，也不挑刺。再坐了一会儿，你抬脚上路。
 evt_s2_fl_cheng_1_opt_2,default,1,你起身走开，没去管那两人说什么。日头还高，事情还多。
 evt_s2_fl_cheng_1_opt_3,default,1,你扭头跟树底下另一个等人的人搭了句话，问他今日街上是不是清淡。他点头嗯了一声，说热得人都躲着。两人又坐了一会儿，各自抬脚走开。

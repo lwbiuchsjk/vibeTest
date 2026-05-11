@@ -97,10 +97,6 @@ evt_s2_fl_zhou_4_opt_1,cost,default,,,,,spirit,1
 evt_s2_fl_zhou_5_opt_1,cost,default,,,,,spirit,1
 evt_s2_fl_zhou_5_opt_3,cost,default,,,,,spirit,1
 evt_s2_fl_zhou_6_opt_2,cost,default,,,,,spirit,1
-evt_s2_fl_train_1_opt_1,cost,default,,,,,spirit,1
-evt_s2_fl_train_1_opt_1,resolution,default,player,,add,,insight,1
-evt_s2_fl_train_2_opt_1,resolution,default,player,,add,,physique,1
-evt_s2_fl_train_3_opt_1,resolution,default,player,,add,,physique,1
 evt_s2_fl_cheng_2_opt_2,cost,default,,,,,spirit,1
 evt_s2_fl_cheng_3_opt_2,cost,default,,,,,spirit,1
 evt_s2_fl_cheng_4_opt_1,cost,default,,,,,spirit,1

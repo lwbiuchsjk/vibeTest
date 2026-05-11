@@ -65,12 +65,6 @@ evt_s2_fl_zhou_5_opt_3,cp_evt_s2_fl_zhou_5,凑近些看,3
 evt_s2_fl_zhou_6_opt_1,cp_evt_s2_fl_zhou_6,默默听完,1
 evt_s2_fl_zhou_6_opt_2,cp_evt_s2_fl_zhou_6,跟着问一句,2
 evt_s2_fl_zhou_6_opt_3,cp_evt_s2_fl_zhou_6,走开,3
-evt_s2_fl_train_1_opt_1,cp_evt_s2_fl_train_1,[选项·走近] 凑过去看,1
-evt_s2_fl_train_1_opt_2,cp_evt_s2_fl_train_1,[选项·绕开] 装没看见,2
-evt_s2_fl_train_2_opt_1,cp_evt_s2_fl_train_2,[选项·坚持] 跑完三圈,1
-evt_s2_fl_train_2_opt_2,cp_evt_s2_fl_train_2,[选项·偷停] 跑两圈就停,2
-evt_s2_fl_train_3_opt_1,cp_evt_s2_fl_train_3,[选项·尝试] 上手打几下,1
-evt_s2_fl_train_3_opt_2,cp_evt_s2_fl_train_3,[选项·观望] 看别人打,2
 evt_s2_fl_cheng_1_opt_1,cp_evt_s2_fl_cheng_1,记在心里,1
 evt_s2_fl_cheng_1_opt_2,cp_evt_s2_fl_cheng_1,起身走开,2
 evt_s2_fl_cheng_1_opt_3,cp_evt_s2_fl_cheng_1,跟旁边的人也搭句话,3

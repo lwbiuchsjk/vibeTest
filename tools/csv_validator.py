@@ -317,6 +317,38 @@ def validate(csv_dir: Path, ref_dir: Path) -> ValidationResult:
             eid = row.get("event_id", "")
             result.add_p2(f"event_conditions: '{eid}' 使用未知 condition_type '{ct}'")
 
+    # ── 检查 6.1: required_location 缺失防御（2026-05-12 新增）──
+    # 触发场景：Phase B 跑测发现 evt_s2_fl_zhou_* / evt_s2_fl_pharmacy_{4,5,6}
+    # 漏配 required_location，导致跨地点抽到。调度器按 required_location 过滤事件池，
+    # 缺失 = 任何地点都可命中。
+    #
+    # 豁免规则（不进调度器的事件不需要 required_location）：
+    #   - type == "reflection"  → 系统自省事件，由阶段触发器 / forced_next 强制注入
+    #   - tags 含 "chain"       → 链式事件，由 set_forced_next 或 final_event_pool_exhausted_forced_id
+    #                             强制注入，调度器不抽
+    events_with_required_location: set[str] = {
+        r.get("event_id", "").strip() for r in event_conditions
+        if r.get("condition_type", "").strip() == "required_location"
+        and r.get("event_id", "").strip()
+    }
+    for row in events:
+        eid = row.get("event_id", "").strip()
+        if not eid:
+            continue
+        event_type = row.get("type", "").strip()
+        tags_raw = row.get("tags", "").strip()
+        tags_set = {t.strip() for t in tags_raw.split(";") if t.strip()}
+        # 豁免：系统自省 + 链式事件
+        if event_type == "reflection":
+            continue
+        if "chain" in tags_set:
+            continue
+        if eid not in events_with_required_location:
+            result.add_p1(
+                f"event_conditions: 事件 '{eid}' 缺 required_location 行"
+                "（非 reflection / chain 事件需指定调度地点，否则任意地点都可命中）"
+            )
+
     # ── 检查 6.5: event_presentations.presents 合法性（Step 2 新增）──
     # presents 字段空 → 引擎默认 text；非空必须在 KNOWN_PRESENTS_VALUES 白名单内。
     # demo 期不应出现 DEMO_UNSUPPORTED_PRESENTS 中的值（引擎/UI 渲染分支未实现）。

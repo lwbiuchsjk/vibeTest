@@ -30,9 +30,6 @@ evt_s2_fl_zhou_3,[填充·练场·3] 角落里那把木剑,,10,ReturnToScheduler
 evt_s2_fl_zhou_4,[填充·练场·4] 陆师傅演那一招,,10,ReturnToScheduler,cp_evt_s2_fl_zhou_4,filler;stage2,,FALSE,
 evt_s2_fl_zhou_5,[填充·练场·5] 群训里的那少年,,10,ReturnToScheduler,cp_evt_s2_fl_zhou_5,filler;stage2,,FALSE,
 evt_s2_fl_zhou_6,[填充·练场·6] 街头几个少年的闲话,,10,ReturnToScheduler,cp_evt_s2_fl_zhou_6,filler;stage2,,FALSE,
-evt_s2_fl_train_1,[填充·练场·1] 偷看队列,,10,ReturnToScheduler,cp_evt_s2_fl_train_1,filler;stage2,,FALSE,
-evt_s2_fl_train_2,[填充·练场·2] 跑步晨练,,10,ReturnToScheduler,cp_evt_s2_fl_train_2,filler;stage2,,FALSE,
-evt_s2_fl_train_3,[填充·练场·3] 沙袋空击,,10,ReturnToScheduler,cp_evt_s2_fl_train_3,filler;stage2,,FALSE,
 
 evt_s3_chain_entry,[拜师·屏1] 母亲准备,pond_still.png,10,ChainContinue,cp_evt_s3_chain_entry,chain;shi,,FALSE,
 evt_s3_chain_2,[拜师·屏2] 集体面试,pond_ripple_1.png,10,ChainContinue,cp_evt_s3_chain_2,chain;shi,,FALSE,
