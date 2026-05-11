@@ -247,10 +247,22 @@ var _continue_handler: Callable = Callable()
 @onready var left_stack: Control = $Root/RootContent/MainSplit/LeftPanel/LeftStack
 @onready var header: VBoxContainer = $Root/RootContent/Header
 
-# Phase A 调优 3：自省事件入场过场动效追踪。
-# 进入 girl_enter 背景时（reflection 类事件）触发一次 LeftStack alpha 0→1 fade-in；
-# 同一自省事件内多 presentation 切换不重复触发；切出 girl_enter 后清空状态供下次 reflection 触发。
-var _last_reflection_bg_path: String = ""
+# ============================================================
+# 事件切换呼吸感（UI fade 调度器）—— [[事件切换呼吸感_MVP]]
+# ============================================================
+## UI fade 时长（用户可手调）
+const UI_FADE_OUT_SEC: float = 0.20
+const UI_FADE_IN_SEC: float = 0.30
+const FIRST_ENTER_FADE_IN_SEC: float = 0.60
+
+## fade 期 disabled 输入兜底 + 重复触发互斥
+var _is_fading: bool = false
+## 当前 UI fade tween（kill 兜底用）
+var _ui_fade_tween: Tween = null
+## 上次渲染的 event_id（跨事件 / 屏内 / 首次入场 判定）
+var _last_rendered_event_id: String = ""
+## 上次渲染的背景路径（跨事件同图 → 触发 IntroSequence 脉动；异图 → cross-fade）
+var _last_rendered_bg_path: String = ""
 
 
 # 功能：初始化场景。
@@ -298,6 +310,12 @@ func _ready() -> void:
 		# reveal_core_girl 阶段整体淡入实现少女独立浮现；LeftOverlay (UI 容器) tscn 默认 visible=false，
 		# 由游戏后续逻辑（事件预览 / 创建阶段）显示，与 intro 时序解耦。
 		left_stack.modulate.a = 0.0
+		# narrative_panel 独立于 LeftStack fade — 由 _run_first_enter_fade 接管首次浮现。
+		# 不设此 α=0 会导致 intro_reveal_core_girl 的 LeftStack fade 让 narrative_panel
+		# 先可见（"出现"），后被 _run_first_enter_fade 重置 α=0（"消失"），再 fade-in（"再出现"）—— 三段闪烁。
+		# 状态栏（character_panel / world_panel / task_summary_card）继续随 LeftStack fade 一起浮现，
+		# 因其内容已有占位（如 state_seal 自身 α=0 等首次真值才浮现）。
+		narrative_panel.modulate.a = 0.0
 		# === 用户尝试方案：隐藏 LeftStack 所有背景渲染节点，让核心区透出底层 ScreenMosaic 屏幕级渲染 ===
 		# 目的：让 LeftStack 区域 = LeftStack 外区域 = 整屏统一的 ScreenMosaic 视觉（同字号、同深浅、同图片尺寸）
 		# LeftOverlay (UI 容器) 默认 visible=false 由游戏后续逻辑控制，此处保留不动。
@@ -386,19 +404,153 @@ func _on_intro_reveal_ui() -> void:
 #       Step 2：注入 sys_opening_reflection 作为开场首个事件（首个自省，含池塘开场叙事 +
 #       4 地点选择末屏）。事件不存在时引擎在 _select_next_event 报 missing_event_def fatal，
 #       配置者应确保 CSV 中存在该 event_id；老 demo 配置无此事件时直接跳过 forced 注入。
-# Phase A 调优 3：自省事件入场过场动效（轻度方案）。
-# 触发时机：_render_event_background 检测到 background path 切换到 pond_girl_enter.png。
-# 视觉效果：LeftStack alpha 0 → 1 over 0.6s，模拟"ritual 入场"渐显感。
-# 升级路径：如果用户认为效果不足以传达"涟漪循环 → girl_enter"的视觉语言，
-# 升级到中度方案（独立"自省过场"节点 + 复用 ripple 帧），开 [[文字马赛克美术背景_落地进度]] 专项。
-func _trigger_reflection_intro_fade() -> void:
-	if left_stack == null:
+# ============================================================
+# 事件切换呼吸感 fade 调度器（[[事件切换呼吸感_MVP]] 改动 4-5-7）
+# ============================================================
+
+# 功能：跨事件 fade — 整 narrative_panel α 1→0 → 切内容 → α 0→1。
+# 说明：
+#   - 异图（pulse_after_fade_out=false）：UI fade 与 IntroSequence 背景 cross-fade 并行启动
+#   - 同图（pulse_after_fade_out=true）：串行节奏 UI fade-out → 背景 pulse → UI fade-in
+#     等待 pulse 完成后再 fade-in，避免文字与背景脉动重叠造成节奏混乱
+#   - fade 全程 _is_fading=true + 输入锁定
+func _run_cross_event_fade(turn_result: Dictionary, pulse_after_fade_out: bool = false) -> void:
+	_kill_ui_fade_tween()
+	_is_fading = true
+	_set_inputs_locked(true)
+	narrative_panel.modulate.a = 1.0
+	_ui_fade_tween = create_tween()
+	_ui_fade_tween.set_trans(Tween.TRANS_SINE)
+	_ui_fade_tween.set_ease(Tween.EASE_IN_OUT)
+	_ui_fade_tween.tween_property(narrative_panel, "modulate:a", 0.0, UI_FADE_OUT_SEC)
+	_ui_fade_tween.tween_callback(_do_render_current_event.bind(turn_result))
+	if pulse_after_fade_out and intro_sequence != null:
+		# 串行：fade-out 完成后触发 pulse，等 pulse 完成再 fade-in
+		_ui_fade_tween.tween_callback(intro_sequence.pulse_event_background.bind(IntroSequence.PULSE_DURATION))
+		_ui_fade_tween.tween_interval(IntroSequence.PULSE_DURATION)
+	_ui_fade_tween.tween_property(narrative_panel, "modulate:a", 1.0, UI_FADE_IN_SEC)
+	_ui_fade_tween.tween_callback(_on_ui_fade_done)
+
+
+# 功能：屏内 fade — event_detail_label / option_list 按需淡。
+# 说明：event_title 保持不变（同一事件不同屏）；状态栏不动；背景幂等跳过。
+#       关键判定：
+#         - event_detail 文本相同（如 presentation 末屏 → choice，文本一致仅出选项）→ 不 fade 文本
+#         - option_list 内容会变（新增 / 替换 / 清空）→ fade option_list
+#       两者各自独立 fade（互不依赖）；若两者都无变化则跳过 fade 直接调 _do_render_current_event 兜底。
+func _run_intra_event_fade(turn_result: Dictionary) -> void:
+	_kill_ui_fade_tween()
+	var expected_detail: String = _compute_event_detail_text(turn_result)
+	var fade_detail: bool = expected_detail != event_detail_label.text
+	var fade_options: bool = _detect_options_change(turn_result)
+
+	# 两者都不变 → 直接渲染（无 fade，无锁定）
+	if not fade_detail and not fade_options:
+		_do_render_current_event(turn_result)
 		return
-	left_stack.modulate.a = 0.0
-	var tw: Tween = create_tween()
-	tw.set_trans(Tween.TRANS_SINE)
-	tw.set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(left_stack, "modulate:a", 1.0, 0.6)
+
+	_is_fading = true
+	_set_inputs_locked(true)
+	if fade_detail:
+		event_detail_label.modulate.a = 1.0
+	if fade_options:
+		option_list.modulate.a = 1.0
+	_ui_fade_tween = create_tween()
+	_ui_fade_tween.set_parallel(true)
+	_ui_fade_tween.set_trans(Tween.TRANS_SINE)
+	_ui_fade_tween.set_ease(Tween.EASE_IN_OUT)
+	if fade_detail:
+		_ui_fade_tween.tween_property(event_detail_label, "modulate:a", 0.0, UI_FADE_OUT_SEC)
+	if fade_options:
+		_ui_fade_tween.tween_property(option_list, "modulate:a", 0.0, UI_FADE_OUT_SEC)
+	_ui_fade_tween.chain().tween_callback(_do_render_current_event.bind(turn_result))
+	if fade_detail:
+		_ui_fade_tween.chain().tween_property(event_detail_label, "modulate:a", 1.0, UI_FADE_IN_SEC)
+	if fade_options:
+		# 若 detail 也淡入，则 option fade-in 与之并行；否则独立 chain
+		if fade_detail:
+			_ui_fade_tween.parallel().tween_property(option_list, "modulate:a", 1.0, UI_FADE_IN_SEC)
+		else:
+			_ui_fade_tween.chain().tween_property(option_list, "modulate:a", 1.0, UI_FADE_IN_SEC)
+	_ui_fade_tween.chain().tween_callback(_on_ui_fade_done)
+
+
+# 功能：首次入场 fade — 整 narrative_panel α 0→1（沿用旧 reflection fade 0.6s 节奏）。
+# 说明：先把 α 设 0（防止 _do_render_current_event 设 narrative_panel.visible=true 与后续 α=0 之间的同帧瞬态），
+#       再装内容 + tween fade-in。
+func _run_first_enter_fade(turn_result: Dictionary) -> void:
+	_kill_ui_fade_tween()
+	_is_fading = true
+	_set_inputs_locked(true)
+	narrative_panel.modulate.a = 0.0
+	_do_render_current_event(turn_result)
+	_ui_fade_tween = create_tween()
+	_ui_fade_tween.set_trans(Tween.TRANS_SINE)
+	_ui_fade_tween.set_ease(Tween.EASE_IN_OUT)
+	_ui_fade_tween.tween_property(narrative_panel, "modulate:a", 1.0, FIRST_ENTER_FADE_IN_SEC)
+	_ui_fade_tween.tween_callback(_on_ui_fade_done)
+
+
+# 功能：计算当前 turn_result 对应的 event_detail_label.text（与 _do_render_current_event 内部口径一致）。
+# 说明：抽离出来供 fade 调度器在 fade 启动前预计算，对比 event_detail_label.text 判断是否需要 fade 叙事文本。
+#       拼接规则：presentation_item.speaker + text → "\n\n" + check_summary。
+#       注：选项出现瞬间（屏内 presentation → choice）末屏文本不变，detail 文本一致 → 不应触发 fade。
+func _compute_event_detail_text(turn_result: Dictionary) -> String:
+	var presentation: Dictionary = turn_result.get("presentation", {})
+	var presentation_item: Dictionary = presentation.get("current_item", {})
+	var narrative_parts: Array[String] = []
+	if not presentation_item.is_empty():
+		var speaker := str(presentation_item.get("speaker", "")).strip_edges()
+		var body := str(presentation_item.get("text", ""))
+		if not body.is_empty():
+			if speaker.is_empty():
+				narrative_parts.append(body)
+			else:
+				narrative_parts.append("%s: %s" % [speaker, body])
+	var check_summary := _build_check_result_summary(turn_result)
+	if not check_summary.is_empty():
+		narrative_parts.append(check_summary)
+	return "\n\n".join(narrative_parts)
+
+
+# 功能：判断屏内切换时 option_list 是否需要参与 fade。
+# 说明：fade-out 起点 option_list 有内容 OR fade-in 终点会有新选项装载，均视为需要 fade。
+#       简化判定：phase=choice/desperate_gamble/preemptive_bet/reflection/location_select/presentation 都可能装新选项
+#       或当前已有选项（结算反馈后清空）。若当前 option_list 已有 child 视为需要 fade（最常见的需 fade 情况）。
+func _detect_options_change(turn_result: Dictionary) -> bool:
+	if option_list.get_child_count() > 0:
+		return true
+	var phase: String = str(turn_result.get("phase", ""))
+	return phase in ["choice", "desperate_gamble", "preemptive_bet", "reflection", "location_select", "presentation"]
+
+
+# 功能：fade 完成回调 — 解锁输入 + 兜底 α 状态。
+func _on_ui_fade_done() -> void:
+	_is_fading = false
+	_set_inputs_locked(false)
+	narrative_panel.modulate.a = 1.0
+	event_detail_label.modulate.a = 1.0
+	option_list.modulate.a = 1.0
+
+
+# 功能：kill 当前 fade tween（快连点 / 重复触发兜底）。
+func _kill_ui_fade_tween() -> void:
+	if _ui_fade_tween != null and _ui_fade_tween.is_valid():
+		_ui_fade_tween.kill()
+	_ui_fade_tween = null
+
+
+# 功能：fade 期间锁定 / 解锁所有可点控件（OptionCard / button / ContinueButton）。
+# 说明：直接 disabled，兼具防误触 + 视觉提示；解锁恢复 disabled=false（OptionCard 内部 reset_modulate_to_default
+#       已在结算反馈期使用，本调用不打架）。
+func _set_inputs_locked(locked: bool) -> void:
+	for child in option_list.get_children():
+		if child is BaseButton:
+			(child as BaseButton).disabled = locked
+		elif child.has_method("set_disabled"):
+			child.call("set_disabled", locked)
+	if continue_button != null:
+		continue_button.disabled = locked
 
 
 func _on_intro_completed() -> void:
@@ -434,9 +586,56 @@ func _handle_preview_turn_result(turn_result: Dictionary) -> void:
 	_update_side_panels()
 
 
-# 功能：渲染当前事件。
-# 说明：根据 phase 分别处理展示、选择、确认、心性风险入口等界面状态。
+# 功能：事件切换呼吸感 fade 调度入口（[[事件切换呼吸感_MVP]]）。
+# 说明：
+#   - 根据 event_id 判定切换类型：首次入场（_last_rendered_event_id="") / 跨事件 / 屏内
+#   - 先触发背景 cross-fade（IntroSequence 内部 0.5s tween），与 UI fade-out 并行
+#   - 分发到三个 fade 函数之一，由其负责调用 _do_render_current_event 做实际渲染
+#   - fade 期间 _is_fading=true，输入控件 disabled + gui_input handler 守门兜底
+# 边界：
+#   - world_ended 走 cross-event fade（fade-in 完成后调 _do_render_current_event → _render_end_screen）
+#   - test 场景共享脚本但无 IntroSequence；本函数路径对 test 兼容（IntroSequence null 时 _render_event_background 内部已 null 防御）
 func _render_current_event(turn_result: Dictionary) -> void:
+	var event_id: String = _extract_event_id_for_fade(turn_result)
+	var is_first_enter: bool = _last_rendered_event_id == ""
+	var is_cross_event: bool = (not is_first_enter) and event_id != _last_rendered_event_id
+	var new_bg_path: String = str(turn_result.get("resolved_background_art", "")).strip_edges()
+
+	# 背景调度分发：
+	#   - 首次入场 / 跨事件异图 → _render_event_background 触发 IntroSequence cross-fade，与 UI fade 并行
+	#   - 跨事件同图 → 背景 pulse 串行夹在 UI fade-out 与 fade-in 之间（_run_cross_event_fade pulse_after_fade_out=true）
+	#   - 屏内 → 背景不动（叙事节奏不被背景干扰）
+	if is_first_enter:
+		_render_event_background(new_bg_path)
+		_run_first_enter_fade(turn_result)
+	elif is_cross_event:
+		var is_same_bg: bool = new_bg_path == _last_rendered_bg_path and intro_sequence != null
+		if not is_same_bg:
+			_render_event_background(new_bg_path)
+		_run_cross_event_fade(turn_result, is_same_bg)
+	else:
+		_run_intra_event_fade(turn_result)
+
+	_last_rendered_event_id = event_id
+	_last_rendered_bg_path = new_bg_path
+
+
+# 功能：从 turn_result 提取用于 fade 判定的 event_id。
+# 说明：world_ended phase 用 ending_event_id；普通 phase 用 event_id；都缺则用 phase 作 fallback。
+func _extract_event_id_for_fade(turn_result: Dictionary) -> String:
+	if _is_world_ended_result(turn_result):
+		return "__ended__:" + str(turn_result.get("ending_event_id", ""))
+	var event_id: String = str(turn_result.get("event_id", "")).strip_edges()
+	if not event_id.is_empty():
+		return event_id
+	# 兜底：极少数 phase（如 location_select 兜底分支）可能无 event_id，按 phase 区分
+	return "__phase__:" + str(turn_result.get("phase", ""))
+
+
+# 功能：渲染当前事件（实际写入 UI 内容；由 fade 调度器在合适时机调用）。
+# 说明：根据 phase 分别处理展示、选择、确认、心性风险入口等界面状态。
+#       不调 _render_event_background（由外层调度器与 fade 并行触发），不更新 _last_rendered_event_id（由外层管理）。
+func _do_render_current_event(turn_result: Dictionary) -> void:
 	if _is_world_ended_result(turn_result):
 		_render_end_screen(turn_result)
 		return
@@ -451,29 +650,15 @@ func _render_current_event(turn_result: Dictionary) -> void:
 	if phase != "choice":
 		_bet_mode_options.clear()
 
-	_render_event_background(str(turn_result.get("resolved_background_art", "")))
 	_set_end_screen_visible(false)
 	_update_left_task_panel(turn_result)
 
 	# 叙事面板：标题 + 展示文本 + 鉴定结果摘要
 	event_title_label.text = str(turn_result.get("title", ""))
-	var narrative_parts: Array[String] = []
-	# Phase A 调优 1：选项 / 自省 / 鉴定 等 phase 都保留末屏 presentation 文字，
-	# 与选项 / 按钮同屏渲染。原仅 presentation phase 显示导致点出选项时末屏文字消失。
-	if not presentation_item.is_empty():
-		var speaker := str(presentation_item.get("speaker", "")).strip_edges()
-		var body := str(presentation_item.get("text", ""))
-		if not body.is_empty():
-			if speaker.is_empty():
-				narrative_parts.append(body)
-			else:
-				narrative_parts.append("%s: %s" % [speaker, body])
-	var check_summary := _build_check_result_summary(turn_result)
-	if not check_summary.is_empty():
-		narrative_parts.append(check_summary)
-	event_detail_label.text = "\n\n".join(narrative_parts)
+	var narrative_text: String = _compute_event_detail_text(turn_result)
+	event_detail_label.text = narrative_text
 	# 有标题或叙事内容时才显示叙事面板
-	var has_narrative := not event_title_label.text.strip_edges().is_empty() or not narrative_parts.is_empty()
+	var has_narrative := not event_title_label.text.strip_edges().is_empty() or not narrative_text.is_empty()
 	narrative_panel.visible = has_narrative
 
 	_clear_option_list()
@@ -2022,6 +2207,9 @@ func _on_continue_footer_pressed_router() -> void:
 #       OptionCard 自身 mouse_filter=STOP 会拦截卡片区域点击,NarrativePanel 只收到空白区点击,与 OptionCard 不冲突。
 #       依赖 EventDetail / EventTitle 的 mouse_filter=IGNORE(在 tscn 中配置),让事件传递到 NarrativePanel。
 func _on_narrative_panel_gui_input(event: InputEvent) -> void:
+	# 事件切换呼吸感：fade 期间守门兜底（disabled 之外的二次防御）
+	if _is_fading:
+		return
 	if continue_button == null or not continue_button.visible:
 		return
 	if event is InputEventMouseButton:
@@ -2349,17 +2537,9 @@ func _render_event_background(background_art_path: String) -> void:
 	# 消费引擎已解析的最终背景路径（事件 backgroundArt → 地点 art_file → 空字符串）。
 	# 自省事件（sys_*_reflection）通过 events.csv background_art 字段配 pond_girl_enter.png，
 	# 走引擎 fallback 链产出 girl_enter 路径，与 IntroSequence 终态视觉一致（无视觉跳变）。
+	# 自省事件入场 fade 已合并到通用 fade 调度器（_run_first_enter_fade / _run_cross_event_fade），
+	# 不再在此处独立触发 _trigger_reflection_intro_fade。详见 [[事件切换呼吸感_MVP]] 改动 5。
 	var normalized_path := background_art_path.strip_edges()
-
-	# Phase A 调优 3：自省事件入场过场动效（LeftStack alpha 0→1 fade-in，影响 LeftOverlay UI 出场感）。
-	# 决议方案下 LeftStack 内背景层不可见，但 LeftOverlay UI 仍随 LeftStack modulate 一并 fade。
-	# 设计基线见 [[当前版本完整主路径_MVP设计]] §二·原则 7（自省事件复用 IntroSequence 视觉）。
-	var is_reflection_bg := normalized_path.ends_with("pond_girl_enter.png")
-	if is_reflection_bg and normalized_path != _last_reflection_bg_path:
-		_last_reflection_bg_path = normalized_path
-		_trigger_reflection_intro_fade()
-	elif not is_reflection_bg:
-		_last_reflection_bg_path = ""
 
 	# intro_sequence 节点可能在 test 场景下不存在（test/event_logic_test 等共享脚本场景）；做 null 防御
 	if intro_sequence == null:

@@ -36,6 +36,21 @@ const GIRL_ENTER_PATH := "res://assets/art/environments/backgrounds/pond_girl_en
 const GIRL_ENTER_FACE_MASK_PATH := "res://assets/art/environments/backgrounds/pond_girl_enter_face_mask.png"
 
 # ============================================================
+# Cross-fade 时长（事件切换呼吸感 MVP）
+# ============================================================
+## EventBg A/B 套与 mosaic↔plain mode 切换的 cross-fade 时长。
+## 与 mosaic_crossfade（0.5s）统一节奏。
+const EVENT_CROSSFADE_SEC: float = 0.5
+
+## 同图跨事件背景脉动（同地点不同填充事件呼吸感）。
+## 用 modulate 颜色变暗（不动 α）：图像短暂变暗复明，类似"翻页时光影掠过"。
+## α 始终为 1 → 米色底完全被图遮住 → 不会漏出底色造成闪屏。
+## PULSE_DIM_FACTOR 是变暗最深处的 RGB 系数（0.7 = 70% 亮度），越低越显著。
+const PULSE_DIM_FACTOR: float = 0.2
+const PULSE_DURATION: float = 0.8
+
+
+# ============================================================
 # intro 涟漪场景专用词汇（13 层 mosaic 用）
 # ============================================================
 const INTRO_TEXT_TOKENS: Array = [
@@ -336,25 +351,50 @@ func _render_plain_mode(art_path: String) -> void:
 	_crossfade_event_to_image(tex)
 
 
-## 功能：EventBg A/B cross-fade 到新 texture。DONE 状态瞬切（事件期不需要长过渡）。
+## 功能：EventBg A/B cross-fade 到新 texture。0.5s 双向 α tween（事件切换呼吸感 MVP）。
+## 说明：
+##   - 装新图到非活跃 EventBg slot
+##   - 起点：active α=1（旧图显示中），inactive α=0（新图装好待淡入）
+##   - tween：active 1→0 + inactive 0→1 并行 0.5s
+##   - 完成后翻转 _event_active_is_a，确保 α 状态一致
 func _crossfade_event_to_image(tex: Texture2D) -> void:
 	if _event_crossfade_tween != null and _event_crossfade_tween.is_valid():
 		_event_crossfade_tween.kill()
 	var inactive: TextureRect = event_bg_b if _event_active_is_a else event_bg_a
 	var active: TextureRect = event_bg_a if _event_active_is_a else event_bg_b
 	inactive.texture = tex
-	# DONE 状态瞬切
-	active.modulate.a = 0.0
-	inactive.modulate.a = 1.0
+	# 起点：active 旧图 α=1，inactive 新图 α=0
+	active.modulate.a = 1.0
+	inactive.modulate.a = 0.0
+	_event_crossfade_tween = create_tween()
+	_event_crossfade_tween.set_parallel(true)
+	_event_crossfade_tween.set_trans(Tween.TRANS_SINE)
+	_event_crossfade_tween.set_ease(Tween.EASE_IN_OUT)
+	_event_crossfade_tween.tween_property(active,   "modulate:a", 0.0, EVENT_CROSSFADE_SEC)
+	_event_crossfade_tween.tween_property(inactive, "modulate:a", 1.0, EVENT_CROSSFADE_SEC)
+	_event_crossfade_tween.chain().tween_callback(_on_event_crossfade_done)
+
+
+## 功能：EventBg cross-fade 完成回调。翻转 active 标识 + 兜底 α 状态。
+func _on_event_crossfade_done() -> void:
 	_event_active_is_a = not _event_active_is_a
+	var new_active: TextureRect = event_bg_a if _event_active_is_a else event_bg_b
+	var new_inactive: TextureRect = event_bg_b if _event_active_is_a else event_bg_a
+	new_active.modulate.a = 1.0
+	new_inactive.modulate.a = 0.0
 
 
 # ============================================================
 # Mode 切换 cross-fade（mosaic↔plain）
 # ============================================================
 
-## 功能：mode 切换瞬时 α 翻转（DONE 状态下不走 Tween，避免阻塞事件流）。
+## 功能：mode 切换 cross-fade（mosaic ↔ plain）。0.5s 双向 α tween（事件切换呼吸感 MVP）。
 ## 参数 target_mode：目标 mode。
+## 说明：
+##   - 非活跃套（inactive_mosaic / inactive_event）始终保持 α=0（不参与 tween）
+##   - target=MOSAIC：active_event 1→0，active_mosaic 0→1 并行 0.5s
+##   - target=PLAIN：active_mosaic 1→0，active_event 0→1 并行 0.5s
+##   - 不翻转 active 标识（mode 切换时活跃套类型变了，但同类型内的 active 选择不变）
 func _mode_crossfade(target_mode: Mode) -> void:
 	if _mode_crossfade_tween != null and _mode_crossfade_tween.is_valid():
 		_mode_crossfade_tween.kill()
@@ -362,18 +402,61 @@ func _mode_crossfade(target_mode: Mode) -> void:
 	var inactive_mosaic: Control = mosaic_layers_b if _mosaic_active_is_a else mosaic_layers_a
 	var active_event: TextureRect = event_bg_a if _event_active_is_a else event_bg_b
 	var inactive_event: TextureRect = event_bg_b if _event_active_is_a else event_bg_a
+	# 非活跃套始终 α=0（不参与 tween）
+	inactive_mosaic.modulate.a = 0.0
+	inactive_event.modulate.a = 0.0
+	# 起点：当前活跃套 α=1，目标活跃套 α=0（之前的隐藏状态）
 	if target_mode == Mode.MOSAIC:
-		# Event → Mosaic：mosaic active α=1，event 全 α=0
-		active_mosaic.modulate.a = 1.0
-		inactive_mosaic.modulate.a = 0.0
-		active_event.modulate.a = 0.0
-		inactive_event.modulate.a = 0.0
-	else:
-		# Mosaic → Event：event active α=1，mosaic 全 α=0
+		# 从 plain 切到 mosaic：当前 event α=1, mosaic α=0
 		active_event.modulate.a = 1.0
-		inactive_event.modulate.a = 0.0
 		active_mosaic.modulate.a = 0.0
-		inactive_mosaic.modulate.a = 0.0
+	else:
+		# 从 mosaic 切到 plain：当前 mosaic α=1, event α=0
+		active_mosaic.modulate.a = 1.0
+		active_event.modulate.a = 0.0
+	_mode_crossfade_tween = create_tween()
+	_mode_crossfade_tween.set_parallel(true)
+	_mode_crossfade_tween.set_trans(Tween.TRANS_SINE)
+	_mode_crossfade_tween.set_ease(Tween.EASE_IN_OUT)
+	if target_mode == Mode.MOSAIC:
+		_mode_crossfade_tween.tween_property(active_event,  "modulate:a", 0.0, EVENT_CROSSFADE_SEC)
+		_mode_crossfade_tween.tween_property(active_mosaic, "modulate:a", 1.0, EVENT_CROSSFADE_SEC)
+	else:
+		_mode_crossfade_tween.tween_property(active_mosaic, "modulate:a", 0.0, EVENT_CROSSFADE_SEC)
+		_mode_crossfade_tween.tween_property(active_event,  "modulate:a", 1.0, EVENT_CROSSFADE_SEC)
+
+
+# ============================================================
+# 同图跨事件背景脉动（事件切换呼吸感 MVP 增强）
+# ============================================================
+
+## 功能：当前活跃背景层做一次 modulate 颜色变暗脉动（RGB 系数 1 → PULSE_DIM_FACTOR → 1）。
+## 说明：
+##   - 同一地点不同填充事件 art_path 相同 → set_event_background 幂等返回 → 背景静止无呼吸感
+##   - 调用此接口给当前活跃层（mosaic 套 / event 套）做一次"翻页光影"式变暗复明
+##   - 用 modulate 颜色而非 α：α 始终为 1，米色底完全被图遮住，不会闪屏
+##   - 复用 _event_crossfade_tween 字段做 kill 兜底（pulse 与 plain crossfade 排他不冲突）
+## 参数 duration：脉动总时长（默认 PULSE_DURATION = 0.6s，比 cross-fade 略长更舒缓）。
+func pulse_event_background(duration: float = PULSE_DURATION) -> void:
+	if _state != State.DONE:
+		return
+	var target: CanvasItem = null
+	if _mode == Mode.MOSAIC:
+		target = mosaic_layers_a if _mosaic_active_is_a else mosaic_layers_b
+	else:
+		target = event_bg_a if _event_active_is_a else event_bg_b
+	if target == null:
+		return
+	if _event_crossfade_tween != null and _event_crossfade_tween.is_valid():
+		_event_crossfade_tween.kill()
+	var bright: Color = Color(1.0, 1.0, 1.0, 1.0)
+	var dim: Color = Color(PULSE_DIM_FACTOR, PULSE_DIM_FACTOR, PULSE_DIM_FACTOR, 1.0)
+	target.modulate = bright
+	_event_crossfade_tween = create_tween()
+	_event_crossfade_tween.set_trans(Tween.TRANS_SINE)
+	_event_crossfade_tween.set_ease(Tween.EASE_IN_OUT)
+	_event_crossfade_tween.tween_property(target, "modulate", dim, duration * 0.5)
+	_event_crossfade_tween.tween_property(target, "modulate", bright, duration * 0.5)
 
 
 # ============================================================

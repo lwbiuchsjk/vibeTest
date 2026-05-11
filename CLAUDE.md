@@ -184,6 +184,7 @@ Design hook 中处理含中文的 junction 路径（`$ROOT` 解析到 `D:\坚果
 - [Web首屏加载性能_诊断与部署方案](Design/进度/Web首屏加载性能_诊断与部署方案.md) — MVP 落地：nginx 自签 HTTPS 70s 首屏；COS/nip.io 路径已验证排除；CDN 等深度优化待备案解锁
 - [代码重构_预启动](Design/进度/代码重构_预启动.md) — **预启动**：项目内容期收口后的代码重构总入口；含 Phase A 实施期 10 条工程洞察 + 5 项宏观观察 + demo 期临时收紧清单（心性完全隐藏 / 鉴定降配 / demo_mode_config 开关）；启动时机为 Phase B + 阶段 3 + 阶段 4 全部收口后
 - [文字马赛克全局化_预启动](Design/进度/文字马赛克全局化_预启动.md) — **预启动 / 高优先级技术债务**：mosaic 是项目美术核心视觉身份；当前 hybrid 方案（pond_* mosaic / 其他事件背景 plain PNG，2026-05-12 落地）是为内容创作主线让路的**临时妥协**；内容期收口后必启动 mosaic 渲染性能修复回到全场景 mosaic 化。索引依赖设计 [[文字马赛克_hover鱼眼_预启动]] + 症状档案 [[intro_mosaic_性能排查_2026-05-11]]。**误用警示**：hybrid 状态下不要给新事件背景挂 13 层 mosaic（会立刻 FPS 5），见进度文档 §误用警示
+- [事件切换呼吸感_落地进度](Design/进度/事件切换呼吸感_落地进度.md) — **已落地**（2026-05-12）：IntroSequence plain mode + mode 切换 tween 化 + main_game fade 调度器 + 合并 _trigger_reflection_intro_fade + 同图 pulse 串行节奏（modulate 颜色变暗不动 α）+ 3 项实施期 bug/增强；MVP 设计文档同步更新
 
 ## 已归档
 
