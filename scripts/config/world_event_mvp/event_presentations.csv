@@ -8,7 +8,8 @@ sys_reflection,sys_reflection_p1_met_he,1,text,,"""何掌柜虽然不爱说话�
 你低头。水里映着自己——指尖还残着药材的气味。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_he"""
 sys_reflection,sys_reflection_p1_met_qin,1,text,,"""她真的同意你去仙门吗？""她有些拿不准。
 你也不知道。求仙的路就在那里，大家都去得。她应该都明白的。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_qin"""
-sys_reflection,sys_reflection_p1_met_zhou,1,text,,"[待 NPC 周既明批次撰写 — 承担""沈对周的好奇/戒备/借光形态感受""被见证]",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_zhou"""
+sys_reflection,sys_reflection_p1_met_zhou,1,text,,"""周既明，好像是镇上大户人家的孩子……他会不会更有机会呀？"" 她满是担忧。
+进仙门又不是只有一个名额……但愿吧。你心里也不是很有把握。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_zhou"""
 sys_reflection,sys_reflection_p1_met_cheng,1,text,,"[待 NPC 程叔衡批次撰写 — 承担""沈对程的不确定/学识好奇/警觉""被见证]",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_cheng"""
 sys_reflection,sys_reflection_p2,2,text,,"""再去哪里看看？""她说。",text,
 sys_reflection,sys_reflection_p3,3,text,,你抬起头。镇上几个方向，都在那里。,location_select,
@@ -22,7 +23,10 @@ evt_s2_sk_qin,evt_s2_sk_qin_p1,1,text,,你进院时绕过门旁那筐刚送来�
 evt_s2_sk_qin,evt_s2_sk_qin_p2,2,text,,回来了。砚儿过来——孙伯早上送来这筐，娘正算这月走礼，你看一眼，哪些下午回回去，哪些留家里。,text,
 evt_s2_sk_qin,evt_s2_sk_qin_p3,3,text,,你坐到桌边。一筐里几样并排——半把咸鱼、一捧干笋、一包红枣、一块腌肉。桌上那张纸娘已写了大半，铜板分成三堆。,text,
 evt_s2_sk_qin,evt_s2_sk_qin_p4,4,text,,你看着筐里这几样。回礼的密度娘心里有数。分粗了亏邻里，分细了又显家中拘谨。这几样哪些匀出去合适——你掂量了一下。,text,
-evt_s2_sk_zhou,evt_s2_sk_zhou_p1,1,text,,[骨架·练场·屏1] 练场上周既明带几个少年练拳，他擦汗时瞥见你站在场边,text,
+evt_s2_sk_zhou,evt_s2_sk_zhou_p1,1,text,,你这一日在镇上跑完几桩事，回家绕了远路，去看看练场。远远听到训练的声音，靠近些，难得遇到了陆师傅亲自指点。,text,
+evt_s2_sk_zhou,evt_s2_sk_zhou_p2,2,text,,场中正是一个少年在练剑。动作流畅，每一下收得稳稳的。陆师傅站在三步外看着，偶尔开口。少年应声，剑招渐渐迷了你的眼。,text,
+evt_s2_sk_zhou,evt_s2_sk_zhou_p3,3,text,,那一遍做完，少年走到场边喝水。他穿一件淡青色的练衣，腰间一块玉佩玲珑剔透。他转头朝你这边看了一眼，停了片刻，没说什么，又走回场上。,text,
+evt_s2_sk_zhou,evt_s2_sk_zhou_p4,4,text,,你站在边上没动。方才那个少年练的那一招，动作好像也不复杂，你眼里还能看见他收手的姿势。,text,
 evt_s2_sk_cheng,evt_s2_sk_cheng_p1,1,text,,[骨架·道观·屏1] 道观侧院程叔衡盘坐石上，眼皮微抬看了你一眼，没说话,text,
 evt_s2_fl_pharmacy_1,evt_s2_fl_pharmacy_1_p1,1,text,,中午前药铺忙起来。柜台后只剩你和一个老伙计——他把一张方子塞到你手里，又转身去应付门口的客人。,text,
 evt_s2_fl_pharmacy_1,evt_s2_fl_pharmacy_1_p2,2,text,,你低头看方子上的几味药——有几个名字你认得，有几个还得想一想。柜台另一头的客人正等着。,text,
@@ -48,6 +52,18 @@ evt_s2_fl_qin_house_5,evt_s2_fl_qin_house_5_p1,1,text,,返家时，已经月上�
 evt_s2_fl_qin_house_5,evt_s2_fl_qin_house_5_p2,2,text,,内屋的门掩着，灯熄了。灶台边上几个洗了一半的盘子还摞在那。,text,
 evt_s2_fl_qin_house_6,evt_s2_fl_qin_house_6_p1,1,text,,你路过镇上的市集。娘的摊位摆在老位置——咸菜罐子叠了几摞，针线包压着摊布的一角，那只小杌子空在那里。,text,
 evt_s2_fl_qin_house_6,evt_s2_fl_qin_house_6_p2,2,text,,摊位边的小账本翻开着，铅笔搁在上头。王嫂走过来，问素娘呢——说要还上回那一吊钱。,text,
+evt_s2_fl_zhou_1,evt_s2_fl_zhou_1_p1,1,text,,娘交代了一桩事，让你顺路把一个小包送到练场。你绕过镇南那段石路走过来，门里头几个徒弟正在场上练剑。,text,
+evt_s2_fl_zhou_1,evt_s2_fl_zhou_1_p2,2,text,,你把小包递给来收的老门房，他抬手示意你放在门内长凳上。你站在长凳边没急着走——场上其中一个少年正在练那一招，每一下收得很稳，剑尖沉下去时手腕不晃。,text,
+evt_s2_fl_zhou_2,evt_s2_fl_zhou_2_p1,1,text,,你替邻里跑一桩话，从镇北那条小巷子横穿过去。巷子尽头一段路紧挨练场的围墙，墙不高，能听到里头的动静。,text,
+evt_s2_fl_zhou_2,evt_s2_fl_zhou_2_p2,2,text,,墙里头一片人在练。喊招声短促，木剑碰木剑的脆响隔一阵就来一下；偶尔有师傅的一两声短训。一阵接着一阵不歇。,text,
+evt_s2_fl_zhou_3,evt_s2_fl_zhou_3_p1,1,text,,你在镇上跑事，顺道绕进练场旁的一片空地——熟门熟路抄近道。空地上有一段石阶，石阶尽头靠墙搭了一条长凳。,text,
+evt_s2_fl_zhou_3,evt_s2_fl_zhou_3_p2,2,text,,长凳一头搁着一把木剑。剑身从上到下都是磨痕，木色被汗水浸得有些深；木柄上却包了一层细皮，针脚密得几乎看不见，是工匠做的。,text,
+evt_s2_fl_zhou_4,evt_s2_fl_zhou_4_p1,1,text,,你从镇南那条街跑完一桩话回来，路过练场。门里头格外静——平时一片喧腾的练场今天没有那些杂声，几个徒弟围着场子中央站着。你脚下慢了下来。,text,
+evt_s2_fl_zhou_4,evt_s2_fl_zhou_4_p2,2,text,,场中央是陆师傅。他一个人在演那一段招式——起手、转腕、收剑，每一下都不快但都很稳。围着的几个徒弟一动不动看着。你站在门外没进去，从街那一头远远也看见了。,text,
+evt_s2_fl_zhou_5,evt_s2_fl_zhou_5_p1,1,text,,你被娘差去练场旁的杂货摊取一样东西，摊主一时找不到货让你等等。你站在练场门外的台阶上没动，门里头那时已经有几个徒弟在场上练了。,text,
+evt_s2_fl_zhou_5,evt_s2_fl_zhou_5_p2,2,text,,几个徒弟分作两组对练。其中一组里有个少年——那身衣着你眼熟，他收手时手腕沉下去的样子也熟。一组练完，两边互相点了点头各归到旁边歇着，没多说几句话。,text,
+evt_s2_fl_zhou_6,evt_s2_fl_zhou_6_p1,1,text,,你在镇上办完事路过练场口，日头当头晒得人发昏，便在练场旁那家茶水摊坐下来喝一碗。摊棚后头几个同代的小子也凑在那里乘凉。,text,
+evt_s2_fl_zhou_6,evt_s2_fl_zhou_6_p2,2,text,,几个小子说着话，话头不知怎么就拐到了练场那边——其中一个朝练场指了指，说起周家那个少爷又在那里练剑。另一个接话说他家本来不愁衣食，父母还托人请了陆师傅，那身衣裳和挂的玉都是请人专做的。几个人凑在一起笑了两声又散开说别的去了。,text,
 evt_s2_fl_train_1,evt_s2_fl_train_1_p1,1,text,,[填充·练场·1·屏1] 远远看练场队列出操（撰写期补）,text,
 evt_s2_fl_train_2,evt_s2_fl_train_2_p1,1,text,,[填充·练场·2·屏1] 跟着晨练跑了几圈，喘得不行（撰写期补）,text,
 evt_s2_fl_train_3,evt_s2_fl_train_3_p1,1,text,,[填充·练场·3·屏1] 角落的沙袋——空击试一试（撰写期补）,text,

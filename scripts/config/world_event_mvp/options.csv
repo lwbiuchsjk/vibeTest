@@ -5,9 +5,9 @@ evt_s2_sk_he_opt_3,cp_evt_s2_sk_he,转身去做别的,3
 evt_s2_sk_qin_opt_1,cp_evt_s2_sk_qin,试着分这一筐,1
 evt_s2_sk_qin_opt_2,cp_evt_s2_sk_qin,在边上听娘安排,2
 evt_s2_sk_qin_opt_3,cp_evt_s2_sk_qin,先把这筐搬进灶屋,3
-evt_s2_sk_zhou_opt_1,cp_evt_s2_sk_zhou,[选项·搭讪] 上前请教练拳,1
-evt_s2_sk_zhou_opt_2,cp_evt_s2_sk_zhou,[选项·远观] 远远看几招,2
-evt_s2_sk_zhou_opt_3,cp_evt_s2_sk_zhou,[选项·避开] 不愿引人注意,3
+evt_s2_sk_zhou_opt_1,cp_evt_s2_sk_zhou,试着模仿一下方才那个招式,1
+evt_s2_sk_zhou_opt_2,cp_evt_s2_sk_zhou,站在边上看完那一套招式,2
+evt_s2_sk_zhou_opt_3,cp_evt_s2_sk_zhou,回家,3
 evt_s2_sk_cheng_opt_1,cp_evt_s2_sk_cheng,[选项·靠近] 上前问候,1
 evt_s2_sk_cheng_opt_2,cp_evt_s2_sk_cheng,[选项·静观] 远远看一会,2
 evt_s2_sk_cheng_opt_3,cp_evt_s2_sk_cheng,[选项·离开] 不打扰,3
@@ -47,6 +47,24 @@ evt_s2_fl_qin_house_5_opt_3,cp_evt_s2_fl_qin_house_5,不饿，先回屋睡了,3
 evt_s2_fl_qin_house_6_opt_1,cp_evt_s2_fl_qin_house_6,替娘招呼一两句，让王嫂坐一会,1
 evt_s2_fl_qin_house_6_opt_2,cp_evt_s2_fl_qin_house_6,默默看着摊位,2
 evt_s2_fl_qin_house_6_opt_3,cp_evt_s2_fl_qin_house_6,把摊位上的物件挪一挪,3
+evt_s2_fl_zhou_1_opt_1,cp_evt_s2_fl_zhou_1,多看几眼那个招式,1
+evt_s2_fl_zhou_1_opt_2,cp_evt_s2_fl_zhou_1,放下东西就走,2
+evt_s2_fl_zhou_1_opt_3,cp_evt_s2_fl_zhou_1,和老门房说两句话再走,3
+evt_s2_fl_zhou_2_opt_1,cp_evt_s2_fl_zhou_2,停下听一会,1
+evt_s2_fl_zhou_2_opt_2,cp_evt_s2_fl_zhou_2,继续走,2
+evt_s2_fl_zhou_2_opt_3,cp_evt_s2_fl_zhou_2,折回去看一眼,3
+evt_s2_fl_zhou_3_opt_1,cp_evt_s2_fl_zhou_3,拿起来看一会,1
+evt_s2_fl_zhou_3_opt_2,cp_evt_s2_fl_zhou_3,走过去看,2
+evt_s2_fl_zhou_3_opt_3,cp_evt_s2_fl_zhou_3,不去碰,3
+evt_s2_fl_zhou_4_opt_1,cp_evt_s2_fl_zhou_4,靠近些看,1
+evt_s2_fl_zhou_4_opt_2,cp_evt_s2_fl_zhou_4,站远处看完,2
+evt_s2_fl_zhou_4_opt_3,cp_evt_s2_fl_zhou_4,走开做自己的事,3
+evt_s2_fl_zhou_5_opt_1,cp_evt_s2_fl_zhou_5,站着看一会,1
+evt_s2_fl_zhou_5_opt_2,cp_evt_s2_fl_zhou_5,看一眼就走,2
+evt_s2_fl_zhou_5_opt_3,cp_evt_s2_fl_zhou_5,凑近些看,3
+evt_s2_fl_zhou_6_opt_1,cp_evt_s2_fl_zhou_6,默默听完,1
+evt_s2_fl_zhou_6_opt_2,cp_evt_s2_fl_zhou_6,跟着问一句,2
+evt_s2_fl_zhou_6_opt_3,cp_evt_s2_fl_zhou_6,走开,3
 evt_s2_fl_train_1_opt_1,cp_evt_s2_fl_train_1,[选项·走近] 凑过去看,1
 evt_s2_fl_train_1_opt_2,cp_evt_s2_fl_train_1,[选项·绕开] 装没看见,2
 evt_s2_fl_train_2_opt_1,cp_evt_s2_fl_train_2,[选项·坚持] 跑完三圈,1

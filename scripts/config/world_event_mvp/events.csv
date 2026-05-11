@@ -1,5 +1,5 @@
 event_id,title,background_art,base_weight,continuation_policy,choice_point_id,tags,task_links,is_ending_event,type
-sys_opening_reflection,[自省·首个] 池塘开场,pond_girl_enter.png,10,ReturnToScheduler,,system;reflection;opening,,FALSE,reflection
+sys_opening_reflection,[自省·首个] 池塘开场,pond_ripple_1.png,10,ReturnToScheduler,,system;reflection;opening,,FALSE,reflection
 sys_reflection,[自省·中段] 包后回望,pond_girl_enter.png,10,ReturnToScheduler,,system;reflection,,FALSE,reflection
 sys_final_reflection,[自省·最终] 结局收口,pond_girl_enter.png,10,ReturnToScheduler,,system;reflection;final,,TRUE,reflection
 evt_s2_sk_he,[骨架·药铺] 何守仁首遇,pharmacy_default_heshouren_foreground.png,10,ReturnToScheduler,cp_evt_s2_sk_he,skeleton;stage2;stage2_skeleton,advance:task_meet_he,FALSE,
@@ -18,6 +18,12 @@ evt_s2_fl_qin_house_3,[填充·家+市场·3] 门轴松了,,10,ReturnToScheduler
 evt_s2_fl_qin_house_4,[填充·家+市场·4] 床头压着的两吊铜板,,10,ReturnToScheduler,cp_evt_s2_fl_qin_house_4,filler;stage2,,FALSE,
 evt_s2_fl_qin_house_5,[填充·家+市场·5] 晚归的灶台,,10,ReturnToScheduler,cp_evt_s2_fl_qin_house_5,filler;stage2,,FALSE,
 evt_s2_fl_qin_house_6,[填充·家+市场·6] 替娘看一会摊,,10,ReturnToScheduler,cp_evt_s2_fl_qin_house_6,filler;stage2,,FALSE,
+evt_s2_fl_zhou_1,[填充·练场·1] 替人送一趟物件,,10,ReturnToScheduler,cp_evt_s2_fl_zhou_1,filler;stage2,,FALSE,
+evt_s2_fl_zhou_2,[填充·练场·2] 墙外的训练声,,10,ReturnToScheduler,cp_evt_s2_fl_zhou_2,filler;stage2,,FALSE,
+evt_s2_fl_zhou_3,[填充·练场·3] 角落里那把木剑,,10,ReturnToScheduler,cp_evt_s2_fl_zhou_3,filler;stage2,,FALSE,
+evt_s2_fl_zhou_4,[填充·练场·4] 陆师傅演那一招,,10,ReturnToScheduler,cp_evt_s2_fl_zhou_4,filler;stage2,,FALSE,
+evt_s2_fl_zhou_5,[填充·练场·5] 群训里的那少年,,10,ReturnToScheduler,cp_evt_s2_fl_zhou_5,filler;stage2,,FALSE,
+evt_s2_fl_zhou_6,[填充·练场·6] 街头几个少年的闲话,,10,ReturnToScheduler,cp_evt_s2_fl_zhou_6,filler;stage2,,FALSE,
 evt_s2_fl_train_1,[填充·练场·1] 偷看队列,,10,ReturnToScheduler,cp_evt_s2_fl_train_1,filler;stage2,,FALSE,
 evt_s2_fl_train_2,[填充·练场·2] 跑步晨练,,10,ReturnToScheduler,cp_evt_s2_fl_train_2,filler;stage2,,FALSE,
 evt_s2_fl_train_3,[填充·练场·3] 沙袋空击,,10,ReturnToScheduler,cp_evt_s2_fl_train_3,filler;stage2,,FALSE,
