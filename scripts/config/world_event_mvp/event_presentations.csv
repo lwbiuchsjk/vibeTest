@@ -2,7 +2,8 @@ event_id,presentation_id,display_order,item_type,speaker,text,presents,condition
 sys_opening_reflection,sys_opening_reflection_p1,1,text,,"""我们真的要进仙门吗？""",text,
 sys_opening_reflection,sys_opening_reflection_p2,2,text,,池塘的水面还在轻轻晃。她站在你身边，没看你，眼睛跟着涟漪动。,text,
 sys_opening_reflection,sys_opening_reflection_p3,3,text,,你没答。等你回过神时，她已经在看远处。镇子那几个方向，各自开着烟火气。,location_select,
-sys_reflection,sys_reflection_p1_fallback,1,text,,[中段自省·屏1·林叙事] 林对刚发生的骨架做承担位回应（差分逻辑待补，撰写期分 4 版按 last_consumed_skeleton_event_id）,text,
+sys_reflection,sys_reflection_p1_fallback,1,text,,"""嗯……""她说着停了下来，视线收回水面。
+你低头。水里映着自己——这一日的事还在身上。",text,
 sys_reflection,sys_reflection_p1_met_he,1,text,,"""何掌柜虽然不爱说话，但对你还挺好的。""她说着停了下来，视线收回水面。
 你低头。水里映着自己——指尖还残着药材的气味。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_he"""
 sys_reflection,sys_reflection_p1_met_qin,1,text,,"""她真的同意你去仙门吗？""她有些拿不准。
