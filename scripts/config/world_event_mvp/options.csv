@@ -8,9 +8,9 @@ evt_s2_sk_qin_opt_3,cp_evt_s2_sk_qin,先把这筐搬进灶屋,3
 evt_s2_sk_zhou_opt_1,cp_evt_s2_sk_zhou,试着模仿一下方才那个招式,1
 evt_s2_sk_zhou_opt_2,cp_evt_s2_sk_zhou,站在边上看完那一套招式,2
 evt_s2_sk_zhou_opt_3,cp_evt_s2_sk_zhou,回家,3
-evt_s2_sk_cheng_opt_1,cp_evt_s2_sk_cheng,[选项·靠近] 上前问候,1
-evt_s2_sk_cheng_opt_2,cp_evt_s2_sk_cheng,[选项·静观] 远远看一会,2
-evt_s2_sk_cheng_opt_3,cp_evt_s2_sk_cheng,[选项·离开] 不打扰,3
+evt_s2_sk_cheng_opt_1,cp_evt_s2_sk_cheng,不抬头，继续搬,1
+evt_s2_sk_cheng_opt_2,cp_evt_s2_sk_cheng,悄悄抬眼瞥一下,2
+evt_s2_sk_cheng_opt_3,cp_evt_s2_sk_cheng,停下手，搭一句,3
 evt_s2_fl_pharmacy_1_opt_1,cp_evt_s2_fl_pharmacy_1,仔细按方抓药,1
 evt_s2_fl_pharmacy_1_opt_2,cp_evt_s2_fl_pharmacy_1,叫住老伙计问几句,2
 evt_s2_fl_pharmacy_1_opt_3,cp_evt_s2_fl_pharmacy_1,大致抓一下,3
@@ -71,12 +71,24 @@ evt_s2_fl_train_2_opt_1,cp_evt_s2_fl_train_2,[选项·坚持] 跑完三圈,1
 evt_s2_fl_train_2_opt_2,cp_evt_s2_fl_train_2,[选项·偷停] 跑两圈就停,2
 evt_s2_fl_train_3_opt_1,cp_evt_s2_fl_train_3,[选项·尝试] 上手打几下,1
 evt_s2_fl_train_3_opt_2,cp_evt_s2_fl_train_3,[选项·观望] 看别人打,2
-evt_s2_fl_dao_1_opt_1,cp_evt_s2_fl_dao_1,[选项·静听] 闭目听钟,1
-evt_s2_fl_dao_1_opt_2,cp_evt_s2_fl_dao_1,[选项·路过] 听一下就走,2
-evt_s2_fl_dao_2_opt_1,cp_evt_s2_fl_dao_2,[选项·搭话] 与老者闲聊,1
-evt_s2_fl_dao_2_opt_2,cp_evt_s2_fl_dao_2,[选项·点头] 礼貌点头便走,2
-evt_s2_fl_dao_3_opt_1,cp_evt_s2_fl_dao_3,[选项·驻足] 看那架势,1
-evt_s2_fl_dao_3_opt_2,cp_evt_s2_fl_dao_3,[选项·离开] 不深究,2
+evt_s2_fl_cheng_1_opt_1,cp_evt_s2_fl_cheng_1,记在心里,1
+evt_s2_fl_cheng_1_opt_2,cp_evt_s2_fl_cheng_1,起身走开,2
+evt_s2_fl_cheng_1_opt_3,cp_evt_s2_fl_cheng_1,跟旁边的人也搭句话,3
+evt_s2_fl_cheng_2_opt_1,cp_evt_s2_fl_cheng_2,照着脚下的路继续走,1
+evt_s2_fl_cheng_2_opt_2,cp_evt_s2_fl_cheng_2,站着多看一会儿,2
+evt_s2_fl_cheng_2_opt_3,cp_evt_s2_fl_cheng_2,心里嘀咕一句"这地方倒齐整",3
+evt_s2_fl_cheng_3_opt_1,cp_evt_s2_fl_cheng_3,转身就走,1
+evt_s2_fl_cheng_3_opt_2,cp_evt_s2_fl_cheng_3,在阶下歇一会儿再走,2
+evt_s2_fl_cheng_3_opt_3,cp_evt_s2_fl_cheng_3,跟接货的人问句话,3
+evt_s2_fl_cheng_4_opt_1,cp_evt_s2_fl_cheng_4,注意听他说话,1
+evt_s2_fl_cheng_4_opt_2,cp_evt_s2_fl_cheng_4,转头看别处,2
+evt_s2_fl_cheng_4_opt_3,cp_evt_s2_fl_cheng_4,等他走后跟伙计问句话,3
+evt_s2_fl_cheng_5_opt_1,cp_evt_s2_fl_cheng_5,把这事记在心里,1
+evt_s2_fl_cheng_5_opt_2,cp_evt_s2_fl_cheng_5,随他们说去,2
+evt_s2_fl_cheng_5_opt_3,cp_evt_s2_fl_cheng_5,跟摊主问句话,3
+evt_s2_fl_cheng_6_opt_1,cp_evt_s2_fl_cheng_6,自己也喝口水继续干活,1
+evt_s2_fl_cheng_6_opt_2,cp_evt_s2_fl_cheng_6,多看了老人一眼,2
+evt_s2_fl_cheng_6_opt_3,cp_evt_s2_fl_cheng_6,跟同行的人继续闲聊,3
 evt_s3_chain_entry_opt_1,cp_evt_s3_chain_entry,[选项·继续] 跟母亲出门,1
 evt_s3_chain_2_opt_1,cp_evt_s3_chain_2,[选项·继续] 等待师傅评判,1
 evt_s3_chain_3_opt_1,cp_evt_s3_chain_3,[选项·继续] 与陆默立片刻,1

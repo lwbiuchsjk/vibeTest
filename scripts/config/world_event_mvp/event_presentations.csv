@@ -10,7 +10,8 @@ sys_reflection,sys_reflection_p1_met_qin,1,text,,"""她真的同意你去仙门�
 你也不知道。求仙的路就在那里，大家都去得。她应该都明白的。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_qin"""
 sys_reflection,sys_reflection_p1_met_zhou,1,text,,"""周既明，好像是镇上大户人家的孩子……他会不会更有机会呀？"" 她满是担忧。
 进仙门又不是只有一个名额……但愿吧。你心里也不是很有把握。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_zhou"""
-sys_reflection,sys_reflection_p1_met_cheng,1,text,,"[待 NPC 程叔衡批次撰写 — 承担""沈对程的不确定/学识好奇/警觉""被见证]",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_cheng"""
+sys_reflection,sys_reflection_p1_met_cheng,1,text,,"""他说你看着有灵性。他不会只是说说而已吧？"" 她不是很有信心，没敢看你认真的眼神。
+程先生一定是认真的。你心里热乎乎的感觉，不是骗人的。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_cheng"""
 sys_reflection,sys_reflection_p2,2,text,,"""再去哪里看看？""她说。",text,
 sys_reflection,sys_reflection_p3,3,text,,你抬起头。镇上几个方向，都在那里。,location_select,
 sys_final_reflection,sys_final_reflection_p1,1,text,,[最终自省·屏1·林叙事] 拜师后的收口——林叙述新阶段的开始（撰写期补）,text,
@@ -27,7 +28,10 @@ evt_s2_sk_zhou,evt_s2_sk_zhou_p1,1,text,,你这一日在镇上跑完几桩事，
 evt_s2_sk_zhou,evt_s2_sk_zhou_p2,2,text,,场中正是一个少年在练剑。动作流畅，每一下收得稳稳的。陆师傅站在三步外看着，偶尔开口。少年应声，剑招渐渐迷了你的眼。,text,
 evt_s2_sk_zhou,evt_s2_sk_zhou_p3,3,text,,那一遍做完，少年走到场边喝水。他穿一件淡青色的练衣，腰间一块玉佩玲珑剔透。他转头朝你这边看了一眼，停了片刻，没说什么，又走回场上。,text,
 evt_s2_sk_zhou,evt_s2_sk_zhou_p4,4,text,,你站在边上没动。方才那个少年练的那一招，动作好像也不复杂，你眼里还能看见他收手的姿势。,text,
-evt_s2_sk_cheng,evt_s2_sk_cheng_p1,1,text,,[骨架·道观·屏1] 道观侧院程叔衡盘坐石上，眼皮微抬看了你一眼，没说话,text,
+evt_s2_sk_cheng,evt_s2_sk_cheng_p1,1,text,,你这一日在镇上跑完几桩事，听人说道观招短工，半天活工钱当面付。停了一下，应下，往镇外走。,text,
+evt_s2_sk_cheng,evt_s2_sk_cheng_p2,2,text,,你跨进道观门。砖瓦讲究得不像本地的，香气重而不杂，角落里的东西也摆得齐整。\n一个弟子过来分活，让你搬几个书箱到东厢。,text,
+evt_s2_sk_cheng,evt_s2_sk_cheng_p3,3,text,,"你搬到第三趟时，一位中年男子从院里出来。素色长衫，神色温和——正是镇上人说的""程先生""。\n他走到你身边的书箱前停下，对弟子说：""这几本，应当不必再翻了吧。""\n""还有用处。""\n""那便随他。""",text,
+evt_s2_sk_cheng,evt_s2_sk_cheng_p4,4,text,,你站在那里没动，手里的书箱还提着。程在你身旁没走开，像是在看那几本旧册子。,text,
 evt_s2_fl_pharmacy_1,evt_s2_fl_pharmacy_1_p1,1,text,,中午前药铺忙起来。柜台后只剩你和一个老伙计——他把一张方子塞到你手里，又转身去应付门口的客人。,text,
 evt_s2_fl_pharmacy_1,evt_s2_fl_pharmacy_1_p2,2,text,,你低头看方子上的几味药——有几个名字你认得，有几个还得想一想。柜台另一头的客人正等着。,text,
 evt_s2_fl_pharmacy_2,evt_s2_fl_pharmacy_2_p1,1,text,,雨从半上午落到这会儿，门帘垂着没怎么动。老伙计在角落里坐着，背靠木柜，下巴抵在胸口。,text,
@@ -67,9 +71,19 @@ evt_s2_fl_zhou_6,evt_s2_fl_zhou_6_p2,2,text,,几个小子说着话，话头不�
 evt_s2_fl_train_1,evt_s2_fl_train_1_p1,1,text,,[填充·练场·1·屏1] 远远看练场队列出操（撰写期补）,text,
 evt_s2_fl_train_2,evt_s2_fl_train_2_p1,1,text,,[填充·练场·2·屏1] 跟着晨练跑了几圈，喘得不行（撰写期补）,text,
 evt_s2_fl_train_3,evt_s2_fl_train_3_p1,1,text,,[填充·练场·3·屏1] 角落的沙袋——空击试一试（撰写期补）,text,
-evt_s2_fl_dao_1,evt_s2_fl_dao_1_p1,1,text,,[填充·道观·1·屏1] 殿前听老钟回响（撰写期补）,text,
-evt_s2_fl_dao_2,evt_s2_fl_dao_2_p1,1,text,,[填充·道观·2·屏1] 扫地时遇见一位老者搭话（撰写期补）,text,
-evt_s2_fl_dao_3,evt_s2_fl_dao_3_p1,1,text,,[填充·道观·3·屏1] 殿内观人练拳——架势奇特（撰写期补）,text,
+evt_s2_fl_cheng_1,evt_s2_fl_cheng_1_p1,1,text,,你给道观应下一桩半日的活，出门走得早，先在街口树荫底下的石条上坐了一会儿。日头正烈，街上人不多，过路的脚步声听得清。,text,
+evt_s2_fl_cheng_1,evt_s2_fl_cheng_1_p2,2,text,,两个穿青布短褂的从你前头走过，一个说程先生是个好人，那道观这两年讲究得很。另一个嗯了一声，说也是镇上有福气。脚步声远了。,text,
+evt_s2_fl_cheng_2,evt_s2_fl_cheng_2_p1,1,text,,今日替娘亲送一份东西给镇外的人家，顺着那条石板小道往北走，不知不觉就要走到道观。天色还早，路上没几个人。,text,
+evt_s2_fl_cheng_2,evt_s2_fl_cheng_2_p2,2,text,,走到拐角时，你看见远处那座道观的飞檐露在树梢上头。风吹过来，带着一阵不淡不浓的香气，钟声也跟着飘过来一声。,text,
+evt_s2_fl_cheng_3,evt_s2_fl_cheng_3_p1,1,text,,镇上一家香铺的掌秤的让你帮忙搬一趟货到道观去，工钱当场给。你应了，跟着到铺子后头点了点东西。,text,
+evt_s2_fl_cheng_3,evt_s2_fl_cheng_3_p2,2,text,,是一筐香料，分了两包，沉甸甸的。你扛上肩，往镇外那条路走。日头偏西，路上没几个人。,text,
+evt_s2_fl_cheng_3,evt_s2_fl_cheng_3_p3,3,text,,走到道观门外，你把两包香料卸在门口的石阶上。门里出来一个穿短褂的，看了一眼便点头让你放下，又抬手指了指里头不必你进去。你站在阶下，伸手抹了把额头的汗。,text,
+evt_s2_fl_cheng_4,evt_s2_fl_cheng_4_p1,1,text,,你今日要往道观去应一桩差事。半途中拐进一家铺子，顺道取一份东西。铺主说去后头拿，让你略候一候。你站在柜外的板凳边，等他取来。,text,
+evt_s2_fl_cheng_4,evt_s2_fl_cheng_4_p2,2,text,,"这时门外进来一个穿青色短褂的，约二十岁年纪，是道观那边的弟子。他跟柜上的人说要取上次预定的一份东西。柜上的人忙称是，让他略候。他点了点头，没接柜上的人客套话，只说了一句""也罢""，往里头走了两步又停下，立在原处不动。",text,
+evt_s2_fl_cheng_5,evt_s2_fl_cheng_5_p1,1,text,,道观那边总会派一些杂事。有机会补贴家用，让你心中欢喜。事毕，返程路上，你进了一家茶水摊歇脚。三五张矮桌坐着歇脚的人，茶水滚得正烈。摊主给你倒了一碗，让你自己挑张桌。,text,
+evt_s2_fl_cheng_5,evt_s2_fl_cheng_5_p2,2,text,,你挑了门口的一张矮桌坐下。后头一桌的两个老者正在闲谈，前面那位说起前两年镇北边谁家的孩子，在程先生那边学了一阵，后来仙门选拔考过去了，如今已经在山上学艺。另一位嗯了一声，说镇上是有福气的地方。两人又说回别的事去。,text,
+evt_s2_fl_cheng_6,evt_s2_fl_cheng_6_p1,1,text,,道观的伙计总是做不完，今日正巧有人同去。走了半路，口干舌燥，经过井边，停下喝口水。井边一个老人正蹲着洗几个瓜，旁边水盆放了一只木瓢。,text,
+evt_s2_fl_cheng_6,evt_s2_fl_cheng_6_p2,2,text,,同行的人喝水时随口提起道观，说今年的香比往年好闻，程先生那边一向讲究。老人嗯了一声，没接话，把瓜在水盆里翻了个面。同行人见老人面色不知可否，询问起来，老人只是打个哈哈。,text,
 evt_s3_chain_entry,evt_s3_chain_entry_p1,1,text,,[拜师·屏1·母亲准备] 母亲早早起身为你打理出门——这是拜师的日子（撰写期补）,text,
 evt_s3_chain_2,evt_s3_chain_2_p1,1,text,,[拜师·屏2·集体面试] 几位少年候在堂前，师傅一个个看过去（撰写期补）,text,
 evt_s3_chain_3,evt_s3_chain_3_p1,1,text,,[拜师·屏3·私密愣住·陆首登] 师傅独留你一会——而陆承岳在角落沉默看你（陆首登承担位）,text,

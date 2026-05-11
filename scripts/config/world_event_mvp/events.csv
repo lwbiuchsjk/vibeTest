@@ -1,11 +1,17 @@
 event_id,title,background_art,base_weight,continuation_policy,choice_point_id,tags,task_links,is_ending_event,type
-sys_opening_reflection,[自省·首个] 池塘开场,pond_ripple_1.png,10,ReturnToScheduler,,system;reflection;opening,,FALSE,reflection
+sys_opening_reflection,[自省·首个] 池塘开场,pond_girl_enter.png,10,ReturnToScheduler,,system;reflection;opening,,FALSE,reflection
 sys_reflection,[自省·中段] 包后回望,pond_girl_enter.png,10,ReturnToScheduler,,system;reflection,,FALSE,reflection
 sys_final_reflection,[自省·最终] 结局收口,pond_girl_enter.png,10,ReturnToScheduler,,system;reflection;final,,TRUE,reflection
 evt_s2_sk_he,[骨架·药铺] 何守仁首遇,pharmacy_default_heshouren_foreground.png,10,ReturnToScheduler,cp_evt_s2_sk_he,skeleton;stage2;stage2_skeleton,advance:task_meet_he,FALSE,
-evt_s2_sk_qin,[骨架·家+市场] 秦素娘首遇,,10,ReturnToScheduler,cp_evt_s2_sk_qin,skeleton;stage2;stage2_skeleton,advance:task_meet_qin,FALSE,
+evt_s2_sk_qin,[骨架·家+市场] 秦素娘首遇,qin_house_qinsuniang_foreground.png,10,ReturnToScheduler,cp_evt_s2_sk_qin,skeleton;stage2;stage2_skeleton,advance:task_meet_qin,FALSE,
 evt_s2_sk_zhou,[骨架·练场] 周既明首遇,,10,ReturnToScheduler,cp_evt_s2_sk_zhou,skeleton;stage2;stage2_skeleton,advance:task_meet_zhou,FALSE,
 evt_s2_sk_cheng,[骨架·道观] 程叔衡首遇,,10,ReturnToScheduler,cp_evt_s2_sk_cheng,skeleton;stage2;stage2_skeleton,advance:task_meet_cheng,FALSE,
+evt_s2_fl_cheng_1,[填充·道观·1] 路过两人议论程先生,,10,ReturnToScheduler,cp_evt_s2_fl_cheng_1,filler;stage2,,FALSE,
+evt_s2_fl_cheng_2,[填充·道观·2] 远远看见道观,,10,ReturnToScheduler,cp_evt_s2_fl_cheng_2,filler;stage2,,FALSE,
+evt_s2_fl_cheng_3,[填充·道观·3] 替镇上店家送一趟货到道观门口,,10,ReturnToScheduler,cp_evt_s2_fl_cheng_3,filler;stage2,,FALSE,
+evt_s2_fl_cheng_4,[填充·道观·4] 去道观途中铺子里撞见弟子来办事,,10,ReturnToScheduler,cp_evt_s2_fl_cheng_4,filler;stage2,,FALSE,
+evt_s2_fl_cheng_5,[填充·道观·5] 茶水摊听人说起通过选拔的事,,10,ReturnToScheduler,cp_evt_s2_fl_cheng_5,filler;stage2,,FALSE,
+evt_s2_fl_cheng_6,[填充·道观·6] 井边的老人对道观漫不经心,,10,ReturnToScheduler,cp_evt_s2_fl_cheng_6,filler;stage2,,FALSE,
 evt_s2_fl_pharmacy_1,[填充·药铺·1] 抓药练习,,10,ReturnToScheduler,cp_evt_s2_fl_pharmacy_1,filler;stage2,,FALSE,
 evt_s2_fl_pharmacy_2,[填充·药铺·2] 雨天磨药,,10,ReturnToScheduler,cp_evt_s2_fl_pharmacy_2,filler;stage2,,FALSE,
 evt_s2_fl_pharmacy_3,[填充·药铺·3] 柜上待客,,10,ReturnToScheduler,cp_evt_s2_fl_pharmacy_3,filler;stage2,,FALSE,
@@ -27,9 +33,7 @@ evt_s2_fl_zhou_6,[填充·练场·6] 街头几个少年的闲话,,10,ReturnToSch
 evt_s2_fl_train_1,[填充·练场·1] 偷看队列,,10,ReturnToScheduler,cp_evt_s2_fl_train_1,filler;stage2,,FALSE,
 evt_s2_fl_train_2,[填充·练场·2] 跑步晨练,,10,ReturnToScheduler,cp_evt_s2_fl_train_2,filler;stage2,,FALSE,
 evt_s2_fl_train_3,[填充·练场·3] 沙袋空击,,10,ReturnToScheduler,cp_evt_s2_fl_train_3,filler;stage2,,FALSE,
-evt_s2_fl_dao_1,[填充·道观·1] 观前听钟,,10,ReturnToScheduler,cp_evt_s2_fl_dao_1,filler;stage2,,FALSE,
-evt_s2_fl_dao_2,[填充·道观·2] 扫地遇老者,,10,ReturnToScheduler,cp_evt_s2_fl_dao_2,filler;stage2,,FALSE,
-evt_s2_fl_dao_3,[填充·道观·3] 殿内观人练拳,,10,ReturnToScheduler,cp_evt_s2_fl_dao_3,filler;stage2,,FALSE,
+
 evt_s3_chain_entry,[拜师·屏1] 母亲准备,pond_still.png,10,ChainContinue,cp_evt_s3_chain_entry,chain;shi,,FALSE,
 evt_s3_chain_2,[拜师·屏2] 集体面试,pond_ripple_1.png,10,ChainContinue,cp_evt_s3_chain_2,chain;shi,,FALSE,
 evt_s3_chain_3,[拜师·屏3] 私密愣住·陆首登,pond_ripple_2.png,10,ChainContinue,cp_evt_s3_chain_3,chain;shi,,FALSE,
