@@ -4,7 +4,7 @@ sys_reflection,[自省·中段] 包后回望,pond_girl_enter.png,10,ReturnToSche
 sys_final_reflection,[自省·最终] 结局收口,pond_girl_enter.png,10,ReturnToScheduler,,system;reflection;final,,TRUE,reflection
 evt_s2_sk_he,[骨架·药铺] 何守仁首遇,pharmacy_default_heshouren_foreground.png,10,ReturnToScheduler,cp_evt_s2_sk_he,skeleton;stage2;stage2_skeleton,advance:task_meet_he,FALSE,
 evt_s2_sk_qin,[骨架·家+市场] 秦素娘首遇,qin_house_qinsuniang_foreground.png,10,ReturnToScheduler,cp_evt_s2_sk_qin,skeleton;stage2;stage2_skeleton,advance:task_meet_qin,FALSE,
-evt_s2_sk_zhou,[骨架·练场] 周既明首遇,,10,ReturnToScheduler,cp_evt_s2_sk_zhou,skeleton;stage2;stage2_skeleton,advance:task_meet_zhou,FALSE,
+evt_s2_sk_zhou,[骨架·练场] 周既明首遇,training_ground_zhoujiming_foreground.png,10,ReturnToScheduler,cp_evt_s2_sk_zhou,skeleton;stage2;stage2_skeleton,advance:task_meet_zhou,FALSE,
 evt_s2_sk_cheng,[骨架·道观] 程叔衡首遇,dao_temple_chengshuheng_foreground.png,10,ReturnToScheduler,cp_evt_s2_sk_cheng,skeleton;stage2;stage2_skeleton,advance:task_meet_cheng,FALSE,
 evt_s2_fl_cheng_1,[填充·道观·1] 路过两人议论程先生,,10,ReturnToScheduler,cp_evt_s2_fl_cheng_1,filler;stage2,,FALSE,
 evt_s2_fl_cheng_2,[填充·道观·2] 远远看见道观,,10,ReturnToScheduler,cp_evt_s2_fl_cheng_2,filler;stage2,,FALSE,
