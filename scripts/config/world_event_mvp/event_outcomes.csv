@@ -1,6 +1,7 @@
 event_id,branch,target,op,key,value
 evt_s2_sk_he,default,flags,set,met_he,true
 evt_s2_sk_qin,default,flags,set,met_qin,true
+evt_s2_fl_qin_house_6,default,flags,set,qin_market_baseline,true
 evt_s2_sk_zhou,default,flags,set,met_zhou,true
 evt_s2_sk_cheng,default,flags,set,met_cheng,true
 evt_s3_chain_entry,default,chain_context,patch,chainId,chain_shi

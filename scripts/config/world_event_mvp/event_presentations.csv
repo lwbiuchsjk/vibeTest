@@ -1,40 +1,59 @@
-event_id,presentation_id,display_order,item_type,speaker,text,presents
-sys_opening_reflection,sys_opening_reflection_p1,1,text,,"""我们真的要进仙门吗？""",text
-sys_opening_reflection,sys_opening_reflection_p2,2,text,,池塘的水面还在轻轻晃。她站在你身边，没看你，眼睛跟着涟漪动。,text
-sys_opening_reflection,sys_opening_reflection_p3,3,text,,你没答。等你回过神时，她已经在看远处。镇子那几个方向，各自开着烟火气。,location_select
-sys_reflection,sys_reflection_p1,1,text,,[中段自省·屏1·林叙事] 林对刚发生的骨架做承担位回应（差分逻辑待补，撰写期分 4 版按 last_consumed_skeleton_event_id）,text
-sys_reflection,sys_reflection_p2,2,text,,[中段自省·屏2·末段+地点选择] 林叙事末段，引导你再选一处（撰写期补）,location_select
-sys_final_reflection,sys_final_reflection_p1,1,text,,[最终自省·屏1·林叙事] 拜师后的收口——林叙述新阶段的开始（撰写期补）,text
-sys_final_reflection,sys_final_reflection_p2,2,text,,[最终自省·屏2·林叙事] 收口末段——demo 流程结束提示（撰写期补）,text
-evt_s2_sk_he,evt_s2_sk_he_p1,1,text,,你来药铺已经几日，跟着别的伙计跑腿。今早进门，旁边那个老伙计把你拉到一边。,text
-evt_s2_sk_he,evt_s2_sk_he_p2,2,text,,"""何掌柜回来了。今儿你算正式上工——你过去见见他。""",text
-evt_s2_sk_he,evt_s2_sk_he_p3,3,text,,你掀开门帘进店。柜台后那人正低头看一味药材，慢慢翻动。听到你进来，他抬眼看你一下，又低下头继续看，没出声。,text
-evt_s2_sk_he,evt_s2_sk_he_p4,4,text,,你认得那株药材的样子，但说不上来名字。柜后人慢慢摆弄药材的样子，让你想起几样自己一直没记牢的事。,text
-evt_s2_sk_qin,evt_s2_sk_qin_p1,1,text,,[骨架·家+市场·屏1] 母亲秦素娘在灶前忙碌，回头看见你，眼神里有交代有期许,text
-evt_s2_sk_zhou,evt_s2_sk_zhou_p1,1,text,,[骨架·练场·屏1] 练场上周既明带几个少年练拳，他擦汗时瞥见你站在场边,text
-evt_s2_sk_cheng,evt_s2_sk_cheng_p1,1,text,,[骨架·道观·屏1] 道观侧院程叔衡盘坐石上，眼皮微抬看了你一眼，没说话,text
-evt_s2_fl_pharmacy_1,evt_s2_fl_pharmacy_1_p1,1,text,,中午前药铺忙起来。柜台后只剩你和一个老伙计——他把一张方子塞到你手里，又转身去应付门口的客人。,text
-evt_s2_fl_pharmacy_1,evt_s2_fl_pharmacy_1_p2,2,text,,你低头看方子上的几味药——有几个名字你认得，有几个还得想一想。柜台另一头的客人正等着。,text
-evt_s2_fl_pharmacy_2,evt_s2_fl_pharmacy_2_p1,1,text,,雨从半上午落到这会儿，门帘垂着没怎么动。老伙计在角落里坐着，背靠木柜，下巴抵在胸口。,text
-evt_s2_fl_pharmacy_2,evt_s2_fl_pharmacy_2_p2,2,text,,你面前的药臼里还剩半臼没磨。手边的活就这一样，雨声从门缝里渗进来，绵绵的，没头没尾。,text
-evt_s2_fl_pharmacy_3,evt_s2_fl_pharmacy_3_p1,1,text,,上午没几个人。老伙计在里间挪药斗，柜台边只剩你一个。门帘一掀，进来个人，没看旁的，直冲你这头。,text
-evt_s2_fl_pharmacy_3,evt_s2_fl_pharmacy_3_p2,2,text,,客人按着柜台说，家里老人咳了几日，夜里更厉害，让你拿点药。你应了一声，眼睛在身后那排药斗上扫了一遍。,text
-evt_s2_fl_pharmacy_4,evt_s2_fl_pharmacy_4_p1,1,text,,午后铺子清静。你蹲在货架后头码药材，从两个罐子之间的缝里掏出一样东西——薄薄一本书。,text
-evt_s2_fl_pharmacy_4,evt_s2_fl_pharmacy_4_p2,2,text,,你掀开看了几行。字都认得，连起来却像隔着一层。你愣了一下，握着书没动。,text
-evt_s2_fl_pharmacy_5,evt_s2_fl_pharmacy_5_p1,1,text,,铺门刚卸下板，几只木箱已经堆在门槛边——油纸捆得鼓鼓囊囊，有几包还沾着外头的湿气。老伙计夹着账册过来，一包一包翻开比对。,text
-evt_s2_fl_pharmacy_5,evt_s2_fl_pharmacy_5_p2,2,text,,轮到你这边时，账册往下翻了一页。你一包一包拎起来——有几个名目盖在油纸上，你看了两眼也没对上是哪一味。,text
-evt_s2_fl_pharmacy_6,evt_s2_fl_pharmacy_6_p1,1,text,,暮色从门外漫进来，柜台上的影子拉得老长。老伙计在那头一格一格地推药斗，木轴转动的声音咔哒咔哒。,text
-evt_s2_fl_pharmacy_6,evt_s2_fl_pharmacy_6_p2,2,text,,头顶的灯被点上，光晕落在你手边那几样还没归置的零碎上。门外的天暗下去了，再做一会儿也行，搁下走也行。,text
-evt_s2_fl_qin_1,evt_s2_fl_qin_1_p1,1,text,,[填充·家+市场·1·屏1] 母亲灶前忙活，让你帮把手（撰写期补）,text
-evt_s2_fl_qin_2,evt_s2_fl_qin_2_p1,1,text,,[填充·家+市场·2·屏1] 集市买菜——讨价还价或被坑（撰写期补）,text
-evt_s2_fl_qin_3,evt_s2_fl_qin_3_p1,1,text,,[填充·家+市场·3·屏1] 母亲晚饭桌上叮嘱你做人本分（撰写期补）,text
-evt_s2_fl_train_1,evt_s2_fl_train_1_p1,1,text,,[填充·练场·1·屏1] 远远看练场队列出操（撰写期补）,text
-evt_s2_fl_train_2,evt_s2_fl_train_2_p1,1,text,,[填充·练场·2·屏1] 跟着晨练跑了几圈，喘得不行（撰写期补）,text
-evt_s2_fl_train_3,evt_s2_fl_train_3_p1,1,text,,[填充·练场·3·屏1] 角落的沙袋——空击试一试（撰写期补）,text
-evt_s2_fl_dao_1,evt_s2_fl_dao_1_p1,1,text,,[填充·道观·1·屏1] 殿前听老钟回响（撰写期补）,text
-evt_s2_fl_dao_2,evt_s2_fl_dao_2_p1,1,text,,[填充·道观·2·屏1] 扫地时遇见一位老者搭话（撰写期补）,text
-evt_s2_fl_dao_3,evt_s2_fl_dao_3_p1,1,text,,[填充·道观·3·屏1] 殿内观人练拳——架势奇特（撰写期补）,text
-evt_s3_chain_entry,evt_s3_chain_entry_p1,1,text,,[拜师·屏1·母亲准备] 母亲早早起身为你打理出门——这是拜师的日子（撰写期补）,text
-evt_s3_chain_2,evt_s3_chain_2_p1,1,text,,[拜师·屏2·集体面试] 几位少年候在堂前，师傅一个个看过去（撰写期补）,text
-evt_s3_chain_3,evt_s3_chain_3_p1,1,text,,[拜师·屏3·私密愣住·陆首登] 师傅独留你一会——而陆承岳在角落沉默看你（陆首登承担位）,text
-evt_s3_chain_4,evt_s3_chain_4_p1,1,text,,[拜师·屏4·第一次训练] 拜师次日，第一次列队训练（撰写期补）,text
+event_id,presentation_id,display_order,item_type,speaker,text,presents,condition
+sys_opening_reflection,sys_opening_reflection_p1,1,text,,"""我们真的要进仙门吗？""",text,
+sys_opening_reflection,sys_opening_reflection_p2,2,text,,池塘的水面还在轻轻晃。她站在你身边，没看你，眼睛跟着涟漪动。,text,
+sys_opening_reflection,sys_opening_reflection_p3,3,text,,你没答。等你回过神时，她已经在看远处。镇子那几个方向，各自开着烟火气。,location_select,
+sys_reflection,sys_reflection_p1_fallback,1,text,,[中段自省·屏1·林叙事] 林对刚发生的骨架做承担位回应（差分逻辑待补，撰写期分 4 版按 last_consumed_skeleton_event_id）,text,
+sys_reflection,sys_reflection_p1_met_he,1,text,,"""何掌柜虽然不爱说话，但对你还挺好的。""她说着停了下来，视线收回水面。
+你低头。水里映着自己——指尖还残着药材的气味。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_he"""
+sys_reflection,sys_reflection_p1_met_qin,1,text,,"""她真的同意你去仙门吗？""她有些拿不准。
+你也不知道。求仙的路就在那里，大家都去得。她应该都明白的。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_qin"""
+sys_reflection,sys_reflection_p1_met_zhou,1,text,,"[待 NPC 周既明批次撰写 — 承担""沈对周的好奇/戒备/借光形态感受""被见证]",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_zhou"""
+sys_reflection,sys_reflection_p1_met_cheng,1,text,,"[待 NPC 程叔衡批次撰写 — 承担""沈对程的不确定/学识好奇/警觉""被见证]",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_cheng"""
+sys_reflection,sys_reflection_p2,2,text,,"""再去哪里看看？""她说。",text,
+sys_reflection,sys_reflection_p3,3,text,,你抬起头。镇上几个方向，都在那里。,location_select,
+sys_final_reflection,sys_final_reflection_p1,1,text,,[最终自省·屏1·林叙事] 拜师后的收口——林叙述新阶段的开始（撰写期补）,text,
+sys_final_reflection,sys_final_reflection_p2,2,text,,[最终自省·屏2·林叙事] 收口末段——demo 流程结束提示（撰写期补）,text,
+evt_s2_sk_he,evt_s2_sk_he_p1,1,text,,你来药铺已经几日，跟着别的伙计跑腿。今早进门，旁边那个老伙计把你拉到一边。,text,
+evt_s2_sk_he,evt_s2_sk_he_p2,2,text,,"""何掌柜回来了。今儿你算正式上工——你过去见见他。""",text,
+evt_s2_sk_he,evt_s2_sk_he_p3,3,text,,你掀开门帘进店。柜台后那人正低头看一味药材，慢慢翻动。听到你进来，他抬眼看你一下，又低下头继续看，没出声。,text,
+evt_s2_sk_he,evt_s2_sk_he_p4,4,text,,你认得那株药材的样子，但说不上来名字。柜后人慢慢摆弄药材的样子，让你想起几样自己一直没记牢的事。,text,
+evt_s2_sk_qin,evt_s2_sk_qin_p1,1,text,,你进院时绕过门旁那筐刚送来的东西。堂屋桌上一张写满字的纸，旁边铜板分成几小堆，娘坐在桌前。,text,
+evt_s2_sk_qin,evt_s2_sk_qin_p2,2,text,,回来了。砚儿过来——孙伯早上送来这筐，娘正算这月走礼，你看一眼，哪些下午回回去，哪些留家里。,text,
+evt_s2_sk_qin,evt_s2_sk_qin_p3,3,text,,你坐到桌边。一筐里几样并排——半把咸鱼、一捧干笋、一包红枣、一块腌肉。桌上那张纸娘已写了大半，铜板分成三堆。,text,
+evt_s2_sk_qin,evt_s2_sk_qin_p4,4,text,,你看着筐里这几样。回礼的密度娘心里有数。分粗了亏邻里，分细了又显家中拘谨。这几样哪些匀出去合适——你掂量了一下。,text,
+evt_s2_sk_zhou,evt_s2_sk_zhou_p1,1,text,,[骨架·练场·屏1] 练场上周既明带几个少年练拳，他擦汗时瞥见你站在场边,text,
+evt_s2_sk_cheng,evt_s2_sk_cheng_p1,1,text,,[骨架·道观·屏1] 道观侧院程叔衡盘坐石上，眼皮微抬看了你一眼，没说话,text,
+evt_s2_fl_pharmacy_1,evt_s2_fl_pharmacy_1_p1,1,text,,中午前药铺忙起来。柜台后只剩你和一个老伙计——他把一张方子塞到你手里，又转身去应付门口的客人。,text,
+evt_s2_fl_pharmacy_1,evt_s2_fl_pharmacy_1_p2,2,text,,你低头看方子上的几味药——有几个名字你认得，有几个还得想一想。柜台另一头的客人正等着。,text,
+evt_s2_fl_pharmacy_2,evt_s2_fl_pharmacy_2_p1,1,text,,雨从半上午落到这会儿，门帘垂着没怎么动。老伙计在角落里坐着，背靠木柜，下巴抵在胸口。,text,
+evt_s2_fl_pharmacy_2,evt_s2_fl_pharmacy_2_p2,2,text,,你面前的药臼里还剩半臼没磨。手边的活就这一样，雨声从门缝里渗进来，绵绵的，没头没尾。,text,
+evt_s2_fl_pharmacy_3,evt_s2_fl_pharmacy_3_p1,1,text,,上午没几个人。老伙计在里间挪药斗，柜台边只剩你一个。门帘一掀，进来个人，没看旁的，直冲你这头。,text,
+evt_s2_fl_pharmacy_3,evt_s2_fl_pharmacy_3_p2,2,text,,客人按着柜台说，家里老人咳了几日，夜里更厉害，让你拿点药。你应了一声，眼睛在身后那排药斗上扫了一遍。,text,
+evt_s2_fl_pharmacy_4,evt_s2_fl_pharmacy_4_p1,1,text,,午后铺子清静。你蹲在货架后头码药材，从两个罐子之间的缝里掏出一样东西——薄薄一本书。,text,
+evt_s2_fl_pharmacy_4,evt_s2_fl_pharmacy_4_p2,2,text,,你掀开看了几行。字都认得，连起来却像隔着一层。你愣了一下，握着书没动。,text,
+evt_s2_fl_pharmacy_5,evt_s2_fl_pharmacy_5_p1,1,text,,铺门刚卸下板，几只木箱已经堆在门槛边——油纸捆得鼓鼓囊囊，有几包还沾着外头的湿气。老伙计夹着账册过来，一包一包翻开比对。,text,
+evt_s2_fl_pharmacy_5,evt_s2_fl_pharmacy_5_p2,2,text,,轮到你这边时，账册往下翻了一页。你一包一包拎起来——有几个名目盖在油纸上，你看了两眼也没对上是哪一味。,text,
+evt_s2_fl_pharmacy_6,evt_s2_fl_pharmacy_6_p1,1,text,,暮色从门外漫进来，柜台上的影子拉得老长。老伙计在那头一格一格地推药斗，木轴转动的声音咔哒咔哒。,text,
+evt_s2_fl_pharmacy_6,evt_s2_fl_pharmacy_6_p2,2,text,,头顶的灯被点上，光晕落在你手边那几样还没归置的零碎上。门外的天暗下去了，再做一会儿也行，搁下走也行。,text,
+evt_s2_fl_qin_house_1,evt_s2_fl_qin_house_1_p1,1,text,,娘交代了些事情，你从家中匆匆出门，来到镇外小桥，路过桥头。一个肩挑担子的过路客正坐在桥栏边歇脚，担子上的茶具碰得叮当响。,text,
+evt_s2_fl_qin_house_1,evt_s2_fl_qin_house_1_p2,2,text,,客人见你过来，认出你是素娘家的——他放下担子从里头翻出几吊钱递给你；说前年大风天在这镇上歇过一晚，娘煮了一锅热粥给他喝，那份心意他记到现在。,text,
+evt_s2_fl_qin_house_2,evt_s2_fl_qin_house_2_p1,1,text,,来镇上看看铺子，顺道去镇东那条窄街的茶水摊歇歇脚。两个老主顾正坐在摊外的木条凳上闲聊——一个是镇南卖布的，一个是修补摊的。,text,
+evt_s2_fl_qin_house_2,evt_s2_fl_qin_house_2_p2,2,text,,卖布的抿了一口，跟修补摊的提起前年雨季——那阵子镇上水大，素娘把家里几个粮袋借出去给他堵水口，救下他家半亩菜。修补摊的应一声，说素娘这家做事不留半点人情账。,text,
+evt_s2_fl_qin_house_3,evt_s2_fl_qin_house_3_p1,1,text,,从外面回来，推开院门，门轴咯吱一声响。门轴底下那枚木楔松了，门板斜斜挂着。屋里没人，堂屋的窗开着，针线笸箩搁在窗下椅上。,text,
+evt_s2_fl_qin_house_3,evt_s2_fl_qin_house_3_p2,2,text,,堂屋桌上几只杯盏才擦完，院里晾着一筐刚摘的菜。门要修一修才好关上。,text,
+evt_s2_fl_qin_house_4,evt_s2_fl_qin_house_4_p1,1,text,,在外奔波许久，终于回屋。床头那角压着一张小纸条，纸下几枚铜板叠成一小摞——两吊钱。床上叠好的衣物搁在边上。,text,
+evt_s2_fl_qin_house_4,evt_s2_fl_qin_house_4_p2,2,text,,"字条上几个字——""再给你两吊买点用得上的""。屋里没有别的声响，娘出去办事去了。",text,
+evt_s2_fl_qin_house_5,evt_s2_fl_qin_house_5_p1,1,text,,返家时，已经月上枝头。推门进堂屋，屋里没光，灶台那头还留着一点余温。锅盖揭开是温热的饭菜，桌上一双筷子摆好了。,text,
+evt_s2_fl_qin_house_5,evt_s2_fl_qin_house_5_p2,2,text,,内屋的门掩着，灯熄了。灶台边上几个洗了一半的盘子还摞在那。,text,
+evt_s2_fl_qin_house_6,evt_s2_fl_qin_house_6_p1,1,text,,你路过镇上的市集。娘的摊位摆在老位置——咸菜罐子叠了几摞，针线包压着摊布的一角，那只小杌子空在那里。,text,
+evt_s2_fl_qin_house_6,evt_s2_fl_qin_house_6_p2,2,text,,摊位边的小账本翻开着，铅笔搁在上头。王嫂走过来，问素娘呢——说要还上回那一吊钱。,text,
+evt_s2_fl_train_1,evt_s2_fl_train_1_p1,1,text,,[填充·练场·1·屏1] 远远看练场队列出操（撰写期补）,text,
+evt_s2_fl_train_2,evt_s2_fl_train_2_p1,1,text,,[填充·练场·2·屏1] 跟着晨练跑了几圈，喘得不行（撰写期补）,text,
+evt_s2_fl_train_3,evt_s2_fl_train_3_p1,1,text,,[填充·练场·3·屏1] 角落的沙袋——空击试一试（撰写期补）,text,
+evt_s2_fl_dao_1,evt_s2_fl_dao_1_p1,1,text,,[填充·道观·1·屏1] 殿前听老钟回响（撰写期补）,text,
+evt_s2_fl_dao_2,evt_s2_fl_dao_2_p1,1,text,,[填充·道观·2·屏1] 扫地时遇见一位老者搭话（撰写期补）,text,
+evt_s2_fl_dao_3,evt_s2_fl_dao_3_p1,1,text,,[填充·道观·3·屏1] 殿内观人练拳——架势奇特（撰写期补）,text,
+evt_s3_chain_entry,evt_s3_chain_entry_p1,1,text,,[拜师·屏1·母亲准备] 母亲早早起身为你打理出门——这是拜师的日子（撰写期补）,text,
+evt_s3_chain_2,evt_s3_chain_2_p1,1,text,,[拜师·屏2·集体面试] 几位少年候在堂前，师傅一个个看过去（撰写期补）,text,
+evt_s3_chain_3,evt_s3_chain_3_p1,1,text,,[拜师·屏3·私密愣住·陆首登] 师傅独留你一会——而陆承岳在角落沉默看你（陆首登承担位）,text,
+evt_s3_chain_4,evt_s3_chain_4_p1,1,text,,[拜师·屏4·第一次训练] 拜师次日，第一次列队训练（撰写期补）,text,

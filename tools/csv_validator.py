@@ -110,6 +110,19 @@ KNOWN_OUTCOME_BRANCHES = {
     "default", "success", "fail", "critical_success", "critical_fail",
 }
 
+# event_presentations.condition 字段（需求 2 新增，2026-05-11）
+# 来源：Design/配置翻译指南.md 锚点 presentation_condition
+# 引擎消费侧：world_event_engine.gd::_get_event_presentation_filtered
+# 格式：`<world_state_path> <op> <literal>`（空 = 通用 fallback 行）
+# 合法 world_state 顶层 key 白名单（引擎侧硬编码可用的顶层字段）：
+KNOWN_PRESENTATION_CONDITION_WORLD_STATE_KEYS = {
+    "last_consumed_skeleton_event_id",
+    "flags",
+    "params",
+    "currentLocationId",
+    "finalEventPoolConsumed",
+}
+
 # 旧版关系 key 的正则（affinity.player_001->npc_xxx）——已废弃，仅用于识别误用
 AFFINITY_KEY_RE = re.compile(r"^affinity\.\w+->\w+$")
 
@@ -329,6 +342,54 @@ def validate(csv_dir: Path, ref_dir: Path) -> ValidationResult:
                     f"event_presentations: '{pid}' presents=location_select 但 text 为空"
                     "（同屏渲染需要末段叙事文本作 caption）"
                 )
+
+    # ── 检查 6.5b: event_presentations.condition 语法合法性（需求 2 新增）──
+    # 【CSV 契约边界】来源：Design/配置翻译指南.md 锚点 presentation_condition。
+    # 合法 condition 语法：`<world_state_key_path> <op> <literal>`，其中：
+    #   - key_path 为点分路径（如 last_consumed_skeleton_event_id 或 flags.met_he）
+    #   - op 为 == / != / > / >= / < /<=
+    #   - literal 为双引号字符串、数字、true/false
+    # 合法 world_state 顶层 key 白名单：KNOWN_PRESENTATION_CONDITION_WORLD_STATE_KEYS（头部常量）
+    _CONDITION_OPS = {"==", "!=", ">", ">=", "<", "<="}
+
+    def _parse_presentation_condition(cond: str) -> str | None:
+        """返回 None 表示合法，返回错误描述表示不合法。"""
+        cond = cond.strip()
+        if not cond:
+            return None  # 空 condition 合法（fallback 行）
+        for op in sorted(_CONDITION_OPS, key=len, reverse=True):  # 长 op 优先
+            token = f" {op} "
+            if token in cond:
+                parts = cond.split(token, 1)
+                if len(parts) != 2:
+                    return f"条件表达式格式错误（无法按 '{op}' 分割）: {cond!r}"
+                left = parts[0].strip()
+                right = parts[1].strip()
+                # 检查 left 路径首段是否在已知 world_state key 白名单中
+                root_key = left.split(".")[0]
+                if root_key not in KNOWN_PRESENTATION_CONDITION_WORLD_STATE_KEYS:
+                    return (
+                        f"条件左值 '{root_key}' 不在已知 world_state 字段集"
+                        f"（当前白名单: {sorted(KNOWN_PRESENTATION_CONDITION_WORLD_STATE_KEYS)}）"
+                    )
+                # 检查 right 是否为合法 literal（双引号字符串 / 数字 / true / false）
+                if right in ("true", "false"):
+                    return None
+                if right.lstrip("-").isdigit():
+                    return None
+                if right.startswith('"') and right.endswith('"') and len(right) >= 2:
+                    return None
+                return f"条件右值 '{right}' 不是合法 literal（需为双引号字符串、整数或 true/false）"
+        return f"条件表达式缺少合法操作符（期望 {sorted(_CONDITION_OPS)}）: {cond!r}"
+
+    for row in event_presentations:
+        cond = row.get("condition", "").strip()
+        if not cond:
+            continue
+        pid = row.get("presentation_id", "")
+        err = _parse_presentation_condition(cond)
+        if err:
+            result.add_p1(f"event_presentations: '{pid}' condition 语法错误 — {err}")
 
     # ── 检查 6.6: transition_text_pool.csv 结构 + location_id 一致性（Step 2 新增）──
     # 文件可选（demo 期可能尚未创建）；存在时校验：

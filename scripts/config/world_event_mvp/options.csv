@@ -2,10 +2,9 @@ option_id,choice_point_id,text,display_order
 evt_s2_sk_he_opt_1,cp_evt_s2_sk_he,试着辨认药材,1
 evt_s2_sk_he_opt_2,cp_evt_s2_sk_he,站在边上看一会,2
 evt_s2_sk_he_opt_3,cp_evt_s2_sk_he,转身去做别的,3
-evt_s2_sk_qin_opt_1,cp_evt_s2_sk_qin,[选项·搭话] 帮母亲收拾,1
-evt_s2_sk_qin_opt_2,cp_evt_s2_sk_qin,[选项·点头] 应一声便回房,2
-evt_s2_sk_qin_opt_3,cp_evt_s2_sk_qin,[选项·避开] 装没看见,3
-evt_s2_sk_qin_opt_4,cp_evt_s2_sk_qin,[选项·用心做事] 用心帮母亲准备饭食,4
+evt_s2_sk_qin_opt_1,cp_evt_s2_sk_qin,试着分这一筐,1
+evt_s2_sk_qin_opt_2,cp_evt_s2_sk_qin,在边上听娘安排,2
+evt_s2_sk_qin_opt_3,cp_evt_s2_sk_qin,先把这筐搬进灶屋,3
 evt_s2_sk_zhou_opt_1,cp_evt_s2_sk_zhou,[选项·搭讪] 上前请教练拳,1
 evt_s2_sk_zhou_opt_2,cp_evt_s2_sk_zhou,[选项·远观] 远远看几招,2
 evt_s2_sk_zhou_opt_3,cp_evt_s2_sk_zhou,[选项·避开] 不愿引人注意,3
@@ -30,12 +29,24 @@ evt_s2_fl_pharmacy_5_opt_3,cp_evt_s2_fl_pharmacy_5,凑数搬进去算了,3
 evt_s2_fl_pharmacy_6_opt_1,cp_evt_s2_fl_pharmacy_6,留下把零碎收完,1
 evt_s2_fl_pharmacy_6_opt_2,cp_evt_s2_fl_pharmacy_6,收拾一下就走,2
 evt_s2_fl_pharmacy_6_opt_3,cp_evt_s2_fl_pharmacy_6,跟老伙计说几句,3
-evt_s2_fl_qin_1_opt_1,cp_evt_s2_fl_qin_1,[选项·主动] 帮母亲烧火,1
-evt_s2_fl_qin_1_opt_2,cp_evt_s2_fl_qin_1,[选项·旁观] 站旁边发呆,2
-evt_s2_fl_qin_2_opt_1,cp_evt_s2_fl_qin_2,[选项·砍价] 试试讲价,1
-evt_s2_fl_qin_2_opt_2,cp_evt_s2_fl_qin_2,[选项·原价] 老老实实买,2
-evt_s2_fl_qin_3_opt_1,cp_evt_s2_fl_qin_3,[选项·应承] 答应母亲,1
-evt_s2_fl_qin_3_opt_2,cp_evt_s2_fl_qin_3,[选项·沉默] 不答话,2
+evt_s2_fl_qin_house_1_opt_1,cp_evt_s2_fl_qin_house_1,替娘接下，应一声谢,1
+evt_s2_fl_qin_house_1_opt_2,cp_evt_s2_fl_qin_house_1,推辞两声，客人还是塞过来,2
+evt_s2_fl_qin_house_1_opt_3,cp_evt_s2_fl_qin_house_1,婉拒到底，让客人继续上路,3
+evt_s2_fl_qin_house_2_opt_1,cp_evt_s2_fl_qin_house_2,默默走开，不打扰,1
+evt_s2_fl_qin_house_2_opt_2,cp_evt_s2_fl_qin_house_2,上前打个招呼,2
+evt_s2_fl_qin_house_2_opt_3,cp_evt_s2_fl_qin_house_2,站着听完再走,3
+evt_s2_fl_qin_house_3_opt_1,cp_evt_s2_fl_qin_house_3,找根麻绳自己绑紧,1
+evt_s2_fl_qin_house_3_opt_2,cp_evt_s2_fl_qin_house_3,先放着，回头再处理,2
+evt_s2_fl_qin_house_3_opt_3,cp_evt_s2_fl_qin_house_3,去问问孙伯有没有趁手的木楔,3
+evt_s2_fl_qin_house_4_opt_1,cp_evt_s2_fl_qin_house_4,收下，按娘的意思添置,1
+evt_s2_fl_qin_house_4_opt_2,cp_evt_s2_fl_qin_house_4,把钱放回去，下次娘回来再说,2
+evt_s2_fl_qin_house_4_opt_3,cp_evt_s2_fl_qin_house_4,钱拿着，回头看缺什么再添,3
+evt_s2_fl_qin_house_5_opt_1,cp_evt_s2_fl_qin_house_5,默默吃完，把灶台收拾好,1
+evt_s2_fl_qin_house_5_opt_2,cp_evt_s2_fl_qin_house_5,简单吃几口就睡,2
+evt_s2_fl_qin_house_5_opt_3,cp_evt_s2_fl_qin_house_5,不饿，先回屋睡了,3
+evt_s2_fl_qin_house_6_opt_1,cp_evt_s2_fl_qin_house_6,替娘招呼一两句，让王嫂坐一会,1
+evt_s2_fl_qin_house_6_opt_2,cp_evt_s2_fl_qin_house_6,默默看着摊位,2
+evt_s2_fl_qin_house_6_opt_3,cp_evt_s2_fl_qin_house_6,把摊位上的物件挪一挪,3
 evt_s2_fl_train_1_opt_1,cp_evt_s2_fl_train_1,[选项·走近] 凑过去看,1
 evt_s2_fl_train_1_opt_2,cp_evt_s2_fl_train_1,[选项·绕开] 装没看见,2
 evt_s2_fl_train_2_opt_1,cp_evt_s2_fl_train_2,[选项·坚持] 跑完三圈,1

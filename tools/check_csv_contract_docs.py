@@ -30,6 +30,7 @@ REQUIRED_ANCHORS = [
     "rule_types",
     "condition_types",
     "presents_values",
+    "presentation_condition",  # 需求 2 新增：event_presentations.csv condition 差分字段
 ]
 
 

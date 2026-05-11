@@ -594,6 +594,10 @@ def generate_event_presentations_csv(cards: list[dict[str, Any]]) -> list[dict[s
 
     presents 字段默认填 "text"（纯叙事）；非默认值（如 location_select）需在拆解稿
     手动指定，由翻译者按 presents_values 契约白名单填写，不在脚本自动生成范围。
+
+    condition 字段（需求 2 新增）：脚本产出的行统一留空（空 = 通用 fallback 行，
+    无差分过滤）。condition 差分行仅 sys_reflection 等特殊自省事件使用，需人工在
+    CSV 中手动填写；普通事件卡不使用 condition，留空即可兼容引擎过滤逻辑。
     """
     rows: list[dict[str, str]] = []
     for card in cards:
@@ -607,6 +611,7 @@ def generate_event_presentations_csv(cards: list[dict[str, Any]]) -> list[dict[s
                 "speaker": "旁白",
                 "text": para,
                 "presents": "text",
+                "condition": "",  # 脚本产出行 condition 统一留空（无差分过滤）
             })
     return rows
 
@@ -803,6 +808,12 @@ CSV_HEADERS = {
     "event_presentations.csv": [
         "event_id", "presentation_id", "display_order", "item_type",
         "speaker", "text", "presents",
+        # 需求 2 新增：presentation condition 差分字段（空 = 通用 fallback 行；
+        # 非空 = 按 world_state 过滤，见 Design/配置翻译指南.md 锚点 presentation_condition）。
+        # 脚本自动产出的 event_presentations 行 condition 字段统一留空
+        # （条件差分行由 LLM/人工在 CSV 中手动填写；前提：通常只有 sys_reflection 等特殊自省
+        # 事件才使用 condition 差分，普通事件卡不指定 condition）。
+        "condition",
     ],
     "options.csv": [
         "option_id", "choice_point_id", "text", "display_order",

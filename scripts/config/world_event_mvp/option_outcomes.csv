@@ -6,16 +6,13 @@ evt_s2_sk_he_opt_1,fail,2,你退回到柜后做事，手里还在想方才那株
 evt_s2_sk_he_opt_2,default,1,你站在柜台边上看了一会。柜后人翻看药材的速度慢得很，每一味药都要翻看一遍才放回去。
 evt_s2_sk_he_opt_2,default,2,等他终于抬头时，你已经在不知不觉里跟着记下了几样的样子。
 evt_s2_sk_he_opt_3,default,1,你转身去整理药斗里几样常用的药，柜后人始终没抬头。等你忙完出去时，他还在那里慢慢摆弄那一味药。
-evt_s2_sk_qin_opt_1,default,1,[outcome·家+市场·首遇·搭话·屏1] 你帮母亲收拾，秦素娘嘴上没夸但眼神柔下来（关系+2）
-evt_s2_sk_qin_opt_1,default,2,[outcome·家+市场·首遇·搭话·屏2] 灶火噼啪一声，她转身去添柴——你看见她肩膀松了一点
-evt_s2_sk_qin_opt_2,default,1,[outcome·家+市场·首遇·点头·屏1] 你应了一声便回房，秦素娘看你一眼没说话（关系+1）
-evt_s2_sk_qin_opt_2,default,2,[outcome·家+市场·首遇·点头·屏2] 屋里灯还亮着，你听见母亲在外间又坐了好一会
-evt_s2_sk_qin_opt_3,default,1,[outcome·家+市场·首遇·避开·屏1] 你装没看见从旁边过去，秦素娘叹了口气（关系+0）
-evt_s2_sk_qin_opt_3,default,2,[outcome·家+市场·首遇·避开·屏2] 你回屋后听见她在外间洗碗，水声比平日重些
-evt_s2_sk_qin_opt_4,success,1,[outcome·家+市场·首遇·用心·成功·屏1·TODO属性] 你用心准备了一道菜，秦素娘尝了一口手停了一下（关系+2）
-evt_s2_sk_qin_opt_4,success,2,[outcome·家+市场·首遇·用心·成功·屏2·TODO属性] 她没夸你，但晚饭桌上多放了一双筷子的位置——这是她平日里不会做的小事
-evt_s2_sk_qin_opt_4,fail,1,[outcome·家+市场·首遇·用心·失败·屏1·TODO属性] 你想做得更好却出了岔子，秦素娘没说什么默默接过来（关系+1，难为情）
-evt_s2_sk_qin_opt_4,fail,2,[outcome·家+市场·首遇·用心·失败·屏2·TODO属性] 你坐回桌边，看母亲手里那道菜——你想她大概比你更懂这个家的温度
+evt_s2_sk_qin_opt_1,success,1,你把咸鱼和腌肉挑出来留家里，干笋和红枣一并匀出去。娘看了一眼，没多说，从桌上那堆铜板里挑了几枚，搁到笋边。
+evt_s2_sk_qin_opt_1,success,2,她在那张纸上添了一行。回礼的篮子放到桌脚——孙伯家、王嫂家、对门——一会儿要送的几处都列在纸上。
+evt_s2_sk_qin_opt_1,fail,1,"你把红枣留了下来，咸鱼匀出去。娘看了看，把咸鱼移回筐里，""咸鱼留着家里吃。""——她把红枣挑出来，匀进回礼那堆。"
+evt_s2_sk_qin_opt_1,fail,2,你给娘斟了一杯茶。她接着算那张纸，铜板又分了一次。回礼的篮子要赶在天黑前送出去。
+evt_s2_sk_qin_opt_2,default,1,你坐在桌边看娘分。咸鱼和腌肉留下来，干笋和红枣匀出去；铜板从那三堆里挑出几枚，搁到笋边。每一样动作都不快，但每一样都对着这月的礼数来。
+evt_s2_sk_qin_opt_2,default,2,等娘把那张纸添完，你已经在不知不觉里跟着记下了几家走礼的密度。
+evt_s2_sk_qin_opt_3,default,1,你站起身，把那筐先搬进灶屋边上。回头时娘还在桌前算，纸上又添了两行，铜板分得更细了一些。
 evt_s2_sk_zhou_opt_1,success,1,[outcome·练场·首遇·成功·屏1] 周既明扫你一眼，问你练过几年（关系+2）
 evt_s2_sk_zhou_opt_1,success,2,[outcome·练场·首遇·成功·屏2] 你含糊答了几句他便没追问——但他记下了你站姿里的那点东西
 evt_s2_sk_zhou_opt_1,fail,1,[outcome·练场·首遇·失败·屏1] 你架势露怯，周既明只笑了一下没接话（关系+1，尴尬）
@@ -57,18 +54,24 @@ evt_s2_fl_pharmacy_6_opt_1,default,1,你坐回到柜台后头，一样一样把�
 evt_s2_fl_pharmacy_6_opt_1,default,2,等你抬眼时，铺里就剩这两盏灯。老伙计在最后一笔账下面落了今日的工，从抽屉里数了几枚铜钱搁到你掌心，比平日多了几个。
 evt_s2_fl_pharmacy_6_opt_2,default,1,你把眼前的零碎拢成一堆，搁回柜上，转身出门。檐下的天还透着一层暮蓝，巷子里有人挑着担子从西头往东头走。
 evt_s2_fl_pharmacy_6_opt_3,default,1,老伙计这头推药斗，你在柜台另一头搭了句话，他应了。两边都没停手，话却是断断续续的——天气、米价、邻街新开的铺子，都不是要紧事。等你拎起外套时，斗子也合上了最后一格。
-evt_s2_fl_qin_1_opt_1,default,1,[outcome·家+市场·1·主动·屏1] 你帮秦素娘烧火，灶前热得脸红（与秦关系+1）
-evt_s2_fl_qin_1_opt_1,default,2,[outcome·家+市场·1·主动·屏2] 饭桌上她多盛了你一勺——没说什么，碗推得近些
-evt_s2_fl_qin_1_opt_2,default,1,[outcome·家+市场·1·旁观·屏1] 你站在灶旁发呆，没去搭手（无变化）
-evt_s2_fl_qin_1_opt_2,default,2,[outcome·家+市场·1·旁观·屏2] 母亲忙完转身看你一眼，又转回去——你想说点什么但终究没出口
-evt_s2_fl_qin_2_opt_1,default,1,[outcome·家+市场·2·砍价·屏1] 你试着讲价，摊主嘴硬最后让了几文（学识+1）
-evt_s2_fl_qin_2_opt_1,default,2,[outcome·家+市场·2·砍价·屏2] 回家路上你心里盘算——这几文够买半块饴糖，也够给母亲带一根针线
-evt_s2_fl_qin_2_opt_2,default,1,[outcome·家+市场·2·原价·屏1] 你老老实实付了钱（无变化）
-evt_s2_fl_qin_2_opt_2,default,2,[outcome·家+市场·2·原价·屏2] 走回时你才想起隔壁摊位便宜两文——下次再说
-evt_s2_fl_qin_3_opt_1,default,1,[outcome·家+市场·3·应承·屏1] 你应了母亲的叮嘱，她的眉头舒展（与秦关系+1）
-evt_s2_fl_qin_3_opt_1,default,2,[outcome·家+市场·3·应承·屏2] 你回房时她在外间灯下做针线——灯花跳了两下，她没再说话
-evt_s2_fl_qin_3_opt_2,default,1,[outcome·家+市场·3·沉默·屏1] 你没接话，母亲也没追问（无变化）
-evt_s2_fl_qin_3_opt_2,default,2,[outcome·家+市场·3·沉默·屏2] 那一夜你听见她在外间坐了很久才熄灯
+evt_s2_fl_qin_house_1_opt_1,default,1,你接过那几吊钱拢进荷包，替娘应了一声谢。客人挑起担子站起来，往桥北那头慢慢走了。
+evt_s2_fl_qin_house_1_opt_2,default,1,你推让了两声不要。客人摆摆手把那几吊钱往你手里一搁，挑起担子就走，没再回头。
+evt_s2_fl_qin_house_1_opt_3,default,1,你反复推辞，说娘那时也没特意做什么。客人摇了摇头把钱收回担子里，应一声挑起担子往桥那头走了。
+evt_s2_fl_qin_house_2_opt_1,default,1,你轻轻退到街那头。两位老主顾没察觉，话头转到了别处。
+evt_s2_fl_qin_house_2_opt_2,default,1,你走过去跟两位老主顾打个招呼。两人应一声让你坐，话头停在那里，喝了几口茶就散了。
+evt_s2_fl_qin_house_2_opt_3,default,1,你站在街那头听了一会，卖布的又提了一两件娘平日里的小事，修补摊的应着。等他们喝完茶散了，你才走开。
+evt_s2_fl_qin_house_3_opt_1,default,1,你从院里堆杂物的角落找出一段麻绳，把那枚木楔重新固在门轴上。门板正过来，关上时不再响。
+evt_s2_fl_qin_house_3_opt_2,default,1,你把门板搁稳了，松着的木楔还卡在原处。屋里那筐菜的水滴在筐底，针线笸箩还搁在窗下椅上没动。
+evt_s2_fl_qin_house_3_opt_3,default,1,你把门板搁好就出院子了。孙伯家就在隔几步——他在院里晒杂物，听完应一声让你自己进屋翻。
+evt_s2_fl_qin_house_4_opt_1,default,1,你把那两吊钱收进荷包里，字条折起来塞回床头压着。屋外日头偏过去了一截。
+evt_s2_fl_qin_house_4_opt_2,default,1,你把铜板叠回原处，字条压在上头。床上那叠衣物你顺手挪了挪边角。
+evt_s2_fl_qin_house_4_opt_3,default,1,你把那两吊钱收进荷包里。字条压回床头那本旧书底下，留个记号。
+evt_s2_fl_qin_house_5_opt_1,default,1,你坐在桌边把饭吃完。灶台边那几个盘子洗了，搁回原处。屋里依然没声音，内屋的门没动。
+evt_s2_fl_qin_house_5_opt_2,default,1,你坐到桌边吃了几口，碗筷搁在桌上没收。灶台边那几个盘子还摞在那，你出堂屋去了里屋。
+evt_s2_fl_qin_house_5_opt_3,default,1,你掩上锅盖，灯没点就回里屋了。灶台那点余温还在，桌上那双筷子摆着没动。
+evt_s2_fl_qin_house_6_opt_1,default,1,你让王嫂坐到小杌子上，把那一吊钱接过来搁进摊位下的钱袋里。账本上你按娘平时的写法添了一笔。
+evt_s2_fl_qin_house_6_opt_2,default,1,你站在摊位边没说话。王嫂应了一声把那一吊钱搁在账本旁边，转身走了。
+evt_s2_fl_qin_house_6_opt_3,default,1,你把咸菜罐子重新叠齐，摊布拉直，针线包归到原来的位置。王嫂在边上看着应了一声就走了。
 evt_s2_fl_train_1_opt_1,default,1,[outcome·练场·1·走近·屏1] 你凑过去看队列变换，记住几个手势（学识+1）
 evt_s2_fl_train_1_opt_1,default,2,[outcome·练场·1·走近·屏2] 走开时教头并未喝止——你想是因为你看得太专心
 evt_s2_fl_train_1_opt_2,default,1,[outcome·练场·1·绕开·屏1] 你装没看见从场边走过（无变化）
