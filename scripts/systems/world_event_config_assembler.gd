@@ -825,6 +825,11 @@ static func _validate_ending_event_constraints(event_map: Dictionary) -> Diction
 # 功能：将事件展示项编译到对应事件定义中。
 # 说明：当前 MVP 只支持 text 类型展示项，并在编译期完成基础校验、去重与排序。
 static func _apply_event_presentations(event_map: Dictionary, rows: Array) -> Dictionary:
+	# 【CSV 契约边界】需求 2 — presentation condition 字段装配入口。
+	# 来源: Design/配置翻译指南.md 锚点 presentation_condition（新增）。
+	# 引擎消费侧：world_event_engine.gd::_get_event_presentation_filtered（按 world_state
+	# 过滤 condition，只返回满足条件的行；空 condition = 通用 fallback 行）。
+	# 改动本函数时必须同步回看：配置翻译指南锚点 / csv_validator.py / 引擎过滤函数。
 	var used_presentation_ids: Dictionary = {}
 	for row_variant in rows:
 		var row: Dictionary = row_variant
@@ -833,6 +838,10 @@ static func _apply_event_presentations(event_map: Dictionary, rows: Array) -> Di
 		var display_order_text := str(row.get("display_order", "")).strip_edges()
 		var item_type := str(row.get("item_type", "")).strip_edges()
 		var text := str(row.get("text", "")).strip_edges()
+		# CSV 不识别转义,字面 "\n" 读出来是两字符 \ + n;装配阶段统一替换为真换行,
+		# 否则 Label 直接打印反斜杠加 n。其它显示文本字段（如 outcomes、transition）
+		# 走各自加载路径,后续若有 \n 需求,在对应入口加同样的替换。
+		text = text.replace("\\n", "\n")
 		if event_id.is_empty() and presentation_id.is_empty() and display_order_text.is_empty() and item_type.is_empty() and text.is_empty():
 			continue
 		if event_id.is_empty():
@@ -861,6 +870,12 @@ static func _apply_event_presentations(event_map: Dictionary, rows: Array) -> Di
 			push_warning("event_presentations: unknown presents '%s' on %s, fallback to 'text'" % [presents, presentation_id])
 			presents = "text"
 
+		# 需求 2 新增：condition 字段（空 = 通用 fallback 行；非空 = 按 world_state 过滤）。
+		# 语法与 event_conditions.csv 的 weight_rule 表达式一致：
+		#   `<world_state_path> <op> "<value>"` 例：last_consumed_skeleton_event_id == "evt_s2_sk_he"
+		# 引擎过滤逻辑见 world_event_engine.gd::_get_event_presentation_filtered。
+		var condition := str(row.get("condition", "")).strip_edges()
+
 		used_presentation_ids[presentation_id] = true
 		var event_def: Dictionary = event_map[event_id]
 		var presentation: Array = event_def.get("presentation", [])
@@ -871,7 +886,8 @@ static func _apply_event_presentations(event_map: Dictionary, rows: Array) -> Di
 				"type": item_type,
 				"speaker": str(row.get("speaker", "")).strip_edges(),
 				"text": text,
-				"presents": presents
+				"presents": presents,
+				"condition": condition
 			}
 		)
 		_sort_presentation_items(presentation)
