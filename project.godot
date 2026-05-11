@@ -34,3 +34,15 @@ theme/custom="res://theme/default_theme.tres"
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+
+[debug]
+
+; 议题 §🔵 性能排查诊断用：开启 file logging 让所有 print() / push_warning / push_error
+; 全部写入磁盘文件，便于跑测后把卡顿期间的日志整体发回排查。
+; 路径在 user:// 协议下，Windows 实际是 %APPDATA%\Godot\app_userdata\VibeTest\logs\
+; （main_game.gd _ready 启动时会 print 绝对路径方便定位）。
+; max_log_files=5 自动 rotate，保留最近 5 次启动的日志。
+; 卡顿瓶颈彻底解决后可改回 false。
+file_logging/enable_file_logging=true
+file_logging/log_path="user://logs/session.log"
+file_logging/max_log_files=5

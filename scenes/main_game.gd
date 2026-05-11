@@ -258,6 +258,13 @@ var _last_reflection_bg_path: String = ""
 #       结束后通过信号回调进入正式游戏逻辑。
 #       无 IntroSequence 时（test 场景）直接调用 _start_game_after_intro() 跳过 intro。
 func _ready() -> void:
+	# 议题 §🔵 性能排查诊断用：启动时 print file logging 实际写入路径，方便实测后定位日志文件。
+	# 对应 project.godot [debug] 段 file_logging/enable_file_logging=true。
+	# 卡顿瓶颈彻底解决后整段可移除。
+	var log_abs_path: String = ProjectSettings.globalize_path("user://logs/session.log")
+	print("[LOG PATH] file logging -> ", log_abs_path)
+	print("[LOG PATH] user_data_dir -> ", OS.get_user_data_dir())
+
 	# 议题 B:ContinueButton pressed 经由路由 handler 分发,通过 _continue_handler 切换不同 phase 的回调
 	continue_button.pressed.connect(_on_continue_footer_pressed_router)
 	# 议题 B 调整 4:整张叙事面板作为"继续"扩展点击区域,仅 ContinueButton 可见时启用

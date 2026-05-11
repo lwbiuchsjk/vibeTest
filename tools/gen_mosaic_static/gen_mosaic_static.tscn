@@ -1,0 +1,46 @@
+[gd_scene load_steps=2 format=3 uid="uid://b8mosaicstatic1"]
+
+[ext_resource type="Script" path="res://tools/gen_mosaic_static/gen_mosaic_static.gd" id="1_gen_mosaic"]
+
+[node name="GenMosaicStatic" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_gen_mosaic")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="VBox"]
+layout_mode = 2
+text = "Mosaic 静态预渲染工具（REQ-004 静态化方案 C.2）"
+horizontal_alignment = 1
+
+[node name="GenerateButton" type="Button" parent="VBox"]
+layout_mode = 2
+text = "Generate All Mosaics"
+
+[node name="StatusLabel" type="Label" parent="VBox"]
+layout_mode = 2
+text = "就绪。点 Generate All 开始。"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="PreviewLabel" type="Label" parent="VBox"]
+layout_mode = 2
+text = "预览（最近一张生成的 mosaic PNG）："
+
+[node name="PreviewRect" type="TextureRect" parent="VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+expand_mode = 2
+stretch_mode = 5
