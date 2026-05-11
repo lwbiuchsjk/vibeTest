@@ -69,7 +69,9 @@ Godot 4.5，GDScript，Git 版本控制
 
 工程通道已经就位：`text_mosaic_background.gd` 的 `set_exclude_mask` / `clear_exclude_mask` 数据通道；事件配置层未来需要加 `exclude_mask_path` 字段，由 `main_game.gd::_render_event_background` 在切图时调用对应背景层的 `set_exclude_mask`，不需要时调 `clear_exclude_mask`。详见 [[intro_face_mask_抑制大字号_MVP]] §六.1。
 
-**此流程应自动化触发**——新美术资产入库时由工具链或 hook 自动评估 + 触发 mask 生产（按 [[mask生成工作流]]）+ 配置写入，而非每张图人工记起去做。具体自动化设计（触发点 / 评估逻辑 / 配置注入路径）待后续美术素材规模化引入时讨论，当前仅记录规范方向。
+**此流程应自动化触发**——新美术资产入库时由工具链或 hook 自动评估 + 触发 mask 生产（按 [[face_mask生成工作流]]）+ 配置写入，而非每张图人工记起去做。具体自动化设计（触发点 / 评估逻辑 / 配置注入路径）待后续美术素材规模化引入时讨论，当前仅记录规范方向。
+
+完整入库流程见 [[事件背景图入库工作流]]：raw → resize 1024×576 → cp 入 assets/ → face mask 决策（可选子流程）→ 配置事件。
 
 ## CSV 配置流水线（Step 3）执行规范
 
@@ -152,7 +154,7 @@ Design hook 中处理含中文的 junction 路径（`$ROOT` 解析到 `D:\坚果
 | 叙事重写 | [[叙事文风规范]]、[[叙事重写工程规范]]、[[叙事校验规范]] | [[叙事校验_L2审查模板]]、[[叙事重写_Agent产出模板]] |
 | `_explore` 启动 | [[_explore系统_MVP设计]]、[[_explore/README]] | explore-kickoff skill |
 | MVP 设计文档撰写 | [[MVP设计文档规范]] | [[涌现式叙事设计原则]] |
-| 美术资产入库 | [[mask生成工作流]]、[[intro_face_mask_抑制大字号_MVP]] §六.1 | — |
+| 美术资产入库 | [[事件背景图入库工作流]]、[[intro_face_mask_抑制大字号_MVP]] §六.1 | [[face_mask生成工作流]]（步骤 5 子流程） |
 
 **约定**：
 

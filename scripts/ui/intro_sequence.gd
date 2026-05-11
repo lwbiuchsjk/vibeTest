@@ -115,6 +115,35 @@ var _ripple3_tex: Texture2D = null
 ## 少女入画图 Texture2D 缓存（CLICKED 阶段 cross-fade 切到此图永久显示，接管屏幕级渲染）
 var _girl_enter_tex: Texture2D = null
 
+## 当前显示的事件背景图路径（set_event_background 幂等检查用）。
+## - 涟漪期：空字符串（涟漪帧切换不跟踪）
+## - CLICKED 阶段 cross-fade 到 girl_enter：_on_start_fade_out 设为 GIRL_ENTER_PATH
+## - intro_completed 后由 set_event_background 维护
+## 设计依据：避免 t=2.0s intro_completed 后 main_game 注入 sys_opening_reflection（background=girl_enter）
+##         触发重复 cross-fade（13 层 set_source_image + 双套并行渲染 0.5s）导致明显卡顿。
+var _current_displayed_art_path: String = ""
+
+## A/B 套各自持有的 art_path 缓存（议题 §🔵 实施期 2026-05-11）。
+## 当 set_event_background 目标已被某套持有时，直接切到该套（避免重复 _draw 破坏 Godot canvas item batch）。
+var _last_art_in_a: String = ""
+var _last_art_in_b: String = ""
+
+## N 套 LRU 缓存池（议题 §🔵 实施期 2026-05-11，REQ-004）：
+## 涟漪期 A/B 套保留原 cross-fade Tween 机制；intro_completed 后 set_event_background 走 LRU 模式。
+## SLOT_COUNT=4：A + B + 2 个额外套（_ready 时 duplicate A 套生成）。覆盖 girl_enter + 包内 2-3 图。
+## 根因调查 + 静态化方案见 [[代码重构_预启动]] REQ-004。
+const SLOT_COUNT: int = 4
+## 额外的 mosaic 套容器（C、D），_ready 时由 A 套 duplicate 生成。
+var _extra_slots: Array[Control] = []
+## 缓存命中表：art_path → slot 容器（intro_completed 后维护）
+var _slot_holdings: Dictionary = {}
+## LRU 顺序：最旧在头部，最新在末尾
+var _slot_lru: Array[Control] = []
+
+## 调试：DONE 状态下每秒 print 一次 A/B 套实时状态（visible + modulate.a + active 标识）。
+## 议题 §🔵 卡顿诊断用——直接回答"A/B 是否同时渲染"的疑问。卡顿解决后可整体移除。
+var _dbg_state_print_accum: float = 0.0
+
 # ============================================================
 # 子节点引用（@onready，路径与 tscn 中节点名一致）
 # ============================================================
@@ -173,6 +202,23 @@ var _girl_enter_tex: Texture2D = null
 # 初始化
 # ============================================================
 
+## 功能：DONE 状态下每秒打印 A/B 套实时状态，议题 §🔵 卡顿诊断用。
+## 输出：A vis + α + B vis + α + active_is_a + 当前 art_path —— 直接回答"A/B 是否同时渲染"。
+## 卡顿解决后整个 _process + _dbg_state_print_accum 可移除。
+func _process(delta: float) -> void:
+	if _state != State.DONE:
+		return
+	_dbg_state_print_accum += delta
+	if _dbg_state_print_accum < 1.0:
+		return
+	_dbg_state_print_accum = 0.0
+	print("[IntroSeq state] A vis=%s α=%.2f | B vis=%s α=%.2f | active_is_a=%s | art=%s" % [
+		str(mosaic_layers_a.visible), mosaic_layers_a.modulate.a,
+		str(mosaic_layers_b.visible), mosaic_layers_b.modulate.a,
+		str(_active_is_a), _current_displayed_art_path
+	])
+
+
 ## 功能：节点就绪。
 ## 说明：此处仅做 null 检查；实际动画启动由 main_game 在 _ready 末尾调用 start_pond_animation()。
 func _ready() -> void:
@@ -187,6 +233,18 @@ func _ready() -> void:
 	# 开始按钮字体注入（2026-05-10）：思源宋体 Bold 替换全局默认霞鹜文楷，强化"开始游戏"仪式感
 	if start_button != null:
 		start_button.add_theme_font_override("font", FONT_START_BUTTON)
+
+	# 议题 §🔵 实施期 2026-05-11：duplicate A 套生成 C/D 额外缓存套（SLOT_COUNT=4 - 2 = 2 个新套）。
+	# 子节点 script 和 inspector 参数自动继承，与 A 套完全镜像。
+	# 新套初始 modulate.a=0（隐藏），visible=true（避免 visible 切换破坏 batch）。
+	var letters: Array[String] = ["C", "D"]
+	for letter: String in letters:
+		var new_slot: Control = mosaic_layers_a.duplicate(Node.DUPLICATE_USE_INSTANTIATION) as Control
+		new_slot.name = "MosaicLayers" + letter
+		new_slot.modulate = Color(1, 1, 1, 0)
+		new_slot.visible = true
+		add_child(new_slot)
+		_extra_slots.append(new_slot)
 
 
 # ============================================================
@@ -212,6 +270,145 @@ func start_pond_animation() -> void:
 	_schedule_next_ripple_cycle(true)
 
 
+## 功能：切换事件背景（事件背景路由的外部入口）。
+## 参数 art_path：图路径（res://...）；空字符串 = 显示静态米色底（非活跃套 source_image=null）
+## 参数 tokens：字符 token 池，13 层共用；空数组 fallback 到 INTRO_TEXT_TOKENS
+## 参数 face_mask_path：抑制大字号层（IntroCoarse 24px / IntroMedium 14px）落脸的 mask；空字符串 = 清 mask
+## 说明：intro_completed 后由 main_game._render_event_background 调用，统一驱动事件背景切换。
+##       内部复用 _crossfade_to_image 的 A/B 双套 cross-fade（0.5s）实现平滑切换。
+##       状态机要求 DONE（intro 已完成）；其他状态调用时跳过（intro 期间不接受外部切帧）。
+## 设计依据：[[intro_全盘重新设计_预启动]] §🔵 议题决议方案（候选 B）
+func set_event_background(art_path: String, tokens: PackedStringArray, face_mask_path: String = "") -> void:
+	if _state != State.DONE:
+		# intro 期间不接受外部切帧
+		return
+	# 幂等检查：相同 art_path 直接 return
+	if art_path == _current_displayed_art_path:
+		return
+	_current_displayed_art_path = art_path
+
+	if art_path.is_empty():
+		# 空路径：所有 slot α=0
+		mosaic_layers_a.modulate.a = 0.0
+		mosaic_layers_b.modulate.a = 0.0
+		for extra: Control in _extra_slots:
+			extra.modulate.a = 0.0
+		return
+
+	# N=4 LRU 缓存命中（REQ-004 议题 §🔵 实施期 2026-05-11）：
+	# 缓存目标已在某 slot 持有 → 切到该 slot 活跃，永远不重 _draw（避免 Godot canvas item batch 破坏）。
+	if _slot_holdings.has(art_path):
+		var slot: Control = _slot_holdings[art_path]
+		_activate_slot(slot)
+		_apply_face_mask_to_slot(slot, face_mask_path)
+		# 更新 LRU 顺序（最新使用挪到末尾）
+		_slot_lru.erase(slot)
+		_slot_lru.append(slot)
+		return
+
+	# 缓存未命中 → LRU 选 slot 装载新图（slot 首次 _draw，之后该 slot 永远不重 _draw）
+	var tex: Texture2D = ResourceLoader.load(art_path) as Texture2D
+	if tex == null:
+		push_warning("set_event_background: 资源加载失败或非 Texture2D %s" % art_path)
+		return
+
+	var target_slot: Control = _get_lru_slot()
+	# 清除该 slot 之前持有的 art_path（被覆盖）
+	for old_path: String in _slot_holdings.keys():
+		if _slot_holdings[old_path] == target_slot:
+			_slot_holdings.erase(old_path)
+			break
+
+	# 装载新图到 target_slot
+	var target_layers: Array[Control] = _get_slot_layers(target_slot)
+	_set_layers_image(target_layers, tex, tokens)
+	_apply_face_mask_to_slot(target_slot, face_mask_path)
+
+	# 更新缓存 + 激活
+	_slot_holdings[art_path] = target_slot
+	_slot_lru.erase(target_slot)
+	_slot_lru.append(target_slot)
+	_activate_slot(target_slot)
+
+
+## 让指定 slot 成为唯一活跃（modulate.a=1），其他 slot α=0
+func _activate_slot(slot: Control) -> void:
+	mosaic_layers_a.modulate.a = 1.0 if slot == mosaic_layers_a else 0.0
+	mosaic_layers_b.modulate.a = 1.0 if slot == mosaic_layers_b else 0.0
+	for extra: Control in _extra_slots:
+		extra.modulate.a = 1.0 if slot == extra else 0.0
+	# 维护 _active_is_a 以兼容涟漪期 / CLICKED 期逻辑（虽然 DONE 期不依赖）
+	_active_is_a = (slot == mosaic_layers_a)
+
+
+## 给指定 slot 的 IntroCoarse + IntroMedium 应用 face mask（缓存切换时调用）
+func _apply_face_mask_to_slot(slot: Control, mask_path: String) -> void:
+	var coarse: Control = slot.get_node_or_null("IntroCoarse")
+	var medium: Control = slot.get_node_or_null("IntroMedium")
+	if coarse == null or medium == null:
+		return
+	if mask_path.is_empty() or not FileAccess.file_exists(mask_path):
+		coarse.call("clear_exclude_mask")
+		medium.call("clear_exclude_mask")
+		return
+	coarse.call("set_exclude_mask", mask_path)
+	medium.call("set_exclude_mask", mask_path)
+
+
+## 获取 slot 容器内的 13 层 mosaic 节点（按顺序，与 _set_layers_image 期望的顺序对齐）
+func _get_slot_layers(slot_container: Control) -> Array[Control]:
+	return [
+		slot_container.get_node("IntroBg"),
+		slot_container.get_node("IntroCoarse"),
+		slot_container.get_node("IntroMedium"),
+		slot_container.get_node("IntroDarkLight"),
+		slot_container.get_node("IntroDarkAccent"),
+		slot_container.get_node("IntroDarkDeep"),
+		slot_container.get_node("IntroDarkInk"),
+		slot_container.get_node("IntroDarkBetween"),
+		slot_container.get_node("IntroDarkAbyss"),
+		slot_container.get_node("IntroMidDark"),
+		slot_container.get_node("IntroMidLight"),
+		slot_container.get_node("IntroHighlight"),
+		slot_container.get_node("IntroAccent"),
+	]
+
+
+## 返回最久未使用的 slot；优先返回未在 _slot_lru 中的空 slot
+func _get_lru_slot() -> Control:
+	var all_slots: Array[Control] = [mosaic_layers_a, mosaic_layers_b]
+	for extra: Control in _extra_slots:
+		all_slots.append(extra)
+	# 优先返回空 slot
+	for slot: Control in all_slots:
+		if slot not in _slot_lru:
+			return slot
+	# 都满了，返回 LRU 头部
+	return _slot_lru[0]
+
+
+## 议题 §🔵 实施期 2026-05-11：A/B 套缓存切换时，给指定套（is_a=true 即 A 套）的大字号 2 层应用 mask。
+func _apply_face_mask_to_specific(is_a: bool, mask_path: String) -> void:
+	var coarse_layer: Control
+	var medium_layer: Control
+	if is_a:
+		coarse_layer = intro_coarse_a
+		medium_layer = intro_medium_a
+	else:
+		coarse_layer = intro_coarse_b
+		medium_layer = intro_medium_b
+	if mask_path.is_empty():
+		coarse_layer.call("clear_exclude_mask")
+		medium_layer.call("clear_exclude_mask")
+		return
+	if not FileAccess.file_exists(mask_path):
+		coarse_layer.call("clear_exclude_mask")
+		medium_layer.call("clear_exclude_mask")
+		return
+	coarse_layer.call("set_exclude_mask", mask_path)
+	medium_layer.call("set_exclude_mask", mask_path)
+
+
 # ============================================================
 # 纹理预加载
 # ============================================================
@@ -225,36 +422,37 @@ func _preload_textures() -> void:
 	_girl_enter_tex = ResourceLoader.load(GIRL_ENTER_PATH) as Texture2D
 
 
-## 功能：给"即将装载 girl_enter 的非活跃套" IntroCoarse / IntroMedium 两层注入 exclude mask。
-## 时机：_on_start_fade_out 内 _crossfade_to_image(_girl_enter_tex) 之前调用。
-## 设计依据：[[intro_face_mask_抑制大字号_MVP]]——被抑制层在 mask 区不画字符。
-##         背景层 background.gd 的 _draw 主循环每 cell 自查 _exclude_mask_image：
-##         alpha > 阈值则跳过该 cell 不落字符。
-##         **保留 IntroBg 不抑制**：IntroBg ink_levels=32 是高色阶层承担脸部色彩信息，
-##         抑制后脸部丢失色彩。仅抑制 IntroCoarse 24px / IntroMedium 14px 两层
-##         （这两层带 v_max_threshold 是暗部骨架字符，落脸上违和）。
-##         注入只对非活跃套（即将随 cross-fade 显现 girl_enter 的那套）的两层生效，
-##         涟漪期两层都没挂 mask → 涟漪 cross-fade 切帧时不带出抑制效果。
-##         未来其他背景图各自挂 mask：流程独立调用 set_exclude_mask 注入对应图的 mask；
-##         不需要抑制的图调 clear_exclude_mask 恢复全 cell 渲染。
-##         mask 文件未入库时跳过并 push_warning，不阻断游戏运行。
-func _setup_face_mask_for_girl_enter() -> void:
-	if not FileAccess.file_exists(GIRL_ENTER_FACE_MASK_PATH):
+## 功能：给非活跃套（即将随 cross-fade 显现）的 IntroCoarse / IntroMedium 两层应用或清除 face mask。
+## 参数 mask_path：mask 资源路径；空字符串 = 调 clear_exclude_mask 恢复全 cell 渲染；非空 = 调 set_exclude_mask。
+## 设计依据：[[intro_face_mask_抑制大字号_MVP]] + [[intro_全盘重新设计_预启动]] §🔵
+##         背景层 background.gd 的 _draw 主循环每 cell 自查 _exclude_mask_image：alpha > 阈值则跳过该 cell。
+##         **仅抑制 IntroCoarse 24px / IntroMedium 14px 两层**：这两层 v_max_threshold 暗部骨架字符落脸违和。
+##         保留 IntroBg（ink_levels=32 承担色彩信息）不抑制，避免脸部丢色彩。
+##         非空时若 mask 文件不存在则 push_warning 并清 mask（不阻断游戏运行）。
+func _apply_face_mask_to_inactive(mask_path: String) -> void:
+	var coarse_layer: Control
+	var medium_layer: Control
+	if _active_is_a:
+		coarse_layer = intro_coarse_b
+		medium_layer = intro_medium_b
+	else:
+		coarse_layer = intro_coarse_a
+		medium_layer = intro_medium_a
+	if mask_path.is_empty():
+		coarse_layer.call("clear_exclude_mask")
+		medium_layer.call("clear_exclude_mask")
+		return
+	if not FileAccess.file_exists(mask_path):
 		push_warning(
 			"intro_face_mask: mask 资源未入库 %s；脸部抑制跳过。"
-			% GIRL_ENTER_FACE_MASK_PATH
-			+ "按 [[mask生成工作流]] 五步流程从 attachments 挑选并 cp 到 assets。"
+			% mask_path
+			+ "按 [[face_mask生成工作流]] 五步流程从 attachments 挑选并 cp 到 assets。"
 		)
+		coarse_layer.call("clear_exclude_mask")
+		medium_layer.call("clear_exclude_mask")
 		return
-	# 当前非活跃套即将装载 girl_enter；把 mask 注入该套的 IntroCoarse / IntroMedium 两层
-	# 不注入 IntroBg：该层 ink_levels=32 承担色彩，抑制会让脸部丢色彩信息
-	var suppress_layers: Array[Control] = []
-	if _active_is_a:
-		suppress_layers = [intro_coarse_b, intro_medium_b]
-	else:
-		suppress_layers = [intro_coarse_a, intro_medium_a]
-	for layer: Control in suppress_layers:
-		layer.call("set_exclude_mask", GIRL_ENTER_FACE_MASK_PATH)
+	coarse_layer.call("set_exclude_mask", mask_path)
+	medium_layer.call("set_exclude_mask", mask_path)
 
 
 # ============================================================
@@ -307,19 +505,40 @@ func _on_ripple_timer_timeout() -> void:
 	_crossfade_to_image(tex)
 
 
-## 功能：双层 cross-fade 切换到新帧，彻底消除米色闪烁。
-## 说明：把新图设到非活跃层 → 并行 Tween：活跃层 1→0 + 非活跃层 0→1（各 0.5s）；
+## 功能：双层 cross-fade 切换到新帧（可选同步切 token + face mask），彻底消除米色闪烁。
+## 参数 tex：目标图纹理；null = 切到空白米色底（非活跃套各层 source_image=null）
+## 参数 tokens：字符 token 池；空数组（默认）= 用 INTRO_TEXT_TOKENS 池塘词池
+## 参数 face_mask_path：抑制大字号层的 mask 路径；空字符串（默认）= 清非活跃套大字号 2 层的 mask
+## 说明：把新图设到非活跃层 + 同步切 token + 应用 face mask → 并行 Tween：活跃层 1→0 + 非活跃层 0→1（各 0.5s）；
 ##       任意时刻两层 alpha 之和 ≈ 1.0，米色底层的视觉比例始终守恒，无闪烁。
-##       完成后由 _on_crossfade_done 翻转 _active_is_a 标识。
-func _crossfade_to_image(tex: Texture2D) -> void:
+##       完成后由 _on_crossfade_done 翻转 _active_is_a 标识 + 把新非活跃容器 visible=false（跳 GPU pass）。
+##       cross-fade 启动前显式恢复 inactive 容器 visible=true（_on_crossfade_done 上次可能设为 false）。
+##       三参数版用于外部事件背景切帧（[[intro_全盘重新设计_预启动]] §🔵）；内部涟漪期调用沿用默认值。
+func _crossfade_to_image(tex: Texture2D, tokens: PackedStringArray = PackedStringArray(), face_mask_path: String = "") -> void:
+	# 调试 print：标识本次 cross-fade 的目标图 + face mask（议题 §🔵 卡顿诊断用，与 mosaic _draw print 配对）
+	var art_label: String = "<empty>" if tex == null else tex.resource_path
+	var mask_label: String = "<none>" if face_mask_path.is_empty() else face_mask_path
+	print("[IntroSequence] cross-fade -> art=%s | mask=%s | active_was=%s" % [art_label, mask_label, "A" if _active_is_a else "B"])
 	# 杀死已有 cross-fade Tween（防御性，正常流程不会重叠）
 	if _crossfade_tween != null and _crossfade_tween.is_valid():
 		_crossfade_tween.kill()
-	# 把新图设到非活跃层（非活跃层当前 alpha=0，用户看不见，可安全覆盖）
-	_set_layers_image(_get_inactive_layers(), tex)
+	# 把新图 + token 设到非活跃层（非活跃层当前 alpha=0，用户看不见，可安全覆盖）
+	_set_layers_image(_get_inactive_layers(), tex, tokens)
+	# 同步设非活跃套大字号 2 层 face mask（空字符串 = 清 mask，避免上一图的 mask 残留）
+	_apply_face_mask_to_inactive(face_mask_path)
 	# 获取容器引用
 	var active: Control = _get_active_container()
 	var inactive: Control = _get_inactive_container()
+	# 议题 §🔵 实施期 2026-05-11 移除 visible 优化后此处无需恢复 visible（始终保持 true）
+	# 但保留显式赋值以防 tscn 某层 visible=false 未同步
+	inactive.visible = true
+	# 调试实验（议题 §🔵 2026-05-11）：DONE 状态下瞬切（无 Tween）验证 Tween 是否破坏 batch 状态
+	# 涟漪期保留 Tween（米色闪烁解决依赖 cross-fade）
+	if _state == State.DONE:
+		active.modulate.a = 0.0
+		inactive.modulate.a = 1.0
+		_on_crossfade_done()
+		return
 	# 并行 cross-fade：两层同时动，alpha 守恒（Tween.TRANS_SINE + EASE_IN_OUT 使过渡柔和）
 	_crossfade_tween = create_tween()
 	_crossfade_tween.set_parallel(true)
@@ -331,13 +550,31 @@ func _crossfade_to_image(tex: Texture2D) -> void:
 	_crossfade_tween.chain().tween_callback(_on_crossfade_done)
 
 
-## 功能：cross-fade 完成回调，翻转活跃层标识并调度下一次帧切换 Timer。
+## 功能：cross-fade 完成回调，翻转活跃层标识并（仅涟漪期）调度下一次帧切换 Timer。
 ## 副作用：第一次 3 帧涟漪循环完成（ripple_3 → still 的 cross-fade 结束）触发开始按钮渐显。
+## 注意：_active_is_a 翻转必须在所有 cross-fade 完成时做（涟漪期 / 点击切 girl_enter / intro_completed
+##       后外部 set_event_background）；否则 A/B 标识与实际状态错位，下次切帧时新图装到错误套，
+##       cross-fade Tween 改错容器 modulate，两套都接近 alpha=1 同时渲染 → GPU 双倍开销 → 稳态卡顿。
+##       涟漪调度 + 按钮渐显仅涟漪期需要，用状态守门挡掉。
+## 性能优化：翻转后的新非活跃容器（原活跃容器，cross-fade 完成时 alpha=0）visible=false 跳过 GPU pipeline，
+##         稳态下只有 1 套 13 层参与渲染。下次 _crossfade_to_image 启动前恢复 visible=true。
+##         药铺等暗部多的图字符密度高 → vertex/fragment 负载重 → 关掉非活跃套显著减半 GPU 开销。
 func _on_crossfade_done() -> void:
+	# 翻转活跃层：原来的非活跃层已完全显示，成为新的活跃层。
+	# 此翻转对所有 cross-fade 完成都必须执行，不受 _state 守门影响。
+	_active_is_a = not _active_is_a
+	# 取消 visible=false 优化（议题 §🔵 实施期 2026-05-11 发现）：
+	# 多次 cross-fade 后 visible 切换让 Godot 内部 canvas item batch 状态被污染
+	# （draw_calls 从 ~50 暴涨到 74000+ → FPS 60→5）。
+	# 改为 modulate.a=0 隐藏（GPU vertex shader 跑但 fragment 早退）。
+	var new_active: Control = _get_active_container()
+	var new_inactive: Control = _get_inactive_container()
+	new_active.modulate.a = 1.0
+	new_inactive.modulate.a = 0.0
+	# 不再设 visible=false（避免 batch 状态污染）
+	# 后续动作（按钮渐显 + 涟漪调度）仅涟漪期需要；CLICKED / DONE 状态下直接 return
 	if _state != State.RIPPLE_ANIM:
 		return
-	# 翻转活跃层：原来的非活跃层已完全显示，成为新的活跃层
-	_active_is_a = not _active_is_a
 	var is_still: bool = (_ripple_frame_index == -1)
 	# 第一次回到 still 即"涟漪 1→2→3→still 一轮跑完"，触发按钮渐显（一次性）
 	if is_still and not _first_ripple_cycle_done:
@@ -398,13 +635,18 @@ func _get_texture_for_frame(frame_index: int) -> Texture2D:
 ## 功能：将同一 Texture2D 设置到指定层数组并触发重绘。
 ## 参数 layers：目标层节点数组（A 套 13 层、B 套 13 层或全 26 层）。
 ## 参数 tex：要渲染的源图纹理。
+## 参数 tokens：字符 token 池；空数组（默认）则用 INTRO_TEXT_TOKENS 池塘词池（intro 启动期默认）。
 ## 说明：set_source_image 内部已调用 queue_redraw，此处不重复调用。
-func _set_layers_image(layers: Array[Control], tex: Texture2D) -> void:
-	var tokens: PackedStringArray = PackedStringArray(INTRO_TEXT_TOKENS)
+##       外部事件背景切帧（[[intro_全盘重新设计_预启动]] §🔵）通过 set_event_background 公共 API
+##       传入自定义 tokens（如药铺词池）；intro 启动期内部调用不传 tokens，沿用 INTRO_TEXT_TOKENS。
+func _set_layers_image(layers: Array[Control], tex: Texture2D, tokens: PackedStringArray = PackedStringArray()) -> void:
+	var effective_tokens: PackedStringArray = tokens
+	if effective_tokens.is_empty():
+		effective_tokens = PackedStringArray(INTRO_TEXT_TOKENS)
 	# 逐层设置源图和 token，确保各层渲染同一帧画面
 	for layer: Control in layers:
 		layer.call("set_source_image", tex)
-		layer.call("set_text_tokens", tokens)
+		layer.call("set_text_tokens", effective_tokens)
 
 
 # ============================================================
@@ -647,13 +889,14 @@ func _on_button_fade_out_done() -> void:
 
 ## 功能：t=0.5s 时触发，cross-fade 涟漪当前帧切到 girl_enter，IntroSequence 永久保持显示。
 ## 说明：原设计是 IntroSequence 整体淡出让 ScreenMosaic 浮现接管屏幕渲染。
-##       现改为 IntroSequence 不淡出，用 13 层 mosaic 永久承担屏幕级 girl_enter 渲染
-##       （ScreenMosaic 3 层粗渲染体系不再参与），实现 intro 期间与之后视觉风格一致。
-##       函数名 _on_start_fade_out 保留以避免改动 Callable；实际行为是切图。
+##       现改为 IntroSequence 不淡出，用 13 层 mosaic 永久承担屏幕级渲染（参 [[intro_全盘重新设计_预启动]] §🔵）。
+##       intro_completed 后由 main_game 通过 set_event_background 公共 API 喂入后续事件背景。
+##       函数名 _on_start_fade_out 保留以避免改动 Callable；实际行为是切图 + 同步注入 face mask。
 func _on_start_fade_out() -> void:
-	# 先给即将装载 girl_enter 的非活跃套注入脸部 mask；该套 IntroFaceMask 随 cross-fade alpha 同步显现
-	_setup_face_mask_for_girl_enter()
-	_crossfade_to_image(_girl_enter_tex)
+	# 记录当前显示图路径，供 intro_completed 后外部 set_event_background 幂等检查使用
+	_current_displayed_art_path = GIRL_ENTER_PATH
+	# cross-fade 切到 girl_enter：保留 INTRO_TEXT_TOKENS 池塘词池 + 注入 girl_enter face mask
+	_crossfade_to_image(_girl_enter_tex, PackedStringArray(INTRO_TEXT_TOKENS), GIRL_ENTER_FACE_MASK_PATH)
 
 
 ## 功能：t=0.4s 时发射 reveal_screen_mosaic 信号。
@@ -674,6 +917,13 @@ func _emit_reveal_ui() -> void:
 ## 功能：t=2.0s 时发射 completed 信号；IntroSequence 保持显示作为屏幕级 girl_enter 渲染。
 func _emit_completed() -> void:
 	_state = State.DONE
+	# 议题 §🔵 实施期 2026-05-11（REQ-004）：DONE 期初始化 N=4 LRU 池。
+	# CLICKED 期 _on_start_fade_out 已把 girl_enter 装到 cross-fade 翻转后的 active 套，
+	# 登记到缓存池让后续 set_event_background(girl_enter) 命中缓存（不重 _draw）。
+	# 涟漪期 inactive 套持有的图（最后一帧 ripple_*）在 DONE 期不再用，作为空 slot 由 LRU 策略覆盖。
+	var girl_enter_slot: Control = mosaic_layers_a if _active_is_a else mosaic_layers_b
+	_slot_holdings[GIRL_ENTER_PATH] = girl_enter_slot
+	_slot_lru.append(girl_enter_slot)
 	intro_completed.emit()
 	# 不再隐藏自身：IntroSequence 13 层 mosaic 接管屏幕级 girl_enter 渲染，永久保持。
 	# LeftOverlay (UI) 在 Root 内，渲染顺序在 IntroSequence 之上，不会被遮挡。

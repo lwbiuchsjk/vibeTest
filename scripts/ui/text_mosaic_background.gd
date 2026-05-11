@@ -5,6 +5,13 @@
 #         - 每格反向映射到源图坐标取 Image 像素颜色
 #         - 颜色 alpha 过 density_threshold 的格子画一个文字 token
 #       这样字符间距 ≈ font_size,字符自然挨在一起像像素点;font_size 同时控制字号 + 密度。
+#
+# 源图规范(避免误以为需要离线 mosaic 转换):
+#   - 入参 set_source_image(texture) 接受**普通 1024×576 PNG**(aspect 16:9,与全屏 canvas 同)
+#   - **无需任何离线 mosaic 预处理**——本节点 _draw 即时反向采样源图渲染 mosaic 效果
+#   - 入库流程见 Design/事件背景图入库工作流.md (raw → resize → assets/),不存在"mosaic 格式"中间产物
+#   - 离线 mosaic 渲染脚本是 REQ-004 重构期静态化方案 B 的探索方向,**当前不存在**
+#
 # 设计依据:Design/文字马赛克美术背景_MVP设计.md(架构 B 路径:Godot 原生 draw_string)
 extends Control
 
@@ -107,6 +114,15 @@ const EXCLUDE_MASK_ALPHA_THRESHOLD: float = 0.5
 var _source_texture: Texture2D = null
 # 缓存源图 Image,避免每次 _draw 都重新 get_image()(后者会触发 GPU→CPU 拉取)
 var _source_image: Image = null
+# 幂等检查：缓存 texture 引用,避免相同 texture 重复 get_image + queue_redraw
+# 议题 §🔵 实施期 2026-05-11 发现：cross-fade 来回切让 A 套重复设同 texture →
+# 重复 queue_redraw 触发 _draw 重跑 → Godot canvas item batch 状态被破坏 → draw_calls 暴涨
+var _source_texture_ref: Texture2D = null
+
+# 调试：_draw 触发频率统计（议题 §🔵 卡顿诊断用，验证稳态下 _draw 是否被频繁重触发）
+# 卡顿瓶颈解决后整体可移除
+var _dbg_draw_enter_count: int = 0
+var _dbg_last_draw_log_ms: int = 0
 var _text_tokens: PackedStringArray = PackedStringArray()
 var _font: Font = null
 # 呼吸动画累积时间(仅 breathe_enabled=true 时使用)
@@ -147,6 +163,7 @@ func _process(delta: float) -> void:
 # 参数 texture:地点 SVG 加载后的 Texture2D(来自 location_graph.csv 的 art_file)。
 # 说明:传入 null 表示清空背景;Image 不可读时 push_warning,_draw 将不渲染。
 func set_source_image(texture: Texture2D) -> void:
+	# 议题 §🔵 实施期 2026-05-11：set_source_image 幂等检查已撤回（让 items 减半引入新问题）
 	_source_texture = texture
 	_source_image = null
 	if texture != null:
@@ -209,6 +226,16 @@ func clear_exclude_mask() -> void:
 # 性能:稳态下 _draw 不会触发(Godot 缓存上次绘制),仅地点切换/尺寸变化重绘一次。
 #       canvas 1700×2000 + cell=8 约 53000 次 draw_string,单次 < 1s 可接受。
 func _draw() -> void:
+	# 调试：_draw 触发频率统计（议题 §🔵 卡顿诊断用）
+	# 稳态下 Godot 应只在 queue_redraw 时触发 _draw（即 set_source_image / set_text_tokens / resize 等），
+	# 不应每帧重触发。每秒限速 1 行 print，输出过去 1s 内本层 _draw 被调用次数。
+	# 预期值：稳态 0 次（_draw 不被触发，不打印）；切帧时 1 次；如果 print 显示每秒数十次 → bug。
+	_dbg_draw_enter_count += 1
+	var now_ms: int = Time.get_ticks_msec()
+	if now_ms - _dbg_last_draw_log_ms >= 1000:
+		print("[mosaic %s] _draw triggered %d times in last %.1fs" % [name, _dbg_draw_enter_count, (now_ms - _dbg_last_draw_log_ms) / 1000.0])
+		_dbg_last_draw_log_ms = now_ms
+		_dbg_draw_enter_count = 0
 	if _source_image == null or _text_tokens.is_empty():
 		return
 	var canvas_size: Vector2 = size
@@ -218,6 +245,8 @@ func _draw() -> void:
 	var src_h: int = _source_image.get_height()
 	if src_w <= 0 or src_h <= 0:
 		return
+	# 调试：字符数统计（议题 §🔵 卡顿诊断用，卡顿解决后可整体移除 counter + print）
+	var dbg_drawn: int = 0
 
 	# Cover 模式反向映射:与 EventBackground.stretch_mode=6 (KEEP_ASPECT_COVERED) 对齐,保持源图比例。
 	# canvas (cx, cy) → src (src_offset + (cx, cy) * inv_scale)。
@@ -336,8 +365,15 @@ func _draw() -> void:
 					draw_color
 				)
 				token_idx += 1
+				dbg_drawn += 1
 			x += cell
 		y += cell
+
+	# 调试：每次 _draw 触发（切帧 / 尺寸变化）print 该层字符数统计。
+	# 议题 §🔵 卡顿诊断用——观察 IntroBg / IntroCoarse / 各暗部层在不同图下的实际字符数。
+	# 性能影响：稳态下 _draw 不触发（Godot 缓存），仅切帧时 print 一次，可接受。
+	var dbg_cells: int = (int(ceil(canvas_size.x / float(cell))) + 1) * (int(ceil(canvas_size.y / float(cell))) + 1)
+	print("[mosaic %s] drawn=%d / cells≈%d (pass≈%.1f%%)" % [name, dbg_drawn, dbg_cells, (float(dbg_drawn) / maxf(float(dbg_cells), 1.0)) * 100.0])
 
 	# 调试网格(仅 debug_show_grid=true 时启用,在 alpha 通过的格子画红圆)
 	if debug_show_grid:

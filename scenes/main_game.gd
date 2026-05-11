@@ -110,10 +110,23 @@ const COMMON_MOSAIC_TOKENS: Array = [
 const ZHOU_TRAINING_GROUND_PATH: String = "res://assets/art/environments/backgrounds/training_ground.png"
 const ZHOU_TRAINING_GROUND_LOCATION: String = "loc_zhou_training_ground"
 
+# 含人物面部的事件背景图 → face mask 路径映射（demo 期 hardcode）。
+# 用途：抑制大字号 mosaic 层（IntroCoarse 24px / IntroMedium 14px）落脸破坏人物识别。
+# 应用层：text_mosaic_coarse / text_mosaic_medium 通过 set_exclude_mask 注入。
+# 维护协议：每加一张含人物的事件背景图，须按 [[face_mask生成工作流]] 生成对应 face mask
+#           并在 _apply_event_face_mask 函数的分支表内添加 elif 路由。
+#           完整入库流程（含 mask 决策点）见 [[事件背景图入库工作流]]。
+# 重构入口：本 hardcode 全期最多承载 4 NPC × 1 = 4 张图，
+#           正式版改造（events.csv 加 exclude_mask_art 字段）登记于 [[代码重构_预启动]] §必做任务。
+const PHARMACY_HESHOUREN_FACE_MASK_PATH: String = "res://assets/art/environments/backgrounds/pharmacy_default_heshouren_foreground_face_mask.png"
+
 var _engine: WorldEventEngine
 var _event_logs: Array[String] = []
 var _current_turn_result: Dictionary = {}
 var _resizing := false              # 防止窗口尺寸调整时递归触发
+# 调试：FPS 监控累加器（_process 内每 1s print 一次 FPS，性能瓶颈诊断用）
+# 议题 §🔵 实施期保留作 hover / 事件切换性能基线观察工具；卡顿问题收口后整个 _process 函数 + 此变量可移除
+var _fps_debug_accum: float = 0.0
 # 主动押注切换状态：按选项 ID 记录各选项的押注模式（true=押注，false=默认）。
 var _bet_mode_options: Dictionary = {}
 # 状态栏 5 印章 SealPanel 节点引用缓存（议题 A 收口，2026-05-10）。
@@ -2314,165 +2327,74 @@ func _on_viewport_resized() -> void:
 	_resizing = false
 
 
-# 功能：渲染当前事件背景图。
+# 功能：渲染当前事件背景图（议题 §🔵 决议后单一路径：通过 IntroSequence 全屏渲染）。
 # 说明：只消费引擎已解析好的最终背景路径；Consumer 不再自行实现事件/地点 fallback 规则。
-#       同步驱动三层视觉:
-#         - EventBackground(原图层,作为 fallback)
-#         - TextMosaicBackground(静态文字层)
-#         - TextMosaicParticles(动态粒子层,在 flow_regions JSON 定义的主体内流动)
-#       从 _engine.world_state.currentLocationId 取地点 ID 决定 token 集合。
+#       架构（[[intro_全盘重新设计_预启动]] §🔵 候选 B 决议）：
+#         - IntroSequence.set_event_background 接收 (art_path, tokens, face_mask_path) 三参，
+#           内部 A/B 双套 cross-fade 0.5s 切到新帧 + 同步切 token + 同步应用 face mask
+#         - LeftStack 12 层 mosaic + ScreenMosaic 3 层屏幕级 mosaic 永久 visible=false（不参与渲染）
+#         - flow_regions / accent_marked 数据通道废弃（决策点 7 收口搁置 + 议题 §🔵 决议下不再消费）
+#       Consumer 职责简化为：
+#         - 判断 token 池（自省事件 → INTRO_TEXT_TOKENS；普通事件 → location-based）
+#         - 判断 face mask 路径（含人物面部图 → 对应 mask；其他 → 空）
+#         - 单调用 IntroSequence.set_event_background
 func _render_event_background(background_art_path: String) -> void:
-	# Step 3：消费引擎已解析的最终背景路径（事件 backgroundArt → 地点 art_file → 空字符串）。
-	# 路径为空时进入空白底兜底分支，清空所有 mosaic 层。
+	# 消费引擎已解析的最终背景路径（事件 backgroundArt → 地点 art_file → 空字符串）。
 	# 自省事件（sys_*_reflection）通过 events.csv background_art 字段配 pond_girl_enter.png，
-	# 走引擎 fallback 链产出 girl_enter 路径，复用 IntroSequence 终态视觉（不需 Consumer 特判）。
+	# 走引擎 fallback 链产出 girl_enter 路径，与 IntroSequence 终态视觉一致（无视觉跳变）。
 	var normalized_path := background_art_path.strip_edges()
-	# Phase A 调优 3：自省事件入场过场动效（轻度方案——LeftStack alpha 0→1 fade-in）。
+
+	# Phase A 调优 3：自省事件入场过场动效（LeftStack alpha 0→1 fade-in，影响 LeftOverlay UI 出场感）。
+	# 决议方案下 LeftStack 内背景层不可见，但 LeftOverlay UI 仍随 LeftStack modulate 一并 fade。
 	# 设计基线见 [[当前版本完整主路径_MVP设计]] §二·原则 7（自省事件复用 IntroSequence 视觉）。
-	# 完整涟漪循环 → girl_enter 演出待美术阶段升级到中度方案；当前先用 fade-in 创造"过场感"。
 	var is_reflection_bg := normalized_path.ends_with("pond_girl_enter.png")
 	if is_reflection_bg and normalized_path != _last_reflection_bg_path:
 		_last_reflection_bg_path = normalized_path
 		_trigger_reflection_intro_fade()
 	elif not is_reflection_bg:
 		_last_reflection_bg_path = ""
-	if normalized_path.is_empty():
-		event_background_rect.texture = null
-		text_mosaic_bg.set_source_image(null)
-		text_mosaic_particles.set_source_image(null)
-		text_mosaic_particles.clear_flow_data()
-		if text_mosaic_coarse != null:
-			text_mosaic_coarse.set_source_image(null)
-		if text_mosaic_medium != null:
-			text_mosaic_medium.set_source_image(null)
-		if text_mosaic_dark_light != null:
-			text_mosaic_dark_light.set_source_image(null)
-		if text_mosaic_dark_accent != null:
-			text_mosaic_dark_accent.set_source_image(null)
-		if text_mosaic_dark_deep != null:
-			text_mosaic_dark_deep.set_source_image(null)
-		if text_mosaic_dark_ink != null:
-			text_mosaic_dark_ink.set_source_image(null)
-		if text_mosaic_dark_between != null:
-			text_mosaic_dark_between.set_source_image(null)
-		if text_mosaic_dark_abyss != null:
-			text_mosaic_dark_abyss.set_source_image(null)
-		if text_mosaic_mid_dark != null:
-			text_mosaic_mid_dark.set_source_image(null)
-		if text_mosaic_mid_light != null:
-			text_mosaic_mid_light.set_source_image(null)
-		if text_mosaic_highlight != null:
-			text_mosaic_highlight.set_source_image(null)
-		if text_mosaic_accent != null:
-			text_mosaic_accent.set_source_image(null)
-		if text_mosaic_accent_marked != null:
-			text_mosaic_accent_marked.set_source_image(null)
-			text_mosaic_accent_marked.clear_accent_data()
-		if screen_mosaic_coarse != null:
-			screen_mosaic_coarse.set_source_image(null)
-		if screen_mosaic_medium != null:
-			screen_mosaic_medium.set_source_image(null)
-		if screen_mosaic_bg != null:
-			screen_mosaic_bg.set_source_image(null)
+
+	# intro_sequence 节点可能在 test 场景下不存在（test/event_logic_test 等共享脚本场景）；做 null 防御
+	if intro_sequence == null:
 		return
 
-	var resource := ResourceLoader.load(normalized_path)
-	var texture: Texture2D = resource if resource is Texture2D else null
-	# Step 3 决策（方案 A）：原图层显隐策略延后到 Step 4/5 美术资产入库阶段定。
-	# 当前所有事件背景统一走 mosaic 层渲染（texture 仅作 source 生成字符），
-	# EventBackground TextureRect 保持 null，叠加 BackgroundColor 米色底保持宣纸视觉。
-	# 多事件原图引入时（Step 4/5），按事件类型差异化是否显示原图（如 reflection 走 girl_enter
-	# 时 EventBackground 仍 null 避免浅水面偏白；其他场景按设计开启）。
-	event_background_rect.texture = null
+	# 取 token 池 + face mask 路径，单调用 IntroSequence 切帧
+	var tokens: PackedStringArray = _get_tokens_for_event_background(normalized_path)
+	var face_mask_path: String = _get_face_mask_for_art(normalized_path)
+	intro_sequence.set_event_background(normalized_path, tokens, face_mask_path)
 
-	# 文字马赛克静态层:复用同一 Texture2D,按当前 location_id 选 tokens。
-	# 角色创建阶段 _engine 可能尚未完全初始化 world_state,此处做 null 防御。
-	# 未匹配的 location_id 落到 DEFAULT_TEXT_TOKENS,确保文字层始终有内容可渲染。
-	text_mosaic_bg.set_source_image(texture)
+
+# 功能：根据事件背景图路径决定 token 池。
+# 说明：自省事件（pond_girl_enter）保留 INTRO_TEXT_TOKENS 池塘词池维持 intro 视觉调性；
+#       其他事件按 _engine.world_state.currentLocationId 走 LOCATION_TEXT_TOKENS 词池；
+#       未匹配 location 落到 DEFAULT_TEXT_TOKENS（风/云/山/水/...）。
+# 设计依据：[[intro_全盘重新设计_预启动]] §🔵 三 token 池策略
+func _get_tokens_for_event_background(art_path: String) -> PackedStringArray:
+	# 自省事件 / IntroSequence 终态图：用 IntroSequence 内置池塘词池
+	if art_path.ends_with("pond_girl_enter.png"):
+		return PackedStringArray(IntroSequence.INTRO_TEXT_TOKENS)
+	# 普通事件：按 location_id 查表，未匹配落 DEFAULT
 	var location_id: String = ""
 	if _engine != null:
 		location_id = str(_engine.world_state.get("currentLocationId", ""))
 	var raw_tokens: Array = LOCATION_TEXT_TOKENS.get(location_id, DEFAULT_TEXT_TOKENS)
-	var tokens: PackedStringArray = PackedStringArray(raw_tokens)
-	text_mosaic_bg.set_text_tokens(tokens)
+	return PackedStringArray(raw_tokens)
 
-	# 油画式多层叠加:核心区 coarse/medium 两层与 bg 共享源图+tokens,
-	# 字号梯度由各节点 .tscn 属性配置(24 / 14 / 8)。
-	# 仅 main_game 场景有 coarse/medium 节点,test 场景跳过。
-	if text_mosaic_coarse != null:
-		text_mosaic_coarse.set_source_image(texture)
-		text_mosaic_coarse.set_text_tokens(tokens)
-	if text_mosaic_medium != null:
-		text_mosaic_medium.set_source_image(texture)
-		text_mosaic_medium.set_text_tokens(tokens)
-	if text_mosaic_dark_light != null:
-		text_mosaic_dark_light.set_source_image(texture)
-		text_mosaic_dark_light.set_text_tokens(tokens)
-	if text_mosaic_dark_accent != null:
-		text_mosaic_dark_accent.set_source_image(texture)
-		text_mosaic_dark_accent.set_text_tokens(tokens)
-	if text_mosaic_dark_deep != null:
-		text_mosaic_dark_deep.set_source_image(texture)
-		text_mosaic_dark_deep.set_text_tokens(tokens)
-	if text_mosaic_dark_ink != null:
-		text_mosaic_dark_ink.set_source_image(texture)
-		text_mosaic_dark_ink.set_text_tokens(tokens)
-	if text_mosaic_dark_between != null:
-		text_mosaic_dark_between.set_source_image(texture)
-		text_mosaic_dark_between.set_text_tokens(tokens)
-	if text_mosaic_dark_abyss != null:
-		text_mosaic_dark_abyss.set_source_image(texture)
-		text_mosaic_dark_abyss.set_text_tokens(tokens)
-	if text_mosaic_mid_dark != null:
-		text_mosaic_mid_dark.set_source_image(texture)
-		text_mosaic_mid_dark.set_text_tokens(tokens)
-	if text_mosaic_mid_light != null:
-		text_mosaic_mid_light.set_source_image(texture)
-		text_mosaic_mid_light.set_text_tokens(tokens)
-	if text_mosaic_highlight != null:
-		text_mosaic_highlight.set_source_image(texture)
-		text_mosaic_highlight.set_text_tokens(tokens)
-	if text_mosaic_accent != null:
-		text_mosaic_accent.set_source_image(texture)
-		text_mosaic_accent.set_text_tokens(tokens)
 
-	# 屏幕级 mosaic 衬底(油画式 3 层):粗 36px → 中 18px → 细 8px,字号梯度由 .tscn 配置。
-	# 仅 main_game 场景有此节点,test 场景跳过。
-	if screen_mosaic_coarse != null:
-		screen_mosaic_coarse.set_source_image(texture)
-		screen_mosaic_coarse.set_text_tokens(tokens)
-	if screen_mosaic_medium != null:
-		screen_mosaic_medium.set_source_image(texture)
-		screen_mosaic_medium.set_text_tokens(tokens)
-	if screen_mosaic_bg != null:
-		screen_mosaic_bg.set_source_image(texture)
-		screen_mosaic_bg.set_text_tokens(tokens)
-
-	# 文字马赛克粒子层:加载与 art_file 同名的 flow_regions.json,驱动粒子在主体区域内流动。
-	# JSON 不存在时清空粒子,粒子层渲染为空(不影响静态层)。
-	text_mosaic_particles.set_source_image(texture)
-	text_mosaic_particles.set_text_tokens(tokens)
-	var flow_data: Dictionary = _load_flow_regions_for(normalized_path)
-	if flow_data.is_empty():
-		text_mosaic_particles.clear_flow_data()
-		if text_mosaic_accent_marked != null:
-			text_mosaic_accent_marked.set_source_image(null)
-			text_mosaic_accent_marked.clear_accent_data()
-	else:
-		var regions: Array = flow_data.get("flow_regions", [])
-		var img_size_arr: Array = flow_data.get("image_size", [0, 0])
-		var img_size: Vector2 = Vector2(
-			float(img_size_arr[0]), float(img_size_arr[1])
-		)
-		text_mosaic_particles.set_flow_data(regions, img_size)
-		# 标注式点睛色层:从同一 flow_regions.json 读 accent_areas 字段(可选,缺省 = 无点睛)
-		# accent_layers 的 mix_source > 0 时需要源图,这里同步注入(与 set_accent_data 顺序无关,
-		# 但 set_source_image 在前更直观——先有源图,再有 area 数据)
-		if text_mosaic_accent_marked != null:
-			var accent_areas: Array = flow_data.get("accent_areas", [])
-			text_mosaic_accent_marked.set_source_image(texture)
-			text_mosaic_accent_marked.set_accent_data(accent_areas, img_size)
-			text_mosaic_accent_marked.set_text_tokens(tokens)
+# 功能：根据事件背景图路径查 face mask（含人物面部图 → 对应 mask 路径；其他 → 空字符串）。
+# 说明：含人物面部的图须在 const 区登记 *_FACE_MASK_PATH 常量并在本函数的分支表添加 elif 路由。
+#       本函数是 demo 期临时方案——全期最多承载 4 NPC 骨架 + girl_enter = 5 张图；
+#       事件数量持续增长后须升级为 events.csv 字段化（见 [[代码重构_预启动]] REQ-003 必做任务）。
+# 设计依据：[[intro_全盘重新设计_预启动]] §🔵 四 face mask 收敛 + [[face_mask生成工作流]]
+func _get_face_mask_for_art(art_path: String) -> String:
+	# 自省事件 / IntroSequence 终态图：复用 IntroSequence 内置 mask 常量（少女脸）
+	if art_path.ends_with("pond_girl_enter.png"):
+		return IntroSequence.GIRL_ENTER_FACE_MASK_PATH
+	# 何首乌前景图（药铺骨架 evt_s2_sk_he）
+	if art_path.ends_with("pharmacy_default_heshouren_foreground.png"):
+		return PHARMACY_HESHOUREN_FACE_MASK_PATH
+	# 未来加：秦素娘 / 周既明 / 程冕骨架背景图
+	return ""
 
 
 # 功能:从背景图路径推导 flow_regions.json 路径并加载。
@@ -2546,7 +2468,29 @@ func _setup_platform_default_layers() -> void:
 			screen_mosaic_bg.visible = true
 
 
-# 功能：F9 互斥切换"原图层"与"文字马赛克层(静态+粒子)"；F8 强制渲染周既明练武场背景。
+# 功能：调试 FPS 监控——每秒 print 一次当前 FPS 到 Godot console。
+# 说明：议题 §🔵 实施期卡顿诊断用；与 F10 切 IntroSequence visible 配合用于定位渲染瓶颈：
+#       - 默认状态 FPS 数字 = 当前 mosaic 渲染负载下的实际表现
+#       - F10 关 IntroSequence 后 FPS 数字 = 跳过 13 层 mosaic 后的基线
+#       - 两个数字差距大 → 瓶颈在 IntroSequence；差距小 → 瓶颈在其他地方
+#       卡顿问题收口后整个函数 + _fps_debug_accum 变量可移除。
+func _process(delta: float) -> void:
+	_fps_debug_accum += delta
+	if _fps_debug_accum >= 1.0:
+		_fps_debug_accum = 0.0
+		# FPS + 静态内存（MB）+ 节点总数 + Tween 数量 + Texture 对象数量（累积 bug 诊断）
+		var static_mem_mb: float = OS.get_static_memory_usage() / 1048576.0
+		var node_count: int = get_tree().get_node_count()
+		# 累积 bug 诊断：obj 总数 / resources / 每帧 draw call / 每帧 render objects
+		var obj_count: int = int(Performance.get_monitor(Performance.OBJECT_COUNT))
+		var resource_count: int = int(Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT))
+		var draw_calls: int = int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+		var draw_items: int = int(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME))
+		print("[FPS] %d | mem=%.1fMB | nodes=%d | obj=%d | resources=%d | draw_calls=%d | items=%d" % [Engine.get_frames_per_second(), static_mem_mb, node_count, obj_count, resource_count, draw_calls, draw_items])
+
+
+# 功能：F9 互斥切换"原图层"与"文字马赛克层(静态+粒子)"；F8 强制渲染周既明练武场背景；
+#       F10 切 IntroSequence visible（议题 §🔵 实施期渲染瓶颈诊断用，配合 _process FPS 监控）。
 # 说明：仅开发期使用；正式发布前可移除或限制为 OS.is_debug_build() 才生效。
 #       粒子层属于 mosaic 体系，跟随 mosaic 静态层一起 toggle。
 #       F8 用于在不改 CSV 事件配置的前提下验证 M1' 算法在真实暖色调美术上的视觉效果。
@@ -2610,6 +2554,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				_debug_show_check_result_feedback("success")
 			KEY_F6:
 				_debug_show_check_result_feedback("fail")
+			# F10：议题 §🔵 实施期渲染瓶颈诊断（2026-05-11）。
+			# 切 IntroSequence 整体 visible，配合 _process FPS print 观察"开/关"FPS 数字差距，
+			# 定位卡顿是来自 13 层 mosaic 渲染还是其他地方（UI / Tween / 引擎逻辑等）。
+			KEY_F10:
+				if intro_sequence != null:
+					intro_sequence.visible = not intro_sequence.visible
+					print("[F10 调试] IntroSequence visible = %s" % intro_sequence.visible)
 
 
 # 功能：议题 A 调试展示——触发全 5 印章浮动汉字动效（2026-05-10）。

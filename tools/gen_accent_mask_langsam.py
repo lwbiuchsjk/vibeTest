@@ -3,6 +3,15 @@
 """
 LangSAM 文本驱动 mask 生成脚本
 
+适用范围(避免误用):
+- ✓ 本工具仅产 face mask / accent mask (二值 RGBA PNG, A=mask×255)
+- ✓ 供 text_mosaic_background.gd::set_exclude_mask 或
+      text_mosaic_accent_marked.gd 通过 Image.get_pixel().a 判定 mask 区域
+- ✗ **不是** mosaic 离线渲染工具——mosaic 是运行时效果,
+      由 text_mosaic_background.gd::_draw 在 Godot 内反向采样源图实时渲染,
+      不存在"离线 mosaic PNG"产物。源图入库走 Design/事件背景图入库工作流
+- 工作流参考: Design/face_mask生成工作流.md (五步标准流程)
+
 用途:输入源图 + 文本提示,调用 LangSAM(GroundingDINO + SAM 2.1)输出像素级 mask PNG。
 产物为 RGBA PNG(RGB=白色,A=mask × 255),与源图同尺寸,供 Godot 引擎
 text_mosaic_accent_marked.gd 通过 Image.get_pixel().a 判定 accent 区域。
