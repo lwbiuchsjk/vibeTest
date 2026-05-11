@@ -395,7 +395,8 @@ func confirm_reflection_location_select(location_id: String) -> Dictionary:
 	if str(event_def.get("type", "")) != "reflection":
 		return {"ok": false, "error": "current event is not reflection: %s" % event_id}
 
-	var presentation_items: Array = _get_event_presentation(event_def)
+	# 需求 2：使用过滤后的列表（按 condition 过滤），与渲染侧的 presentation_index 对齐。
+	var presentation_items: Array = _get_event_presentation_filtered(event_def)
 	var current_index: int = int(_pending_turn_context.get("presentation_index", 0))
 	if current_index < 0 or current_index >= presentation_items.size():
 		return {"ok": false, "error": "presentation index out of range: %d" % current_index}
@@ -515,7 +516,8 @@ func _resolve_pending_turn(selected_option_id: String) -> Dictionary:
 		# Step 2 P1-1：当前 presentation 行 presents=location_select 时拒绝普通 confirm，
 		# 防止外部 Consumer 绕过 confirm_reflection_location_select 跳过地点选择 →
 		# visited_locations 不写但后续仍启动新包的状态机错位。强制走专用 API。
-		var presentation_items := _get_event_presentation(event_def)
+		# 需求 2：使用过滤后的列表，与渲染侧的 presentation_index 对齐。
+		var presentation_items := _get_event_presentation_filtered(event_def)
 		var current_index: int = int(_pending_turn_context.get("presentation_index", 0))
 		if current_index >= 0 and current_index < presentation_items.size():
 			var current_pres_item: Dictionary = presentation_items[current_index]
@@ -882,7 +884,9 @@ func _create_pending_turn_context(
 				choice_result["resolved_by"] = "pending_external_selection"
 				phase = "choice"
 
-	var presentation_items := _get_event_presentation(event_def)
+	# 需求 2：使用过滤后的列表判断是否有 presentation 屏可展示。
+	# 若 condition 全不满足（过滤后为空）则跳过 presentation 阶段（直接进 confirm/choice）。
+	var presentation_items := _get_event_presentation_filtered(event_def)
 	if not presentation_items.is_empty():
 		phase = "presentation"
 
@@ -929,8 +933,10 @@ func _advance_pending_phase_after_presentation(event_def: Dictionary) -> void:
 	_pending_turn_context["presentation_index"] = 0
 
 
-# 功能：读取事件展示配置。
+# 功能：读取事件展示配置（原始全量列表，含 _dynamic 虚拟行）。
 # 说明：统一收束展示数据的空值处理，便于后续扩展更多展示类型。
+# 注意：此函数返回未过滤的原始列表；渲染层应改用 _get_event_presentation_filtered，
+#       后者会按 condition 字段过滤出满足 world_state 条件的行。
 func _get_event_presentation(event_def: Dictionary) -> Array:
 	var presentation: Variant = event_def.get("presentation", [])
 	if typeof(presentation) == TYPE_ARRAY and presentation != null:
@@ -938,10 +944,80 @@ func _get_event_presentation(event_def: Dictionary) -> Array:
 	return []
 
 
+# 【CSV 契约边界】需求 2 — presentation condition 过滤入口。
+# 来源：Design/配置翻译指南.md 锚点 presentation_condition。
+# 过滤规则：
+#   - 对同一 display_order 的多行（差分行组），先找满足 condition 的行，命中第一个即选用；
+#   - 若同组内无行命中 condition，则选用 condition 为空的行（fallback 通用行）；
+#   - 若同组内 condition 均为空（普通无差分行），直接保留该行不变（兼容旧数据）。
+# condition 语法与 event_conditions.csv 的 weight_rule 表达式相同：
+#   `<world_state_path> <op> "<value>"` 例：last_consumed_skeleton_event_id == "evt_s2_sk_he"
+# 改动本函数时必须同步回看：配置翻译指南锚点 / csv_validator.py / 装配层 _apply_event_presentations。
+func _get_event_presentation_filtered(event_def: Dictionary) -> Array:
+	var raw: Array = _get_event_presentation(event_def)
+	if raw.is_empty():
+		return raw
+
+	# 按 display_order 分组，确认各组是否存在 condition 字段（差分行组 vs 普通行）。
+	# 使用 order → [items] 的字典进行分组。
+	var groups: Dictionary = {}
+	var order_seq: Array = []  # 保留 display_order 出现顺序
+	for item_variant in raw:
+		var item: Dictionary = item_variant
+		var order: int = int(item.get("order", 0))
+		if not groups.has(order):
+			groups[order] = []
+			order_seq.append(order)
+		var arr: Array = groups[order]
+		arr.append(item)
+
+	var result: Array = []
+	for order_variant in order_seq:
+		var order: int = order_variant
+		var group: Array = groups[order]
+
+		# 判断该 order 组是否存在至少一个非空 condition（即为差分行组）。
+		var has_any_condition := false
+		for item_variant in group:
+			var item: Dictionary = item_variant
+			var cond := str(item.get("condition", "")).strip_edges()
+			if not cond.is_empty():
+				has_any_condition = true
+				break
+
+		if not has_any_condition:
+			# 普通行：直接保留整组（通常只有 1 行，兼容旧数据）。
+			for item_variant in group:
+				result.append(item_variant)
+			continue
+
+		# 差分行组：先尝试找到第一个满足 condition 的行。
+		var matched_item: Variant = null
+		var fallback_item: Variant = null  # condition 为空的通用行
+		for item_variant in group:
+			var item: Dictionary = item_variant
+			var cond := str(item.get("condition", "")).strip_edges()
+			if cond.is_empty():
+				# 记录 fallback 行（只保留最后一个，通常只有一个）。
+				fallback_item = item
+			elif matched_item == null and _evaluate_condition(cond):
+				matched_item = item
+
+		# 命中优先，无命中走 fallback，两者均无则跳过该 order（避免引入空行）。
+		if matched_item != null:
+			result.append(matched_item)
+		elif fallback_item != null:
+			result.append(fallback_item)
+		# 若 condition 全不满足且无 fallback，该屏被静默跳过。
+	return result
+
+
 # 功能：构建返回给 Consumer 的展示阶段状态。
 # 说明：Consumer 只消费当前展示项和索引信息，不直接解析事件定义原始结构。
 func _build_presentation_state(event_def: Dictionary, phase: String) -> Dictionary:
-	var presentation_items := _get_event_presentation(event_def)
+	# 需求 2：渲染侧使用过滤后的列表，确保 total / index / current_item 均基于
+	# 按 condition 过滤后实际展示给玩家的行集合。
+	var presentation_items := _get_event_presentation_filtered(event_def)
 	var state := {
 		"active": false,
 		"index": -1,
