@@ -430,6 +430,11 @@ func confirm_reflection_location_select(location_id: String) -> Dictionary:
 	world_state["currentLocationId"] = loc_id
 
 	# 按 transition_text_pool 抽过渡叙事，追加为虚拟 presentation 行（_dynamic=true）。
+	# 关键：追加目标是 raw event_def.presentation（含全部条件分支），而不是 presentation_items（已过滤）。
+	# 历史 BUG：曾用 event_def["presentation"] = presentation_items 写回，把过滤后只剩命中 + fallback
+	#       的列表覆盖了原 raw，导致下一次 sys_reflection 触发时 last_consumed_skeleton_event_id 切换到
+	#       别的骨架，被丢失的 4 个 condition 差分行无可命中、又无 fallback → 整个 order=1 组静默跳过、
+	#       p1 屏在 UI 上消失。修复后 raw 保留全部差分行，过滤每次重跑，跨次自省的 condition 差分稳定。
 	var pool: Dictionary = _dict_or_empty(world_state.get("transitionTextPool", {}))
 	var by_location: Dictionary = _dict_or_empty(pool.get("reflection_transition", {}))
 	var transition_texts: Array = _array_or_empty(by_location.get(loc_id, []))
@@ -438,8 +443,11 @@ func confirm_reflection_location_select(location_id: String) -> Dictionary:
 		for it_var in presentation_items:
 			var it: Dictionary = it_var
 			max_seq = max(max_seq, int(it.get("order", 0)))
+		# raw_presentation 是 event_def.presentation 的引用（GDScript Array 引用语义），
+		# 直接 append 即原地修改 event_def，无需手动写回。
+		var raw_presentation: Array = _get_event_presentation(event_def)
 		for i in range(transition_texts.size()):
-			presentation_items.append({
+			var transition_row: Dictionary = {
 				"id": "%s_transition_%d" % [event_id, i + 1],
 				"order": max_seq + i + 1,
 				"type": "text",
@@ -447,9 +455,11 @@ func confirm_reflection_location_select(location_id: String) -> Dictionary:
 				"text": str(transition_texts[i]),
 				"presents": "text",
 				"_dynamic": true
-			})
-		event_def["presentation"] = presentation_items
-		_event_map[event_id] = event_def
+			}
+			raw_presentation.append(transition_row)
+			# 同步追加到本地 filtered 列表，让后续 next_index >= size 判断走对路径。
+			# transition 行 condition 为空，下次 _get_event_presentation_filtered 重过滤时一定保留。
+			presentation_items.append(transition_row)
 		print("[自省] 末屏地点选择 %s → 追加过渡叙事 %d 条" % [loc_id, transition_texts.size()])
 	else:
 		print("[自省] 末屏地点选择 %s → 无对应过渡叙事池（pool=reflection_transition）" % loc_id)
