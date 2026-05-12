@@ -117,6 +117,26 @@ CSV 配置流水线由以下三者互为契约，任一改动必须触发另两�
   5. cost value 正负号
   6. 任务保底完整性：`tasks.csv` 中 `on_expire=fail` 的任务，必须在 `task_eval_effects.csv` 中有对应的 `status=failed` 效果行
 
+## Design junction 可达性预检
+
+主项目涉及 Design 指针的提交前，**先验证 junction 可达**：
+
+```bash
+ls Design | head -1
+```
+
+- ✅ 正常：能看到坚果云内容（如 `+2阶段路径认同机制讨论整理.md` 等）→ 继续工作
+- ❌ 异常：返回空 / `total 0` → **junction 已损坏 / 立刻停下来报告用户**：
+  - 在 WSL 下**绝对不要**用 `rmdir Design` / `rm Design` / `ln -s` 等命令"修复"——会让损坏永久化（详见 memory `feedback_git_commit_windows`）
+  - 用户需在 Windows 端 cmd 执行重建：
+    ```cmd
+    rmdir "<项目路径>\Design"
+    mklink /J "<项目路径>\Design" "<坚果云同步目录>\vibe-test-design"
+    ```
+  - 重建后再继续提交流程
+
+**背景**：WSL 看不到 Windows NTFS junction 的目标内容，但 junction 损坏时 Design/ 在 WSL 显示为空目录，且 git status 不报 type change（submodule path 空目录是 git 合规态）。这层异常不会被常规 git 检查发现，pre-commit hook 跑 `check_csv_contract_docs.py` 读 `Design/配置翻译指南.md` 失败才暴露——此时已经晚了，应在 commit 前预检。
+
 ## 提交兜底（pre-commit hook）
 
 本地 `.git/hooks/pre-commit` 会在每次提交前运行 `tools/fix_csv_imports.py`（CSV 导入格式检查）和 `tools/check_design_submodule.py`（Design submodule 模式检查），任一失败即阻断提交。背景、触发场景、手动修正方法、新环境启用步骤见 [[工程开发积累]] 第 6 条。
