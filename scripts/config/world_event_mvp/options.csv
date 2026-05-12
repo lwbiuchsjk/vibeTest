@@ -83,7 +83,6 @@ evt_s2_fl_cheng_5_opt_3,cp_evt_s2_fl_cheng_5,跟摊主问句话,3
 evt_s2_fl_cheng_6_opt_1,cp_evt_s2_fl_cheng_6,自己也喝口水继续干活,1
 evt_s2_fl_cheng_6_opt_2,cp_evt_s2_fl_cheng_6,多看了老人一眼,2
 evt_s2_fl_cheng_6_opt_3,cp_evt_s2_fl_cheng_6,跟同行的人继续闲聊,3
-evt_s3_chain_entry_opt_1,cp_evt_s3_chain_entry,[选项·继续] 跟母亲出门,1
-evt_s3_chain_2_opt_1,cp_evt_s3_chain_2,[选项·继续] 等待师傅评判,1
-evt_s3_chain_3_opt_1,cp_evt_s3_chain_3,[选项·继续] 与陆默立片刻,1
-evt_s3_chain_4_opt_1,cp_evt_s3_chain_4,[选项·完成] 列队训练结束,1
+evt_s3_chain_4_opt_1,cp_evt_s3_chain_4,照他说的挪一挪,1
+evt_s3_chain_4_opt_2,cp_evt_s3_chain_4,保持原样不动,2
+evt_s3_chain_4_opt_3,cp_evt_s3_chain_4,"为……为什么要挪？",3

@@ -1,27 +1,27 @@
 event_id,presentation_id,display_order,item_type,speaker,text,presents,condition
-sys_opening_reflection,sys_opening_reflection_p1,1,text,,"""我们真的要进仙门吗？""",text,
+sys_opening_reflection,sys_opening_reflection_p1,1,text,,“我们真的要进仙门吗？”,text,
 sys_opening_reflection,sys_opening_reflection_p2,2,text,,池塘的水面还在轻轻晃。她站在你身边，没看你，眼睛跟着涟漪动。,text,
 sys_opening_reflection,sys_opening_reflection_p3,3,text,,你没答。等你回过神时，她已经在看远处。镇子那几个方向，各自开着烟火气。,location_select,
-sys_reflection,sys_reflection_p1_fallback,1,text,,"""嗯……""她说着停了下来，视线收回水面。
+sys_reflection,sys_reflection_p1_fallback,1,text,,"“嗯……”她说着停了下来，视线收回水面。
 你低头。水里映着自己——这一日的事还在身上。",text,
-sys_reflection,sys_reflection_p1_met_he,1,text,,"""何掌柜虽然不爱说话，但对你还挺好的。""她说着停了下来，视线收回水面。
+sys_reflection,sys_reflection_p1_met_he,1,text,,"“何掌柜虽然不爱说话，但对你还挺好的。”她说着停了下来，视线收回水面。
 你低头。水里映着自己——指尖还残着药材的气味。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_he"""
-sys_reflection,sys_reflection_p1_met_qin,1,text,,"""她真的同意你去仙门吗？""她有些拿不准。
+sys_reflection,sys_reflection_p1_met_qin,1,text,,"“她真的同意你去仙门吗？”她有些拿不准。
 你也不知道。求仙的路就在那里，大家都去得。她应该都明白的。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_qin"""
-sys_reflection,sys_reflection_p1_met_zhou,1,text,,"""周既明，好像是镇上大户人家的孩子……他会不会更有机会呀？"" 她满是担忧。
+sys_reflection,sys_reflection_p1_met_zhou,1,text,,"“周既明，好像是镇上大户人家的孩子……他会不会更有机会呀？” 她满是担忧。
 进仙门又不是只有一个名额……但愿吧。你心里也不是很有把握。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_zhou"""
-sys_reflection,sys_reflection_p1_met_cheng,1,text,,"""他说你看着有灵性。他不会只是说说而已吧？"" 她不是很有信心，没敢看你认真的眼神。
+sys_reflection,sys_reflection_p1_met_cheng,1,text,,"“他说你看着有灵性。他不会只是说说而已吧？” 她不是很有信心，没敢看你认真的眼神。
 程先生一定是认真的。你心里热乎乎的感觉，不是骗人的。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_cheng"""
-sys_reflection,sys_reflection_p2,2,text,,"""再去哪里看看？""她说。",text,
+sys_reflection,sys_reflection_p2,2,text,,“再去哪里看看？”她说。,text,
 sys_reflection,sys_reflection_p3,3,text,,你抬起头。镇上几个方向，都在那里。,location_select,
 sys_final_reflection,sys_final_reflection_p1,1,text,,[最终自省·屏1·林叙事] 拜师后的收口——林叙述新阶段的开始（撰写期补）,text,
 sys_final_reflection,sys_final_reflection_p2,2,text,,[最终自省·屏2·林叙事] 收口末段——demo 流程结束提示（撰写期补）,text,
 evt_s2_sk_he,evt_s2_sk_he_p1,1,text,,你来药铺已经几日，跟着别的伙计跑腿。今早进门，旁边那个老伙计把你拉到一边。,text,
-evt_s2_sk_he,evt_s2_sk_he_p2,2,text,,"""何掌柜回来了。今儿你算正式上工——你过去见见他。""",text,
+evt_s2_sk_he,evt_s2_sk_he_p2,2,text,,“何掌柜回来了。今儿你算正式上工——你过去见见他。”,text,
 evt_s2_sk_he,evt_s2_sk_he_p3,3,text,,你掀开门帘进店。柜台后那人正低头看一味药材，慢慢翻动。听到你进来，他抬眼看你一下，又低下头继续看，没出声。,text,
 evt_s2_sk_he,evt_s2_sk_he_p4,4,text,,你认得那株药材的样子，但说不上来名字。柜后人慢慢摆弄药材的样子，让你想起几样自己一直没记牢的事。,text,
 evt_s2_sk_qin,evt_s2_sk_qin_p1,1,text,,你进院时绕过门旁那筐刚送来的东西。堂屋桌上一张写满字的纸，旁边铜板分成几小堆，娘坐在桌前。,text,
-evt_s2_sk_qin,evt_s2_sk_qin_p2,2,text,,回来了。砚儿过来——孙伯早上送来这筐，娘正算这月走礼，你看一眼，哪些下午回回去，哪些留家里。,text,
+evt_s2_sk_qin,evt_s2_sk_qin_p2,2,text,,“回来了。砚儿过来——孙伯早上送来这筐，娘正算这月走礼，你看一眼，哪些下午回回去，哪些留家里。”,text,
 evt_s2_sk_qin,evt_s2_sk_qin_p3,3,text,,你坐到桌边。一筐里几样并排——半把咸鱼、一捧干笋、一包红枣、一块腌肉。桌上那张纸娘已写了大半，铜板分成三堆。,text,
 evt_s2_sk_qin,evt_s2_sk_qin_p4,4,text,,你看着筐里这几样。回礼的密度娘心里有数。分粗了亏邻里，分细了又显家中拘谨。这几样哪些匀出去合适——你掂量了一下。,text,
 evt_s2_sk_zhou,evt_s2_sk_zhou_p1,1,text,,你这一日在镇上跑完几桩事，回家绕了远路，去看看练场。远远听到训练的声音，靠近些，难得遇到了陆师傅亲自指点。,text,
@@ -30,7 +30,7 @@ evt_s2_sk_zhou,evt_s2_sk_zhou_p3,3,text,,那一遍做完，少年走到场边喝
 evt_s2_sk_zhou,evt_s2_sk_zhou_p4,4,text,,你站在边上没动。方才那个少年练的那一招，动作好像也不复杂，你眼里还能看见他收手的姿势。,text,
 evt_s2_sk_cheng,evt_s2_sk_cheng_p1,1,text,,你这一日在镇上跑完几桩事，听人说道观招短工，半天活工钱当面付。停了一下，应下，往镇外走。,text,
 evt_s2_sk_cheng,evt_s2_sk_cheng_p2,2,text,,你跨进道观门。砖瓦讲究得不像本地的，香气重而不杂，角落里的东西也摆得齐整。\n一个弟子过来分活，让你搬几个书箱到东厢。,text,
-evt_s2_sk_cheng,evt_s2_sk_cheng_p3,3,text,,"你搬到第三趟时，一位中年男子从院里出来。素色长衫，神色温和——正是镇上人说的""程先生""。\n他走到你身边的书箱前停下，对弟子说：""这几本，应当不必再翻了吧。""\n""还有用处。""\n""那便随他。""",text,
+evt_s2_sk_cheng,evt_s2_sk_cheng_p3,3,text,,你搬到第三趟时，一位中年男子从院里出来。素色长衫，神色温和——正是镇上人说的“程先生”。\n他走到你身边的书箱前停下，对弟子说：“这几本，应当不必再翻了吧。”\n“还有用处。”\n“那便随他。”,text,
 evt_s2_sk_cheng,evt_s2_sk_cheng_p4,4,text,,你站在那里没动，手里的书箱还提着。程在你身旁没走开，像是在看那几本旧册子。,text,
 evt_s2_fl_pharmacy_1,evt_s2_fl_pharmacy_1_p1,1,text,,中午前药铺忙起来。柜台后只剩你和一个老伙计——他把一张方子塞到你手里，又转身去应付门口的客人。,text,
 evt_s2_fl_pharmacy_1,evt_s2_fl_pharmacy_1_p2,2,text,,你低头看方子上的几味药——有几个名字你认得，有几个还得想一想。柜台另一头的客人正等着。,text,
@@ -51,7 +51,7 @@ evt_s2_fl_qin_house_2,evt_s2_fl_qin_house_2_p2,2,text,,卖布的抿了一口，�
 evt_s2_fl_qin_house_3,evt_s2_fl_qin_house_3_p1,1,text,,从外面回来，推开院门，门轴咯吱一声响。门轴底下那枚木楔松了，门板斜斜挂着。屋里没人，堂屋的窗开着，针线笸箩搁在窗下椅上。,text,
 evt_s2_fl_qin_house_3,evt_s2_fl_qin_house_3_p2,2,text,,堂屋桌上几只杯盏才擦完，院里晾着一筐刚摘的菜。门要修一修才好关上。,text,
 evt_s2_fl_qin_house_4,evt_s2_fl_qin_house_4_p1,1,text,,在外奔波许久，终于回屋。床头那角压着一张小纸条，纸下几枚铜板叠成一小摞——两吊钱。床上叠好的衣物搁在边上。,text,
-evt_s2_fl_qin_house_4,evt_s2_fl_qin_house_4_p2,2,text,,"字条上几个字——""再给你两吊买点用得上的""。屋里没有别的声响，娘出去办事去了。",text,
+evt_s2_fl_qin_house_4,evt_s2_fl_qin_house_4_p2,2,text,,字条上几个字——“再给你两吊买点用得上的”。屋里没有别的声响，娘出去办事去了。,text,
 evt_s2_fl_qin_house_5,evt_s2_fl_qin_house_5_p1,1,text,,返家时，已经月上枝头。推门进堂屋，屋里没光，灶台那头还留着一点余温。锅盖揭开是温热的饭菜，桌上一双筷子摆好了。,text,
 evt_s2_fl_qin_house_5,evt_s2_fl_qin_house_5_p2,2,text,,内屋的门掩着，灯熄了。灶台边上几个洗了一半的盘子还摞在那。,text,
 evt_s2_fl_qin_house_6,evt_s2_fl_qin_house_6_p1,1,text,,你路过镇上的市集。娘的摊位摆在老位置——咸菜罐子叠了几摞，针线包压着摊布的一角，那只小杌子空在那里。,text,
@@ -76,7 +76,7 @@ evt_s2_fl_cheng_3,evt_s2_fl_cheng_3_p1,1,text,,镇上一家香铺的掌秤的让
 evt_s2_fl_cheng_3,evt_s2_fl_cheng_3_p2,2,text,,是一筐香料，分了两包，沉甸甸的。你扛上肩，往镇外那条路走。日头偏西，路上没几个人。,text,
 evt_s2_fl_cheng_3,evt_s2_fl_cheng_3_p3,3,text,,走到道观门外，你把两包香料卸在门口的石阶上。门里出来一个穿短褂的，看了一眼便点头让你放下，又抬手指了指里头不必你进去。你站在阶下，伸手抹了把额头的汗。,text,
 evt_s2_fl_cheng_4,evt_s2_fl_cheng_4_p1,1,text,,你今日要往道观去应一桩差事。半途中拐进一家铺子，顺道取一份东西。铺主说去后头拿，让你略候一候。你站在柜外的板凳边，等他取来。,text,
-evt_s2_fl_cheng_4,evt_s2_fl_cheng_4_p2,2,text,,"这时门外进来一个穿青色短褂的，约二十岁年纪，是道观那边的弟子。他跟柜上的人说要取上次预定的一份东西。柜上的人忙称是，让他略候。他点了点头，没接柜上的人客套话，只说了一句""也罢""，往里头走了两步又停下，立在原处不动。",text,
+evt_s2_fl_cheng_4,evt_s2_fl_cheng_4_p2,2,text,,这时门外进来一个穿青色短褂的，约二十岁年纪，是道观那边的弟子。他跟柜上的人说要取上次预定的一份东西。柜上的人忙称是，让他略候。他点了点头，没接柜上的人客套话，只说了一句“也罢”，往里头走了两步又停下，立在原处不动。,text,
 evt_s2_fl_cheng_5,evt_s2_fl_cheng_5_p1,1,text,,道观那边总会派一些杂事。有机会补贴家用，让你心中欢喜。事毕，返程路上，你进了一家茶水摊歇脚。三五张矮桌坐着歇脚的人，茶水滚得正烈。摊主给你倒了一碗，让你自己挑张桌。,text,
 evt_s2_fl_cheng_5,evt_s2_fl_cheng_5_p2,2,text,,你挑了门口的一张矮桌坐下。后头一桌的两个老者正在闲谈，前面那位说起前两年镇北边谁家的孩子，在程先生那边学了一阵，后来仙门选拔考过去了，如今已经在山上学艺。另一位嗯了一声，说镇上是有福气的地方。两人又说回别的事去。,text,
 evt_s2_fl_cheng_6,evt_s2_fl_cheng_6_p1,1,text,,道观的伙计总是做不完，今日正巧有人同去。走了半路，口干舌燥，经过井边，停下喝口水。井边一个老人正蹲着洗几个瓜，旁边水盆放了一只木瓢。,text,

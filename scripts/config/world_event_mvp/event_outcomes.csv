@@ -11,8 +11,8 @@ evt_s3_chain_entry,default,chain_context,patch,exitWhenStageGte,5
 evt_s3_chain_entry,default,chain_context,patch,turnMode,deferred
 evt_s3_chain_entry,default,chain_context,patch,deferredTurnCost,1
 evt_s3_chain_entry,default,world,set_forced_next,,evt_s3_chain_2
+evt_s3_chain_2,default,flags,set,lu_special_attention,true
+evt_s3_chain_2,default,flags,set,met_lu,true
 evt_s3_chain_2,default,world,set_forced_next,,evt_s3_chain_3
-evt_s3_chain_3,default,flags,set,lu_special_attention,true
-evt_s3_chain_3,default,flags,set,met_lu,true
 evt_s3_chain_3,default,world,set_forced_next,,evt_s3_chain_4
 evt_s3_chain_4,default,world,set_forced_next,,sys_final_reflection
