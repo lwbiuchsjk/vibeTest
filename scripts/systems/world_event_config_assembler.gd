@@ -76,7 +76,8 @@ static func _assemble_transition_text_pool(tables: Dictionary) -> Dictionary:
 		var pool_id: String = str(row.get("pool_id", "")).strip_edges()
 		var location_id: String = str(row.get("location_id", "")).strip_edges()
 		var seq_text: String = str(row.get("seq", "")).strip_edges()
-		var text: String = str(row.get("text", ""))
+		# 叙事 text 统一经 _load_narrative_text 读取（装配层规约转义入口，含 \n unescape）。
+		var text: String = _load_narrative_text(row)
 		if pool_id.is_empty() or location_id.is_empty() or text.is_empty():
 			continue
 		if seq_text.is_empty() or not seq_text.is_valid_int():
@@ -111,6 +112,20 @@ static func _assemble_transition_text_pool(tables: Dictionary) -> Dictionary:
 			pool_out[location_id_key] = texts
 		out[pool_id_key] = pool_out
 	return out
+
+
+# 功能：从 CSV 行读取叙事 text 字段，统一做装配层转义处理。
+# 说明：所有叙事文本字段（event_presentations.text / option_outcomes.text /
+#       transition_text_pool.text 及未来新增叙事 CSV）必须经本函数读取，确保 unescape
+#       行为一致。把"换行 unescape"从每个装配函数的可选步骤变成读取本身的不可分割部分,
+#       避免新增叙事字段时漏处理（历史 BUG 复发的预防：曾在 option_outcomes / transition
+#       两处遗漏 unescape，导致字面 \n 直接渲染到 UI 上）。
+# 规约：见 CLAUDE.md §CSV 配置静态检查规范·叙事换行用字面 \n；
+#       静态检查见 tools/csv_validator.py 检查 10（CSV 端不允许真换行）。
+static func _load_narrative_text(row: Dictionary, field: String = "text") -> String:
+	var text: String = str(row.get(field, ""))
+	# 字面 \n 两字符 → 真换行（CSV 不识别转义,字面 "\n" 读出来是 \ + n 两字符）
+	return text.replace("\\n", "\n")
 
 
 # 功能：读取编译所需的 6 张核心 CSV 表。
@@ -640,7 +655,8 @@ static func _assemble_choice_points(tables: Dictionary) -> Dictionary:
 		var option_id: String = str(row.get("option_id", "")).strip_edges()
 		var branch: String = str(row.get("branch", "")).strip_edges()
 		var seq_text: String = str(row.get("seq", "")).strip_edges()
-		var text: String = str(row.get("text", ""))
+		# 叙事 text 统一经 _load_narrative_text 读取（装配层规约转义入口，含 \n unescape）。
+		var text: String = _load_narrative_text(row)
 		if option_id.is_empty() or branch.is_empty() or text.strip_edges().is_empty():
 			continue
 		if not option_ref.has(option_id):
@@ -837,11 +853,8 @@ static func _apply_event_presentations(event_map: Dictionary, rows: Array) -> Di
 		var presentation_id := str(row.get("presentation_id", "")).strip_edges()
 		var display_order_text := str(row.get("display_order", "")).strip_edges()
 		var item_type := str(row.get("item_type", "")).strip_edges()
-		var text := str(row.get("text", "")).strip_edges()
-		# CSV 不识别转义,字面 "\n" 读出来是两字符 \ + n;装配阶段统一替换为真换行,
-		# 否则 Label 直接打印反斜杠加 n。其它显示文本字段（如 outcomes、transition）
-		# 走各自加载路径,后续若有 \n 需求,在对应入口加同样的替换。
-		text = text.replace("\\n", "\n")
+		# 叙事 text 统一经 _load_narrative_text 读取（装配层规约转义入口，含 \n unescape）。
+		var text := _load_narrative_text(row).strip_edges()
 		if event_id.is_empty() and presentation_id.is_empty() and display_order_text.is_empty() and item_type.is_empty() and text.is_empty():
 			continue
 		if event_id.is_empty():

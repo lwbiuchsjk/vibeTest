@@ -656,6 +656,24 @@ def validate(csv_dir: Path, ref_dir: Path) -> ValidationResult:
                     "Godot file_access::get_csv_line 报 'end of file before closing'）"
                 )
 
+    # ── 检查 10: 叙事文本字段中的真换行（2026-05-12 新增）──
+    # 背景：叙事 text 字段统一用字面 \n（两字符）表达换行；引擎装配层会做
+    # text.replace("\\n", "\n") 转义。CSV 字段内含真换行（\n / \r / \r\n）会触发
+    # quoted multi-line cell，在编辑器/diff/grep 中显示为"伪行"且跨工具兼容差。
+    # 详见 CLAUDE.md §CSV 配置静态检查规范·叙事换行用字面 \n。
+    # 复用 narrative_text_specs（与 ASCII 双引号检查同位）。
+    for csv_name, rows, text_field, id_field in narrative_text_specs:
+        for row in rows:
+            text = row.get(text_field, "")
+            if "\n" in text or "\r" in text:
+                id_value = row.get(id_field, "?")
+                result.add_p1(
+                    f"{csv_name}: '{id_value}' {text_field} 含真换行符 "
+                    "（应改为字面 \\n 两字符；CSV 真换行触发 quoted multi-line cell，"
+                    "编辑器/diff 工具显示为伪行，跨工具兼容差。"
+                    "迁移工具：tools/migrate_narrative_newlines.py）"
+                )
+
     return result
 
 

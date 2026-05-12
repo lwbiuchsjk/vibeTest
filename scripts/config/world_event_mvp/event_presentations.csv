@@ -2,21 +2,16 @@ event_id,presentation_id,display_order,item_type,speaker,text,presents,condition
 sys_opening_reflection,sys_opening_reflection_p1,1,text,,“我们真的要进仙门吗？”,text,
 sys_opening_reflection,sys_opening_reflection_p2,2,text,,池塘的水面还在轻轻晃。她站在你身边，没看你，眼睛跟着涟漪动。,text,
 sys_opening_reflection,sys_opening_reflection_p3,3,text,,你没答。等你回过神时，她已经在看远处。镇子那几个方向，各自开着烟火气。,location_select,
-sys_reflection,sys_reflection_p1_fallback,1,text,,"“嗯……”她说着停了下来，视线收回水面。
-你低头。水里映着自己——这一日的事还在身上。",text,
-sys_reflection,sys_reflection_p1_met_he,1,text,,"“何掌柜虽然不爱说话，但对你还挺好的。”她说着停了下来，视线收回水面。
-你低头。水里映着自己——指尖还残着药材的气味。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_he"""
-sys_reflection,sys_reflection_p1_met_qin,1,text,,"“她真的同意你去仙门吗？”她有些拿不准。
-你也不知道。求仙的路就在那里，大家都去得。她应该都明白的。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_qin"""
-sys_reflection,sys_reflection_p1_met_zhou,1,text,,"“周既明，好像是镇上大户人家的孩子……他会不会更有机会呀？” 她满是担忧。
-进仙门又不是只有一个名额……但愿吧。你心里也不是很有把握。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_zhou"""
-sys_reflection,sys_reflection_p1_met_cheng,1,text,,"“他说你看着有灵性。他不会只是说说而已吧？” 她不是很有信心，没敢看你认真的眼神。
-程先生一定是认真的。你心里热乎乎的感觉，不是骗人的。",text,"last_consumed_skeleton_event_id == ""evt_s2_sk_cheng"""
+sys_reflection,sys_reflection_p1_fallback,1,text,,“嗯……”她说着停了下来，视线收回水面。\n你低头。水里映着自己——这一日的事还在身上。,text,
+sys_reflection,sys_reflection_p1_met_he,1,text,,“何掌柜虽然不爱说话，但对你还挺好的。”她说着停了下来，视线收回水面。\n你低头。水里映着自己——指尖还残着药材的气味。,text,"last_consumed_skeleton_event_id == ""evt_s2_sk_he"""
+sys_reflection,sys_reflection_p1_met_qin,1,text,,“她真的同意你去仙门吗？”她有些拿不准。\n你也不知道。求仙的路就在那里，大家都去得。她应该都明白的。,text,"last_consumed_skeleton_event_id == ""evt_s2_sk_qin"""
+sys_reflection,sys_reflection_p1_met_zhou,1,text,,“周既明，好像是镇上大户人家的孩子……他会不会更有机会呀？” 她满是担忧。\n进仙门又不是只有一个名额……但愿吧。你心里也不是很有把握。,text,"last_consumed_skeleton_event_id == ""evt_s2_sk_zhou"""
+sys_reflection,sys_reflection_p1_met_cheng,1,text,,“他说你看着有灵性。他不会只是说说而已吧？” 她不是很有信心，没敢看你认真的眼神。\n程先生一定是认真的。你心里热乎乎的感觉，不是骗人的。,text,"last_consumed_skeleton_event_id == ""evt_s2_sk_cheng"""
 sys_reflection,sys_reflection_p2,2,text,,“再去哪里看看？”她说。,text,
 sys_reflection,sys_reflection_p3,3,text,,你抬起头。镇上几个方向，都在那里。,location_select,
-sys_final_reflection,sys_final_reflection_p1,1,text,,"“你娘亲居然会同意！”。看着她惊喜的样子，你更觉得意外。",text,
-sys_final_reflection,sys_final_reflection_p2,2,text,,"“可是……习武很辛苦吧？这真的是求仙门的正路吗？”\n她笑着摇了摇头。",text,
-sys_final_reflection,sys_final_reflection_p3,3,text,,"“反正还有时间对不对？来日方长！”她说着，抬起头看了看远处的山道。\n你浑身酸痛，不敢想象这样的日子还有多久，入仙门的念想还有多长。",text,
+sys_final_reflection,sys_final_reflection_p1,1,text,,“你娘亲居然会同意！”。看着她惊喜的样子，你更觉得意外。,text,
+sys_final_reflection,sys_final_reflection_p2,2,text,,“可是……习武很辛苦吧？这真的是求仙门的正路吗？”\n她笑着摇了摇头。,text,
+sys_final_reflection,sys_final_reflection_p3,3,text,,“反正还有时间对不对？来日方长！”她说着，抬起头看了看远处的山道。\n你浑身酸痛，不敢想象这样的日子还有多久，入仙门的念想还有多长。,text,
 evt_s2_sk_he,evt_s2_sk_he_p1,1,text,,你来药铺已经几日，跟着别的伙计跑腿。今早进门，旁边那个老伙计把你拉到一边。,text,
 evt_s2_sk_he,evt_s2_sk_he_p2,2,text,,“何掌柜回来了。今儿你算正式上工——你过去见见他。”,text,
 evt_s2_sk_he,evt_s2_sk_he_p3,3,text,,你掀开门帘进店。柜台后那人正低头看一味药材，慢慢翻动。听到你进来，他抬眼看你一下，又低下头继续看，没出声。,text,
@@ -82,13 +77,13 @@ evt_s2_fl_cheng_5,evt_s2_fl_cheng_5_p1,1,text,,道观那边总会派一些杂事
 evt_s2_fl_cheng_5,evt_s2_fl_cheng_5_p2,2,text,,你挑了门口的一张矮桌坐下。后头一桌的两个老者正在闲谈，前面那位说起前两年镇北边谁家的孩子，在程先生那边学了一阵，后来仙门选拔考过去了，如今已经在山上学艺。另一位嗯了一声，说镇上是有福气的地方。两人又说回别的事去。,text,
 evt_s2_fl_cheng_6,evt_s2_fl_cheng_6_p1,1,text,,道观的伙计总是做不完，今日正巧有人同去。走了半路，口干舌燥，经过井边，停下喝口水。井边一个老人正蹲着洗几个瓜，旁边水盆放了一只木瓢。,text,
 evt_s2_fl_cheng_6,evt_s2_fl_cheng_6_p2,2,text,,同行的人喝水时随口提起道观，说今年的香比往年好闻，程先生那边一向讲究。老人嗯了一声，没接话，把瓜在水盆里翻了个面。同行人见老人面色不知可否，询问起来，老人只是打个哈哈。,text,
-evt_s3_chain_entry,evt_s3_chain_entry_p1,1,text,,"桌上的布包是娘早就裹好的——束脩、两包茶饼、几枚铜板。你接过来。\n娘正系围裙。“摊上几样还没分妥，娘先去市集那边。砚儿，路上当心。”她抬眼看了看你拿包的手，又转回身去取那把分账纸用的小铜尺。",text,
-evt_s3_chain_entry,evt_s3_chain_entry_p2,2,text,,"镇上还没怎么醒，雾还没散尽。你走得比平日里快——不是赶时间，是想早点到。\n这条路你走过无数次，今天不一样。前面那座练场，再过去些就是出镇的山道——这一天你想了好些日子了，练场，然后是仙门。",text,
-evt_s3_chain_2,evt_s3_chain_2_p1,1,text,,"拜师仪式比你想象得要简单。陆师傅简单地坐着，理着一摞名册——门口聚了十来个少年，比你早到的、刚到的、还有家里送来的。\n“叫到的，上前来。”前排陆续上去。到你时已是后半。陆师傅低头看名册：“过来。”",text,
-evt_s3_chain_2,evt_s3_chain_2_p2,2,text,,"你走上阶，把贽礼放下。“我……我叫沈砚……”",text,
-evt_s3_chain_2,evt_s3_chain_2_p3,3,text,,"你有些紧张，没料到陆师傅看过来。“秦家的孩子？”他在册子上勾了一笔，没等你回答。",text,
-evt_s3_chain_2,evt_s3_chain_2_p4,4,text,,"“东西收下来，日后好好学好好练，别辜负家人。”他勉励几句。",text,
-evt_s3_chain_3,evt_s3_chain_3_p1,1,text,,"拜完师，便是演武。\n陆师傅点出一人，上前来一招一式，煞是好看。这人你见过好多次了，周既明。“周既明，就是那家……”周围一开始还有议论低语，几套招式下来，只剩下叹服的声音。",text,
-evt_s3_chain_3,evt_s3_chain_3_p2,2,text,,"抬腿，蹦脚，势毕。周师兄向大家拱手，目光扫过大家，扫过你。\n再次撞上了这道目光，你没看出什么情绪。",text,
-evt_s3_chain_4,evt_s3_chain_4_p1,1,text,,"“诶，你看周既明打得怎么样？”旁边的师兄弟小声发问。\n你扎着马步，浑身晃悠，脑子里大汗淋漓，根本不知道怎么应声。",text,
-evt_s3_chain_4,evt_s3_chain_4_p2,2,text,,"“把脚挪一挪，会好受很多。”出声的人语气冷淡，你好容易从湿透的发梢间看清了那枚玉佩。",text,
+evt_s3_chain_entry,evt_s3_chain_entry_p1,1,text,,桌上的布包是娘早就裹好的——束脩、两包茶饼、几枚铜板。你接过来。\n娘正系围裙。“摊上几样还没分妥，娘先去市集那边。砚儿，路上当心。”她抬眼看了看你拿包的手，又转回身去取那把分账纸用的小铜尺。,text,
+evt_s3_chain_entry,evt_s3_chain_entry_p2,2,text,,镇上还没怎么醒，雾还没散尽。你走得比平日里快——不是赶时间，是想早点到。\n这条路你走过无数次，今天不一样。前面那座练场，再过去些就是出镇的山道——这一天你想了好些日子了，练场，然后是仙门。,text,
+evt_s3_chain_2,evt_s3_chain_2_p1,1,text,,拜师仪式比你想象得要简单。陆师傅简单地坐着，理着一摞名册——门口聚了十来个少年，比你早到的、刚到的、还有家里送来的。\n“叫到的，上前来。”前排陆续上去。到你时已是后半。陆师傅低头看名册：“过来。”,text,
+evt_s3_chain_2,evt_s3_chain_2_p2,2,text,,你走上阶，把贽礼放下。“我……我叫沈砚……”,text,
+evt_s3_chain_2,evt_s3_chain_2_p3,3,text,,你有些紧张，没料到陆师傅看过来。“秦家的孩子？”他在册子上勾了一笔，没等你回答。,text,
+evt_s3_chain_2,evt_s3_chain_2_p4,4,text,,“东西收下来，日后好好学好好练，别辜负家人。”他勉励几句。,text,
+evt_s3_chain_3,evt_s3_chain_3_p1,1,text,,拜完师，便是演武。\n陆师傅点出一人，上前来一招一式，煞是好看。这人你见过好多次了，周既明。“周既明，就是那家……”周围一开始还有议论低语，几套招式下来，只剩下叹服的声音。,text,
+evt_s3_chain_3,evt_s3_chain_3_p2,2,text,,抬腿，蹦脚，势毕。周师兄向大家拱手，目光扫过大家，扫过你。\n再次撞上了这道目光，你没看出什么情绪。,text,
+evt_s3_chain_4,evt_s3_chain_4_p1,1,text,,“诶，你看周既明打得怎么样？”旁边的师兄弟小声发问。\n你扎着马步，浑身晃悠，脑子里大汗淋漓，根本不知道怎么应声。,text,
+evt_s3_chain_4,evt_s3_chain_4_p2,2,text,,“把脚挪一挪，会好受很多。”出声的人语气冷淡，你好容易从湿透的发梢间看清了那枚玉佩。,text,

@@ -598,6 +598,11 @@ def generate_event_presentations_csv(cards: list[dict[str, Any]]) -> list[dict[s
     condition 字段（需求 2 新增）：脚本产出的行统一留空（空 = 通用 fallback 行，
     无差分过滤）。condition 差分行仅 sys_reflection 等特殊自省事件使用，需人工在
     CSV 中手动填写；普通事件卡不使用 condition，留空即可兼容引擎过滤逻辑。
+
+    换行表达：脚本当前用空格 join 同 `>` 段落内多行，不产出真换行也不产出字面 \\n。
+    若未来设计稿需要单屏内显式换行，应当产出字面 \\n 两字符（引擎装配层 unescape）；
+    禁止产出真换行（触发 quoted multi-line cell，编辑器/diff 显示伪行）。详见
+    CLAUDE.md §CSV 配置静态检查规范·叙事换行用字面 \\n。
     """
     rows: list[dict[str, str]] = []
     for card in cards:

@@ -117,26 +117,7 @@ CSV 配置流水线由以下三者互为契约，任一改动必须触发另两�
   5. cost value 正负号
   6. 任务保底完整性：`tasks.csv` 中 `on_expire=fail` 的任务，必须在 `task_eval_effects.csv` 中有对应的 `status=failed` 效果行
   7. 叙事文本 ASCII 半角双引号检测（2026-05-12 新增）：`event_presentations.csv` / `option_outcomes.csv` / `transition_text_pool.csv` 的 `text` 字段中不应出现 ASCII 半角双引号 `"`（U+0022），叙事台词应用中文全角 `"..."`（U+201C / U+201D）。背景：Godot `file_access::get_csv_line` 严格按 CSV 标准，ASCII 半角双引号触发字段包裹机制，可能导致 `end of file before closing` 运行时报错；中文全角引号对 CSV 解析器透明，避开此问题。
-
-## Design junction 可达性预检
-
-主项目涉及 Design 指针的提交前，**先验证 junction 可达**：
-
-```bash
-ls Design | head -1
-```
-
-- ✅ 正常：能看到坚果云内容（如 `+2阶段路径认同机制讨论整理.md` 等）→ 继续工作
-- ❌ 异常：返回空 / `total 0` → **junction 已损坏 / 立刻停下来报告用户**：
-  - 在 WSL 下**绝对不要**用 `rmdir Design` / `rm Design` / `ln -s` 等命令"修复"——会让损坏永久化（详见 memory `feedback_git_commit_windows`）
-  - 用户需在 Windows 端 cmd 执行重建：
-    ```cmd
-    rmdir "<项目路径>\Design"
-    mklink /J "<项目路径>\Design" "<坚果云同步目录>\vibe-test-design"
-    ```
-  - 重建后再继续提交流程
-
-**背景**：WSL 看不到 Windows NTFS junction 的目标内容，但 junction 损坏时 Design/ 在 WSL 显示为空目录，且 git status 不报 type change（submodule path 空目录是 git 合规态）。这层异常不会被常规 git 检查发现，pre-commit hook 跑 `check_csv_contract_docs.py` 读 `Design/配置翻译指南.md` 失败才暴露——此时已经晚了，应在 commit 前预检。
+  8. 叙事文本换行用字面 `\n` 检测（2026-05-12 新增）：上述 3 张 CSV 的 `text` 字段中不应出现真换行符（`\n` / `\r` / `\r\n`），单屏内换行统一用字面 `\n` 两字符表达，引擎装配层（`world_event_config_assembler.gd` 的 `_apply_event_presentations` / `_assemble_choice_points` / `_assemble_transition_text_pool`）统一做 `text.replace("\\n", "\n")` 转义。背景：CSV 真换行触发 quoted multi-line cell（字段以 ASCII `"` 包裹跨行），在编辑器/diff/grep 等非 CSV-aware 工具下显示为"伪行"，跨工具兼容差；字面 `\n` 是单行表达，所有工具一目了然。历史一次性迁移工具：`tools/migrate_narrative_newlines.py`（用过即删，仅供回退/复用参考）。
 
 ## 提交兜底（pre-commit hook）
 
