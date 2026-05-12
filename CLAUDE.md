@@ -116,6 +116,7 @@ CSV 配置流水线由以下三者互为契约，任一改动必须触发另两�
   4. rule_type / condition_type 合法性
   5. cost value 正负号
   6. 任务保底完整性：`tasks.csv` 中 `on_expire=fail` 的任务，必须在 `task_eval_effects.csv` 中有对应的 `status=failed` 效果行
+  7. 叙事文本 ASCII 半角双引号检测（2026-05-12 新增）：`event_presentations.csv` / `option_outcomes.csv` / `transition_text_pool.csv` 的 `text` 字段中不应出现 ASCII 半角双引号 `"`（U+0022），叙事台词应用中文全角 `"..."`（U+201C / U+201D）。背景：Godot `file_access::get_csv_line` 严格按 CSV 标准，ASCII 半角双引号触发字段包裹机制，可能导致 `end of file before closing` 运行时报错；中文全角引号对 CSV 解析器透明，避开此问题。
 
 ## Design junction 可达性预检
 

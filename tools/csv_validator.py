@@ -634,6 +634,28 @@ def validate(csv_dir: Path, ref_dir: Path) -> ValidationResult:
             except ValueError:
                 result.add_p1(f"option_rules: '{oid}' cost value '{val_str}' 不是有效数字")
 
+    # ── 检查 9: 叙事文本字段中的 ASCII 半角双引号（2026-05-12 新增）──
+    # 背景：Godot file_access::get_csv_line 严格按 CSV 标准；叙事文本中混入 ASCII 半角 "..."
+    # 包裹的台词可能触发"end of file before closing"运行时报错（事故记录见 memory
+    # feedback_csv_agent_delegation_safety）。统一为中文全角 "..." 避开 CSV 字段包裹机制。
+    # 检测策略：Python csv 库标准解析后，字段值中残留的 ASCII 半角 " 必然是叙事台词引号
+    # （CSV 字段包裹符已被解析层剥离）。condition / cost value 等工程字段不在此检查范围。
+    narrative_text_specs = [
+        ("event_presentations.csv", event_presentations, "text", "presentation_id"),
+        ("option_outcomes.csv", option_outcomes, "text", "option_id"),
+        ("transition_text_pool.csv", transition_text_pool, "text", "location_id"),
+    ]
+    for csv_name, rows, text_field, id_field in narrative_text_specs:
+        for row in rows:
+            text = row.get(text_field, "")
+            if '"' in text:
+                id_value = row.get(id_field, "?")
+                result.add_p2(
+                    f"{csv_name}: '{id_value}' {text_field} 含 ASCII 半角双引号 "
+                    "（叙事台词应改为中文全角 “ ”；ASCII 半角可能触发 "
+                    "Godot file_access::get_csv_line 报 'end of file before closing'）"
+                )
+
     return result
 
 
