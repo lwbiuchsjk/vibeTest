@@ -126,7 +126,6 @@ var _current_turn_result: Dictionary = {}
 var _resizing := false              # 防止窗口尺寸调整时递归触发
 # 调试：FPS 监控累加器（_process 内每 1s print 一次 FPS，性能瓶颈诊断用）
 # 议题 §🔵 实施期保留作 hover / 事件切换性能基线观察工具；卡顿问题收口后整个 _process 函数 + 此变量可移除
-var _fps_debug_accum: float = 0.0
 # 主动押注切换状态：按选项 ID 记录各选项的押注模式（true=押注，false=默认）。
 var _bet_mode_options: Dictionary = {}
 # 状态栏 5 印章 SealPanel 节点引用缓存（议题 A 收口，2026-05-10）。
@@ -270,13 +269,6 @@ var _last_rendered_bg_path: String = ""
 #       结束后通过信号回调进入正式游戏逻辑。
 #       无 IntroSequence 时（test 场景）直接调用 _start_game_after_intro() 跳过 intro。
 func _ready() -> void:
-	# 议题 §🔵 性能排查诊断用：启动时 print file logging 实际写入路径，方便实测后定位日志文件。
-	# 对应 project.godot [debug] 段 file_logging/enable_file_logging=true。
-	# 卡顿瓶颈彻底解决后整段可移除。
-	var log_abs_path: String = ProjectSettings.globalize_path("user://logs/session.log")
-	print("[LOG PATH] file logging -> ", log_abs_path)
-	print("[LOG PATH] user_data_dir -> ", OS.get_user_data_dir())
-
 	# 议题 B:ContinueButton pressed 经由路由 handler 分发,通过 _continue_handler 切换不同 phase 的回调
 	continue_button.pressed.connect(_on_continue_footer_pressed_router)
 	# 议题 B 调整 4:整张叙事面板作为"继续"扩展点击区域,仅 ContinueButton 可见时启用
@@ -533,6 +525,66 @@ func _on_ui_fade_done() -> void:
 	option_list.modulate.a = 1.0
 
 
+# ============================================================
+# Outro 流程（[[事件切换呼吸感_MVP]] §收口流程：sys_final_reflection → 待续 → 重启）
+# ============================================================
+
+# 功能：world_ended 触发后启动 outro——LeftStack 整体 fade-out（含状态栏 + narrative_panel + 任务卡）→ IntroSequence 切回涟漪 + 待续/开始 → 玩家点击重启游戏
+# 说明：不走 _render_end_screen 旧路径，旧 end_root 节点本流程不显示。
+# fade LeftStack 而非仅 narrative_panel：让 outro 涟漪期墨印状态栏 / 任务卡也一并隐藏，保留 IntroSequence 涟漪诗意。
+func _start_outro_flow() -> void:
+	_kill_ui_fade_tween()
+	_is_fading = true
+	_set_inputs_locked(true)
+	# LeftStack 整体 fade-out（含 LeftOverlay 所有 UI）后触发 IntroSequence outro 序列
+	_ui_fade_tween = create_tween()
+	_ui_fade_tween.set_trans(Tween.TRANS_SINE)
+	_ui_fade_tween.set_ease(Tween.EASE_IN_OUT)
+	_ui_fade_tween.tween_property(left_stack, "modulate:a", 0.0, UI_FADE_OUT_SEC)
+	_ui_fade_tween.tween_callback(_on_outro_ui_faded_out)
+
+
+# 功能：UI fade-out 完成回调——启动 IntroSequence outro 序列（涟漪 + 待续 + 开始）。
+func _on_outro_ui_faded_out() -> void:
+	if intro_sequence == null:
+		# test 场景共享脚本无 IntroSequence 节点 → 直接 reload 兜底
+		get_tree().reload_current_scene()
+		return
+	if not intro_sequence.restart_requested.is_connected(_on_outro_restart_requested):
+		intro_sequence.restart_requested.connect(_on_outro_restart_requested)
+	intro_sequence.start_outro_sequence()
+	# 输入保持锁定到 reload；旧 LeftOverlay 内容不再可见（narrative_panel α=0）
+
+
+# 功能：outro "开始"按钮被点击 → 就地重置引擎 + 状态，让 IntroSequence 接着走 cross-fade 直接进入 sys_opening_reflection。
+# 说明：不 reload_current_scene——避免重启走一遍涟漪循环 + "开始"按钮（让"开始"出现两次）。
+#       重置后 IntroSequence._input 内同步调用 _enter_clicked_phase 走 cross-fade → girl_enter → intro_completed
+#       → main_game._on_intro_completed 注入 sys_opening_reflection → _start_game_after_intro。
+func _on_outro_restart_requested() -> void:
+	# 1. 重新初始化引擎（创建新 WorldEventEngine + 重新加载配置）
+	var test_config := _load_test_config()
+	_engine = WorldEventEngine.new(_get_test_random_seed(test_config))
+	var load_result := _load_world_event_test_config(test_config)
+	if not load_result.get("ok", false):
+		push_error("Outro restart 引擎初始化失败: %s" % str(load_result.get("error", "unknown")))
+		return
+
+	# 2. 重置 main_game 跨事件状态（让 _render_current_event 走"首次入场"分支）
+	_last_rendered_event_id = ""
+	_last_rendered_bg_path = ""
+	_current_turn_result.clear()
+	_bet_mode_options.clear()
+	_last_pending_option_id = ""
+	_last_pending_is_check = false
+	_kill_ui_fade_tween()
+	_is_fading = false
+	_set_inputs_locked(false)
+
+	# 3. 重置 UI 起点：narrative_panel α=0 等首次入场 fade-in 接管；
+	#    left_stack 已被 outro fade-out 拉到 α=0，由 IntroSequence reveal_core_girl 信号重新 tween 浮现
+	narrative_panel.modulate.a = 0.0
+
+
 # 功能：kill 当前 fade tween（快连点 / 重复触发兜底）。
 func _kill_ui_fade_tween() -> void:
 	if _ui_fade_tween != null and _ui_fade_tween.is_valid():
@@ -596,6 +648,20 @@ func _handle_preview_turn_result(turn_result: Dictionary) -> void:
 #   - world_ended 走 cross-event fade（fade-in 完成后调 _do_render_current_event → _render_end_screen）
 #   - test 场景共享脚本但无 IntroSequence；本函数路径对 test 兼容（IntroSequence null 时 _render_event_background 内部已 null 防御）
 func _render_current_event(turn_result: Dictionary) -> void:
+	# Chain 类型无选项事件（chain_entry/2/3）的 phase=confirm 中间态自动推进：
+	# 末屏 presentation 点继续后引擎进入 phase=confirm 等待"确认结算"——但 chain 类型 + 无 choice_point
+	# 时该状态对玩家无意义（不是"对鉴定/选项做出确认"的语义），直接走 confirm_pending_turn 推进到下一个 chain 事件。
+	# 不识别此情况会让玩家看到多余的"确认结算 ›"按钮，需点两次才进入下一 chain。
+	if _should_auto_confirm_chain(turn_result):
+		_on_continue_button_pressed()
+		return
+
+	# World ended（sys_final_reflection 收口后）→ 进入 outro 流程（涟漪 + "待续" + "开始"重启），
+	# 不走常规 fade 调度 + _render_end_screen 旧路径。
+	if _is_world_ended_result(turn_result):
+		_start_outro_flow()
+		return
+
 	var event_id: String = _extract_event_id_for_fade(turn_result)
 	var is_first_enter: bool = _last_rendered_event_id == ""
 	var is_cross_event: bool = (not is_first_enter) and event_id != _last_rendered_event_id
@@ -618,6 +684,33 @@ func _render_current_event(turn_result: Dictionary) -> void:
 
 	_last_rendered_event_id = event_id
 	_last_rendered_bg_path = new_bg_path
+
+
+# 功能：判断当前 turn_result 是否为 chain 类型无选项事件的 phase=confirm 中间态。
+# 说明：满足 phase=confirm + continuation_policy ∈ {ChainContinue, ChainContinueWithForcedNext} + 无 choice_point_id
+#       的 turn_result，调度器应当跳过渲染直接推进，避免玩家看到多余"确认结算 ›"按钮。
+# 设计依据：chain_entry/2/3 设计稿明确"无玩家选项，单选过"——末屏点继续应直接进入下一 chain 事件。
+func _should_auto_confirm_chain(turn_result: Dictionary) -> bool:
+	var phase: String = str(turn_result.get("phase", ""))
+	if phase != "confirm":
+		return false
+	var event_id: String = str(turn_result.get("event_id", "")).strip_edges()
+	if event_id.is_empty() or _engine == null or not _engine.has_event(event_id):
+		return false
+	var event_def: Dictionary = _engine._event_map.get(event_id, {})
+	if event_def.is_empty():
+		return false
+	# 引擎字段名约定 camelCase：continuationPolicy / choicePointId / isEndingEvent（曾误用 snake_case 导致永不命中）
+	var policy: String = str(event_def.get("continuationPolicy", ""))
+	var cp_id: String = str(event_def.get("choicePointId", "")).strip_edges()
+	# Chain 类型无选项：phase=confirm 直接推进，跳过"确认结算"按钮中转
+	if (policy == "ChainContinue" or policy == "ChainContinueWithForcedNext") and cp_id.is_empty():
+		return true
+	# is_ending_event=TRUE 且无选项：末屏推进 phase=confirm 直接推进到 world_ended，避免末屏看"确认结算"按钮
+	# 典型场景 sys_final_reflection——单次点击末屏 presentation 后应直接进入 outro，不需"确认结算"中转
+	if bool(event_def.get("isEndingEvent", false)) and cp_id.is_empty():
+		return true
+	return false
 
 
 # 功能：从 turn_result 提取用于 fade 判定的 event_id。
@@ -2655,32 +2748,11 @@ func _setup_platform_default_layers() -> void:
 			screen_mosaic_bg.visible = true
 
 
-# 功能：调试 FPS 监控——每秒 print 一次当前 FPS 到 Godot console。
-# 说明：议题 §🔵 实施期卡顿诊断用；与 F10 切 IntroSequence visible 配合用于定位渲染瓶颈：
-#       - 默认状态 FPS 数字 = 当前 mosaic 渲染负载下的实际表现
-#       - F10 关 IntroSequence 后 FPS 数字 = 跳过 13 层 mosaic 后的基线
-#       - 两个数字差距大 → 瓶颈在 IntroSequence；差距小 → 瓶颈在其他地方
-#       卡顿问题收口后整个函数 + _fps_debug_accum 变量可移除。
-func _process(delta: float) -> void:
-	_fps_debug_accum += delta
-	if _fps_debug_accum >= 1.0:
-		_fps_debug_accum = 0.0
-		# FPS + 静态内存（MB）+ 节点总数 + Tween 数量 + Texture 对象数量（累积 bug 诊断）
-		var static_mem_mb: float = OS.get_static_memory_usage() / 1048576.0
-		var node_count: int = get_tree().get_node_count()
-		# 累积 bug 诊断：obj 总数 / resources / 每帧 draw call / 每帧 render objects
-		var obj_count: int = int(Performance.get_monitor(Performance.OBJECT_COUNT))
-		var resource_count: int = int(Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT))
-		var draw_calls: int = int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
-		var draw_items: int = int(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME))
-		print("[FPS] %d | mem=%.1fMB | nodes=%d | obj=%d | resources=%d | draw_calls=%d | items=%d" % [Engine.get_frames_per_second(), static_mem_mb, node_count, obj_count, resource_count, draw_calls, draw_items])
-
-
-# 功能：F9 互斥切换"原图层"与"文字马赛克层(静态+粒子)"；F8 强制渲染周既明练武场背景；
-#       F10 切 IntroSequence visible（议题 §🔵 实施期渲染瓶颈诊断用，配合 _process FPS 监控）。
+# 功能：F9 互斥切换"原图层"与"文字马赛克层(静态+粒子)"；F8 强制渲染周既明练武场背景。
 # 说明：仅开发期使用；正式发布前可移除或限制为 OS.is_debug_build() 才生效。
 #       粒子层属于 mosaic 体系，跟随 mosaic 静态层一起 toggle。
 #       F8 用于在不改 CSV 事件配置的前提下验证 M1' 算法在真实暖色调美术上的视觉效果。
+# 注：F10 切 IntroSequence visible 调试（议题 §🔵 渲染瓶颈诊断用）已移除——hybrid 落地后 mosaic 仅 pond 段使用 FPS 60 稳定，不再需要。
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
@@ -2741,13 +2813,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				_debug_show_check_result_feedback("success")
 			KEY_F6:
 				_debug_show_check_result_feedback("fail")
-			# F10：议题 §🔵 实施期渲染瓶颈诊断（2026-05-11）。
-			# 切 IntroSequence 整体 visible，配合 _process FPS print 观察"开/关"FPS 数字差距，
-			# 定位卡顿是来自 13 层 mosaic 渲染还是其他地方（UI / Tween / 引擎逻辑等）。
-			KEY_F10:
-				if intro_sequence != null:
-					intro_sequence.visible = not intro_sequence.visible
-					print("[F10 调试] IntroSequence visible = %s" % intro_sequence.visible)
 
 
 # 功能：议题 A 调试展示——触发全 5 印章浮动汉字动效（2026-05-10）。

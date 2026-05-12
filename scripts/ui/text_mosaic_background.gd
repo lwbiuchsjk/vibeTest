@@ -119,10 +119,6 @@ var _source_image: Image = null
 # 重复 queue_redraw 触发 _draw 重跑 → Godot canvas item batch 状态被破坏 → draw_calls 暴涨
 var _source_texture_ref: Texture2D = null
 
-# 调试：_draw 触发频率统计（议题 §🔵 卡顿诊断用，验证稳态下 _draw 是否被频繁重触发）
-# 卡顿瓶颈解决后整体可移除
-var _dbg_draw_enter_count: int = 0
-var _dbg_last_draw_log_ms: int = 0
 var _text_tokens: PackedStringArray = PackedStringArray()
 var _font: Font = null
 # 呼吸动画累积时间(仅 breathe_enabled=true 时使用)
@@ -226,16 +222,6 @@ func clear_exclude_mask() -> void:
 # 性能:稳态下 _draw 不会触发(Godot 缓存上次绘制),仅地点切换/尺寸变化重绘一次。
 #       canvas 1700×2000 + cell=8 约 53000 次 draw_string,单次 < 1s 可接受。
 func _draw() -> void:
-	# 调试：_draw 触发频率统计（议题 §🔵 卡顿诊断用）
-	# 稳态下 Godot 应只在 queue_redraw 时触发 _draw（即 set_source_image / set_text_tokens / resize 等），
-	# 不应每帧重触发。每秒限速 1 行 print，输出过去 1s 内本层 _draw 被调用次数。
-	# 预期值：稳态 0 次（_draw 不被触发，不打印）；切帧时 1 次；如果 print 显示每秒数十次 → bug。
-	_dbg_draw_enter_count += 1
-	var now_ms: int = Time.get_ticks_msec()
-	if now_ms - _dbg_last_draw_log_ms >= 1000:
-		print("[mosaic %s] _draw triggered %d times in last %.1fs" % [name, _dbg_draw_enter_count, (now_ms - _dbg_last_draw_log_ms) / 1000.0])
-		_dbg_last_draw_log_ms = now_ms
-		_dbg_draw_enter_count = 0
 	if _source_image == null or _text_tokens.is_empty():
 		return
 	var canvas_size: Vector2 = size
@@ -245,8 +231,6 @@ func _draw() -> void:
 	var src_h: int = _source_image.get_height()
 	if src_w <= 0 or src_h <= 0:
 		return
-	# 调试：字符数统计（议题 §🔵 卡顿诊断用，卡顿解决后可整体移除 counter + print）
-	var dbg_drawn: int = 0
 
 	# Cover 模式反向映射:与 EventBackground.stretch_mode=6 (KEEP_ASPECT_COVERED) 对齐,保持源图比例。
 	# canvas (cx, cy) → src (src_offset + (cx, cy) * inv_scale)。
@@ -365,15 +349,8 @@ func _draw() -> void:
 					draw_color
 				)
 				token_idx += 1
-				dbg_drawn += 1
 			x += cell
 		y += cell
-
-	# 调试：每次 _draw 触发（切帧 / 尺寸变化）print 该层字符数统计。
-	# 议题 §🔵 卡顿诊断用——观察 IntroBg / IntroCoarse / 各暗部层在不同图下的实际字符数。
-	# 性能影响：稳态下 _draw 不触发（Godot 缓存），仅切帧时 print 一次，可接受。
-	var dbg_cells: int = (int(ceil(canvas_size.x / float(cell))) + 1) * (int(ceil(canvas_size.y / float(cell))) + 1)
-	print("[mosaic %s] drawn=%d / cells≈%d (pass≈%.1f%%)" % [name, dbg_drawn, dbg_cells, (float(dbg_drawn) / maxf(float(dbg_cells), 1.0)) * 100.0])
 
 	# 调试网格(仅 debug_show_grid=true 时启用,在 alpha 通过的格子画红圆)
 	if debug_show_grid:

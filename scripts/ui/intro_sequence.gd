@@ -49,6 +49,16 @@ const EVENT_CROSSFADE_SEC: float = 0.5
 const PULSE_DIM_FACTOR: float = 0.2
 const PULSE_DURATION: float = 0.8
 
+## Outro 流程（sys_final_reflection 收口后进入"待续 → 开始重启"循环）
+## 时序：涟漪播放 → 待续淡入 → 待续停留 → 待续淡出 → 涟漪续 → 开始浮现 → 等点击重启
+const OUTRO_TEXT_TBC: String = "待续"
+const OUTRO_TEXT_START: String = "开始"
+const OUTRO_RIPPLE_BEFORE_TBC_SEC: float = 4.0   # 涟漪先播放多久再显示"待续"
+const OUTRO_TBC_FADE_IN_SEC: float = 0.8
+const OUTRO_TBC_HOLD_SEC: float = 3.0            # "待续"停留时长
+const OUTRO_TBC_FADE_OUT_SEC: float = 0.8
+const OUTRO_RIPPLE_BETWEEN_SEC: float = 3.0      # "待续"淡出后再涟漪多久显示"开始"
+
 
 # ============================================================
 # intro 涟漪场景专用词汇（13 层 mosaic 用）
@@ -67,6 +77,8 @@ signal intro_reveal_screen_mosaic()
 signal intro_reveal_core_girl()
 signal intro_reveal_ui()
 signal intro_completed()
+## Outro 流程完成后玩家点击"开始"重启游戏（main_game 监听后 reload scene）。
+signal restart_requested()
 
 # ============================================================
 # 状态枚举
@@ -89,6 +101,13 @@ enum Mode {
 
 var _state: State = State.RIPPLE_ANIM
 var _mode: Mode = Mode.MOSAIC  # intro 期默认 mosaic 模式
+
+## Outro 流程状态（sys_final_reflection 收口后启动）
+var _is_outro: bool = false
+## "开始"按钮可点击重启的开关（"待续"展示期 false，仅"开始"出现后 true）
+var _outro_can_click: bool = false
+## Outro 内部时序 tween
+var _outro_seq_tween: Tween = null
 
 var _ripple_timer: Timer = null
 var _ripple_frame_index: int = -1  # -1=still, 0/1/2=涟漪帧
@@ -693,8 +712,25 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mouse_event: InputEventMouseButton = event as InputEventMouseButton
 		if mouse_event.pressed and mouse_event.button_index == MOUSE_BUTTON_LEFT:
+			# Outro 流程：仅"开始"出现后才允许点击重启；"待续"展示期忽略点击
+			if _is_outro:
+				if _outro_can_click:
+					_outro_can_click = false  # 防本帧重复触发
+					_is_outro = false  # 立即出 outro 态，让 _enter_clicked_phase 正常运行
+					_kill_outro_tween()  # kill 残留 outro 时序 tween
+					var vp: Viewport = get_viewport()
+					if vp != null:
+						vp.set_input_as_handled()
+					# 同步 emit：main_game 在 callback 中重置 _engine + UI 状态
+					restart_requested.emit()
+					# emit 返回后立即走 cross-fade → girl_enter → intro_completed 链，
+					# 避免再走一遍涟漪 + "开始"按钮（让"开始"出现两次）
+					_enter_clicked_phase()
+				return
 			_enter_clicked_phase()
-			get_viewport().set_input_as_handled()
+			var vp_intro: Viewport = get_viewport()
+			if vp_intro != null:
+				vp_intro.set_input_as_handled()
 
 
 # ============================================================
@@ -776,3 +812,85 @@ func _emit_reveal_ui() -> void:
 func _emit_completed() -> void:
 	_state = State.DONE
 	intro_completed.emit()
+
+
+# ============================================================
+# Outro 流程（sys_final_reflection 收口 → 待续 → 开始 → 重启）
+# ============================================================
+
+## 功能：进入 outro 流程——从 DONE/girl_enter 切回涟漪循环，依序播放"待续"→"开始"，
+##       等玩家点击"开始"后 emit restart_requested 通知 main_game 重启场景。
+## 说明：
+##   - 状态复位：_state = RIPPLE_ANIM / _is_outro = true，启用涟漪循环
+##   - 视觉切换：cross-fade pond_girl_enter → pond_still，启动涟漪节奏
+##   - 时序：涟漪预播 OUTRO_RIPPLE_BEFORE_TBC_SEC → "待续"淡入/停留/淡出 → 涟漪续 OUTRO_RIPPLE_BETWEEN_SEC → "开始"淡入 + _outro_can_click=true
+##   - 涟漪循环复用 _schedule_next_ripple_cycle 现有机制（_state=RIPPLE_ANIM 是必要前置）
+##   - 屏蔽 _first_ripple_cycle_done 的"开始按钮自动触发"——outro 自己控时序，不让 _on_mosaic_crossfade_done 误触发
+func start_outro_sequence() -> void:
+	if _is_outro:
+		return
+	_is_outro = true
+	_outro_can_click = false
+	# 状态复位：回到涟漪循环态
+	_state = State.RIPPLE_ANIM
+	_is_first_still = true
+	_ripple_frame_index = -1
+	# 关键：_first_ripple_cycle_done = true 屏蔽 _on_mosaic_crossfade_done 内的"开始按钮自动触发"
+	# outro 自己管时序触发 start_button，不依赖涟漪 still 完成回调
+	_first_ripple_cycle_done = true
+	# 复位 start_button：清空文字 + α=0 隐藏（等"待续"时机再亮）
+	if start_button != null:
+		# kill 旧 tween 避免与 outro 时序冲突
+		for t: Tween in [_button_appear_tween, _button_breathe_alpha_tween, _button_fade_out_tween]:
+			if t != null and t.is_valid():
+				t.kill()
+		start_button.visible = true
+		start_button.modulate.a = 0.0
+		start_button.text = ""
+	# 启动呼吸 Tween（intro_completed 后已 kill，需重启）
+	_start_breathe_tween()
+	# Cross-fade girl_enter → pond_still
+	_crossfade_mosaic_to_image(_still_tex, PackedStringArray(INTRO_TEXT_TOKENS), "")
+	_current_displayed_art_path = STILL_PATH
+	# 启动涟漪定时器：首次 still 停留后进入 ripple_1/2/3 循环
+	_schedule_next_ripple_cycle(true)
+	# 串行 tween 控制"待续"/"开始"时序
+	_kill_outro_tween()
+	_outro_seq_tween = create_tween()
+	_outro_seq_tween.tween_interval(OUTRO_RIPPLE_BEFORE_TBC_SEC)
+	_outro_seq_tween.tween_callback(_outro_show_tbc)
+	_outro_seq_tween.tween_interval(OUTRO_TBC_FADE_IN_SEC + OUTRO_TBC_HOLD_SEC + OUTRO_TBC_FADE_OUT_SEC)
+	_outro_seq_tween.tween_interval(OUTRO_RIPPLE_BETWEEN_SEC)
+	_outro_seq_tween.tween_callback(_outro_show_start)
+
+
+## 功能：outro 内部——"待续"淡入→停留→淡出 三段独立 tween
+func _outro_show_tbc() -> void:
+	if start_button == null:
+		return
+	start_button.text = OUTRO_TEXT_TBC
+	start_button.modulate.a = 0.0
+	var tw: Tween = create_tween()
+	tw.set_trans(Tween.TRANS_SINE)
+	tw.set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(start_button, "modulate:a", 1.0, OUTRO_TBC_FADE_IN_SEC)
+	tw.tween_interval(OUTRO_TBC_HOLD_SEC)
+	tw.tween_property(start_button, "modulate:a", 0.0, OUTRO_TBC_FADE_OUT_SEC)
+
+
+## 功能：outro 内部——"开始"淡入 + 呼吸，启用点击重启
+func _outro_show_start() -> void:
+	if start_button == null:
+		return
+	start_button.text = OUTRO_TEXT_START
+	start_button.modulate.a = 0.0
+	# 复用 intro "开始"浮现机制（淡入 + 呼吸）
+	_trigger_button_appearance()
+	_outro_can_click = true
+
+
+## 功能：kill outro 主时序 tween（场景重启 / 异常兜底）
+func _kill_outro_tween() -> void:
+	if _outro_seq_tween != null and _outro_seq_tween.is_valid():
+		_outro_seq_tween.kill()
+	_outro_seq_tween = null
