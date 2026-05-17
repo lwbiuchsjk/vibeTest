@@ -2,7 +2,7 @@
 """
 CSV 契约文档完整性检查。
 
-背景：CSV 配置流水线的契约真源是 Design/配置翻译指南.md。
+背景：CSV 配置流水线的契约真源是 Design/共享/配置流水线/配置翻译指南.md。
 本脚本通过 pre-commit 阻断"误删文档"或"误删关键契约章节"的提交，
 保证 CSV 翻译脚本、校验脚本、引擎装配器三端始终能对齐到同一份契约。
 
@@ -22,7 +22,7 @@ from pathlib import Path
 
 
 # 契约文档路径（相对仓库根）
-CONTRACT_DOC = "Design/配置翻译指南.md"
+CONTRACT_DOC = "Design/共享/配置流水线/配置翻译指南.md"
 
 # 必须存在的契约锚点名（同时检查 START 与 END）
 REQUIRED_ANCHORS = [
